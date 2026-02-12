@@ -1,2 +1,16 @@
 build/
 .vscode/
+.cache/clangd/index/health_state.cpp.B2B3F8986F537AE4.idx
+.cache/clangd/index/health_state.hpp.D0F246E8AC2BD7C6.idx
+.cache/clangd/index/result.cpp.FDF3FFADAFA14EEA.idx
+.cache/clangd/index/result.hpp.E84C7D6B4BC05BEE.idx
+.cache/clangd/index/safety_envelope_tests.cpp.89CE80D90B8DD4E1.idx
+.cache/clangd/index/safety_envelope.hpp.C7C2ADFBBA92D34C.idx
+.cache/clangd/index/state_machine_tests.cpp.CA1F3210BE7CC4C0.idx
+.cache/clangd/index/state_machine.cpp.F941B932EA401DF3.idx
+.cache/clangd/index/state_machine.hpp.81CAE2927139B15B.idx
+.cache/clangd/index/task_executor.cpp.FF1F4BE8B6909216.idx
+.cache/clangd/index/task_executor.hpp.27AFC7E0DDDEE781.idx
+.cache/clangd/index/time.cpp.ACFC1215243FAFB7.idx
+.cache/clangd/index/time.hpp.6FDFFB13ACF681C3.idx
+.githooks/pre-commit

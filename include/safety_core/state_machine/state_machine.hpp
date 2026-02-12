@@ -2,7 +2,6 @@
 
 #include "safety_core/result.hpp"
 
-#include <array>
 #include <cstdint>
 
 namespace safety_core::sm
@@ -14,8 +13,8 @@ namespace safety_core::sm
         Idle,
         Moving,
         Degraded,
-        AvoidingObstacle,  // Temporary stop due to dynamic obstacle
-        LocalizationLost,   // Safe-limited behavior while localization is uncertain
+        AvoidingObstacle, // Temporary stop due to dynamic obstacle
+        LocalizationLost, // Safe-limited behavior while localization is uncertain
         Docking,
         SafeStop,
     };
