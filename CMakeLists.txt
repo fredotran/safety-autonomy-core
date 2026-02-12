@@ -44,7 +44,8 @@ endif()
 
 if(SAFETY_CORE_ENABLE_SANITIZERS)
     target_compile_options(safety_core PRIVATE -fsanitize=address,undefined)
-    target_link_options(safety_core PRIVATE -fsanitize=address,undefined)
+    # Link options must propagate so downstream executables are linked with sanitizers.
+    target_link_options(safety_core PUBLIC -fsanitize=address,undefined)
 endif()
 
 enable_testing()
