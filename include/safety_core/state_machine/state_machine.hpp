@@ -10,13 +10,14 @@ namespace safety_core::sm
 
     enum class Mode : std::uint8_t
     {
-        kInit = 0U,
-        kStandby,
-        kActive,
-        kDegraded,
-        kObstacleHold,     // Temporary stop due to dynamic obstacle
-        kLocalizationLost, // Safe-limited behavior while localization is uncertain
-        kSafeStop,
+        Init = 0U,
+        Idle,
+        Moving,
+        Degraded,
+        AvoidingObstacle,  // Temporary stop due to dynamic obstacle
+        LocalizationLost,   // Safe-limited behavior while localization is uncertain
+        Docking,
+        SafeStop,
     };
 
     struct Transition
@@ -48,7 +49,7 @@ namespace safety_core::sm
       private:
         [[nodiscard]] bool allowed(Mode target) const noexcept;
 
-        Mode mode_{Mode::kInit};
+        Mode mode_{Mode::Init};
         bool latched_fault_{false};
         std::uint16_t fault_code_{0U};
     };
