@@ -62,7 +62,8 @@ namespace safety_core::sm
         case Mode::Init:
             return target == Mode::Idle || target == Mode::SafeStop;
         case Mode::Idle:
-            return target == Mode::Moving || target == Mode::Degraded || target == Mode::SafeStop || target == Mode::Docking;
+            return target == Mode::Moving || target == Mode::Degraded || target == Mode::SafeStop ||
+                   target == Mode::Docking;
         case Mode::Moving:
             return target == Mode::Degraded || target == Mode::AvoidingObstacle || target == Mode::LocalizationLost ||
                    target == Mode::SafeStop || target == Mode::Docking;
