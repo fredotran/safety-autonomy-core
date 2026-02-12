@@ -1,20 +1,24 @@
-#include <iostream>
-
 #include "safety_core/safety/safety_envelope.hpp"
 
-namespace {
+#include <iostream>
 
-bool check(bool condition, const char* message) {
-    if (!condition) {
-        std::cerr << "[FAIL] " << message << '\n';
-        return false;
+namespace
+{
+
+    bool check(bool condition, const char* message)
+    {
+        if (!condition)
+        {
+            std::cerr << "[FAIL] " << message << '\n';
+            return false;
+        }
+        return true;
     }
-    return true;
-}
 
-}  // namespace
+} // namespace
 
-int main() {
+int main()
+{
     using safety_core::safety::EnvelopeEvaluation;
     using safety_core::safety::evaluate_stop_distance;
 
@@ -41,7 +45,8 @@ int main() {
                                   /*safety_buffer_m=*/0.1);
     ok &= check(eval.within_envelope, "Stopped vehicle should always be within envelope");
 
-    if (!ok) {
+    if (!ok)
+    {
         return 1;
     }
 

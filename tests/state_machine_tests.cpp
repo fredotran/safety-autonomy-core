@@ -1,20 +1,24 @@
-#include <iostream>
-
 #include "safety_core/state_machine/state_machine.hpp"
 
-namespace {
+#include <iostream>
 
-bool check(bool condition, const char* message) {
-    if (!condition) {
-        std::cerr << "[FAIL] " << message << '\n';
-        return false;
+namespace
+{
+
+    bool check(bool condition, const char* message)
+    {
+        if (!condition)
+        {
+            std::cerr << "[FAIL] " << message << '\n';
+            return false;
+        }
+        return true;
     }
-    return true;
-}
 
-}  // namespace
+} // namespace
 
-int main() {
+int main()
+{
     using safety_core::Result;
     using safety_core::sm::Mode;
     using safety_core::sm::ModeStateMachine;
@@ -69,7 +73,8 @@ int main() {
     ok &= check(!res.ok(), "cannot leave SafeStop after latched fault");
     ok &= check(sm.mode() == Mode::kSafeStop, "mode should remain SafeStop after failed transition");
 
-    if (!ok) {
+    if (!ok)
+    {
         return 1;
     }
 
