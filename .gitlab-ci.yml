@@ -1,19 +1,47 @@
-# You can override the included template(s) by including variable overrides
-# SAST customization: https://docs.gitlab.com/user/application_security/sast/#available-cicd-variables
-# Secret Detection customization: https://docs.gitlab.com/user/application_security/secret_detection/pipeline/configure/
-# Dependency Scanning customization: https://docs.gitlab.com/user/application_security/dependency_scanning/#customizing-analyzer-behavior
-# Container Scanning customization: https://docs.gitlab.com/user/application_security/container_scanning/#customizing-analyzer-behavior
-# Note that environment variables can be set in several places
-# See https://docs.gitlab.com/ci/variables/#cicd-variable-precedence
 stages:
-- test
-- secret-detection
+  - format
+  - lint
+  - test
+  - secret-detection
+
+image: debian:12-slim
+
+variables:
+  BUILD_DIR: build
+  CMAKE_FLAGS: "-DCMAKE_BUILD_TYPE=RelWithDebInfo -DSAFETY_CORE_ENABLE_SANITIZERS=ON"
+  SECRET_DETECTION_ENABLED: "true"
+
+before_script:
+  - apt-get update -y
+  - apt-get install -y --no-install-recommends build-essential cmake ninja-build clang clang-tidy clang-format git ca-certificates
+
+format_check:
+  stage: format
+  script:
+    - echo "Running clang-format check"
+    - clang-format --version
+    - clang-format --dry-run --Werror $(find include src tests -name '*.hpp' -o -name '*.cpp')
+
+clang_tidy:
+  stage: lint
+  script:
+    - cmake -S . -B ${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug -DSAFETY_CORE_ENABLE_SANITIZERS=OFF
+    - cmake --build ${BUILD_DIR} --target safety_core
+    - clang-tidy -p ${BUILD_DIR} $(find src include -name '*.cpp')
+
+build_and_test:
+  stage: test
+  script:
+    - cmake -S . -B ${BUILD_DIR} ${CMAKE_FLAGS}
+    - cmake --build ${BUILD_DIR}
+    - ctest --test-dir ${BUILD_DIR} --output-on-failure
+
 sast:
   stage: test
-include:
-- template: Security/SAST.gitlab-ci.yml
-- template: Security/Secret-Detection.gitlab-ci.yml
-variables:
-  SECRET_DETECTION_ENABLED: 'true'
+
 secret_detection:
   stage: secret-detection
+
+include:
+  - template: Security/SAST.gitlab-ci.yml
+  - template: Security/Secret-Detection.gitlab-ci.yml
