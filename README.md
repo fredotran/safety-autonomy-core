@@ -5,7 +5,7 @@ High-assurance C++ core for safety-minded robotics and autonomous vehicles: dete
 ## Scope
 - Deterministic mode/state management (Init, Standby, Active, Degraded, ObstacleHold, LocalizationLost, SafeStop)
 - Diagnostics and health state with latched faults
-- Time/budget utilities and bounded task executor
+- Time/budget utilities and bounded task executor with pluggable clocks/configs
 - Safety envelope helper for stop-distance checks against dynamic obstacles
 - Foundations for filters, planners, and controllers (to be added iteratively)
 
@@ -23,6 +23,8 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DSAFETY_CORE_ENABLE_SANIT
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```
+
+Sample wiring (hosted): instantiate `platform::SteadyClock::instance()`, configure `config::SystemConfig`, pass into `exec::TaskExecutor` via `apply_config`, and use `diag::LoggingHealthMonitor` to observe transitions.
 
 Notes:
 - Sanitizers are enabled by default for non-safety builds; disable with `-DSAFETY_CORE_ENABLE_SANITIZERS=OFF` when targeting production-like safety builds.

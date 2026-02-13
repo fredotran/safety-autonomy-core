@@ -14,3 +14,15 @@ build/
 .cache/clangd/index/time.cpp.ACFC1215243FAFB7.idx
 .cache/clangd/index/time.hpp.6FDFFB13ACF681C3.idx
 .githooks/pre-commit
+.cache/clangd/index/alpha_beta_filter.hpp.04F2AB50E074A8F2.idx
+.cache/clangd/index/alpha_beta.cpp.96E251193CC6B93C.idx
+.cache/clangd/index/clock.cpp.6650573B206960AA.idx
+.cache/clangd/index/clock.hpp.0E8547455F2A2042.idx
+.cache/clangd/index/health_monitor.hpp.79043E7EC88506DF.idx
+.cache/clangd/index/logging_health_monitor.cpp.FA76635FD4E17D9F.idx
+.cache/clangd/index/logging_health_monitor.hpp.A3FE36A37D95D15E.idx
+.cache/clangd/index/safety_pid.cpp.4DDBCEB4F1E662B6.idx
+.cache/clangd/index/safety_pid.hpp.25894A131C81E582.idx
+.cache/clangd/index/system_config.hpp.96FB397695D9E426.idx
+.cache/clangd/index/system_context_tests.cpp.9692687E3445E0EB.idx
+.cache/clangd/index/system_context.hpp.2189995D0055DA42.idx

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "safety_core/result.hpp"
+#include "safety_core/config/system_config.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -35,6 +35,13 @@ namespace safety_core::safety
         eval.stopping_distance  = required;
         eval.within_envelope    = distance_to_obstacle_m >= required;
         return eval;
+    }
+
+    inline EnvelopeEvaluation evaluate_stop_distance(double distance_to_obstacle_m, double current_speed_mps,
+                                                     const config::MotionEnvelopeConfig& envelope) noexcept
+    {
+        return evaluate_stop_distance(distance_to_obstacle_m, current_speed_mps, envelope.max_comfort_decel_mps2,
+                                      envelope.control_latency_s, envelope.safety_buffer_m);
     }
 
 } // namespace safety_core::safety

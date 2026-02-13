@@ -1,9 +1,16 @@
 #include "safety_core/state_machine/state_machine.hpp"
 
+#include "safety_core/diag/health_monitor.hpp"
+#include "safety_core/system/system_context.hpp"
+
 namespace safety_core::sm
 {
 
-    ModeStateMachine::ModeStateMachine() noexcept = default;
+    ModeStateMachine::ModeStateMachine(diag::HealthMonitor* monitor) noexcept : monitor_(monitor) {}
+
+    ModeStateMachine::ModeStateMachine(const system::SystemContext& context) noexcept : monitor_(context.health_monitor)
+    {
+    }
 
     Result ModeStateMachine::transition_to(Mode target) noexcept
     {
@@ -17,7 +24,9 @@ namespace safety_core::sm
             return Result::InvalidState("transition not allowed");
         }
 
-        mode_ = target;
+        const Mode prev = mode_;
+        mode_           = target;
+        notify_transition(prev, target);
         return Result::Ok();
     }
 
@@ -26,6 +35,7 @@ namespace safety_core::sm
         latched_fault_ = true;
         fault_code_    = fault_code;
         mode_          = Mode::SafeStop;
+        notify_fault(fault_code);
         return Result::Fault("fault latched");
     }
 
@@ -81,6 +91,29 @@ namespace safety_core::sm
         default:
             return false;
         }
+    }
+
+    void ModeStateMachine::set_monitor(diag::HealthMonitor* monitor) noexcept
+    {
+        monitor_ = monitor;
+    }
+
+    void ModeStateMachine::notify_transition(Mode from, Mode to) const noexcept
+    {
+        if ((monitor_ == nullptr) || (from == to))
+        {
+            return;
+        }
+        monitor_->on_mode_transition(from, to);
+    }
+
+    void ModeStateMachine::notify_fault(std::uint16_t fault_code) const noexcept
+    {
+        if (monitor_ == nullptr)
+        {
+            return;
+        }
+        monitor_->on_fault_latched(fault_code);
     }
 
 } // namespace safety_core::sm

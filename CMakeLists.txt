@@ -16,6 +16,10 @@ add_library(safety_core STATIC
     src/diagnostics/health_state.cpp
     src/state_machine/state_machine.cpp
     src/exec/task_executor.cpp
+    src/platform/clock.cpp
+    src/diag/logging_health_monitor.cpp
+    src/control/safety_pid.cpp
+    src/filters/alpha_beta.cpp
 )
 
 target_include_directories(safety_core
@@ -65,6 +69,14 @@ add_executable(safety_envelope_smoke
 target_link_libraries(safety_envelope_smoke PRIVATE safety_core)
 
 add_test(NAME safety_envelope_smoke COMMAND safety_envelope_smoke)
+
+add_executable(system_context_smoke
+    tests/system_context_tests.cpp
+)
+
+target_link_libraries(system_context_smoke PRIVATE safety_core)
+
+add_test(NAME system_context_smoke COMMAND system_context_smoke)
 
 install(TARGETS safety_core
     EXPORT safety_core_targets
