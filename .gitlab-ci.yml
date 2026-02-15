@@ -13,7 +13,7 @@ variables:
 
 before_script:
   - apt-get update -y
-  - apt-get install -y --no-install-recommends build-essential cmake ninja-build clang clang-tidy clang-format git ca-certificates
+  - apt-get install -y --no-install-recommends build-essential cmake ninja-build clang clang-tidy clang-format git ca-certificates gcovr
 
 format_check:
   stage: format
@@ -34,7 +34,28 @@ build_and_test:
   script:
     - cmake -S . -B ${BUILD_DIR} ${CMAKE_FLAGS}
     - cmake --build ${BUILD_DIR}
+    - |
+      for UNIT in context_factory.cpp.o task_executor.cpp.o safety_pid.cpp.o state_machine.cpp.o; do
+        OBJ_FILE=$(find ${BUILD_DIR}/CMakeFiles/safety_core.dir -name "${UNIT}" | head -n 1)
+        test -n "${OBJ_FILE}"
+        if nm -u "${OBJ_FILE}" | grep -E -q '(_Znwm|_Znam|malloc|calloc|realloc)(@@.*)?$'; then
+          echo "[FAIL] ${UNIT} references heap-allocation symbols"
+          nm -u "${OBJ_FILE}"
+          exit 1
+        fi
+      done
     - ctest --test-dir ${BUILD_DIR} --output-on-failure
+
+coverage:
+  stage: test
+  variables:
+    CC: gcc
+    CXX: g++
+  script:
+    - cmake -S . -B build-coverage -DCMAKE_BUILD_TYPE=Debug -DSAFETY_CORE_ENABLE_SANITIZERS=OFF -DSAFETY_CORE_ENABLE_COVERAGE=ON
+    - cmake --build build-coverage
+    - ctest --test-dir build-coverage --output-on-failure
+    - gcovr --root . --filter src --filter include --exclude build-coverage --print-summary --fail-under-line 90 --fail-under-branch 80
 
 sast:
   stage: test

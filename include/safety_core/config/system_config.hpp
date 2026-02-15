@@ -7,6 +7,9 @@
 namespace safety_core::config
 {
 
+    constexpr std::uint16_t kLegacySystemConfigVersion  = 1U;
+    constexpr std::uint16_t kCurrentSystemConfigVersion = 2U;
+
     struct TimingConfig
     {
         time::Duration control_period;
@@ -28,6 +31,7 @@ namespace safety_core::config
         TimingConfig timing;
         MotionEnvelopeConfig envelope;
         std::uint8_t max_tasks;
+        std::uint16_t config_version{kCurrentSystemConfigVersion};
     };
 
 } // namespace safety_core::config

@@ -1,14 +1,29 @@
 #include "safety_core/state_machine/state_machine.hpp"
 
+#include "safety_core/common/time.hpp"
+#include "safety_core/diag/diagnostic_transport.hpp"
 #include "safety_core/diag/health_monitor.hpp"
+#include "safety_core/diag/topics.hpp"
 #include "safety_core/system/system_context.hpp"
+
+#include <cstdio>
 
 namespace safety_core::sm
 {
 
-    ModeStateMachine::ModeStateMachine(diag::HealthMonitor* monitor) noexcept : monitor_(monitor) {}
+    namespace
+    {
+        static_assert(64U < diag::kDiagnosticPayloadCapacity);
+        static_assert(48U < diag::kDiagnosticPayloadCapacity);
+    } // namespace
 
-    ModeStateMachine::ModeStateMachine(const system::SystemContext& context) noexcept : monitor_(context.health_monitor)
+    ModeStateMachine::ModeStateMachine(diag::HealthMonitor* monitor, diag::DiagnosticTransport* transport) noexcept
+        : monitor_(monitor), diag_transport_(transport)
+    {
+    }
+
+    ModeStateMachine::ModeStateMachine(const system::SystemContext& context) noexcept
+        : monitor_(context.health_monitor), diag_transport_(context.diagnostic_transport), clock_(context.clock)
     {
     }
 
@@ -98,22 +113,62 @@ namespace safety_core::sm
         monitor_ = monitor;
     }
 
+    void ModeStateMachine::set_diagnostic_transport(diag::DiagnosticTransport* transport) noexcept
+    {
+        diag_transport_ = transport;
+    }
+
+    void ModeStateMachine::set_clock(platform::Clock* clock) noexcept
+    {
+        clock_ = clock;
+    }
+
     void ModeStateMachine::notify_transition(Mode from, Mode to) const noexcept
     {
-        if ((monitor_ == nullptr) || (from == to))
+        if (from == to)
         {
             return;
         }
-        monitor_->on_mode_transition(from, to);
+
+        if (monitor_ != nullptr)
+        {
+            monitor_->on_mode_transition(from, to);
+        }
+
+        char payload[64]{};
+        static_cast<void>(
+            std::snprintf(payload, sizeof(payload), "from=%d to=%d", static_cast<int>(from), static_cast<int>(to)));
+        publish_event(diag::topic::kModeTransition, std::string_view(payload));
     }
 
     void ModeStateMachine::notify_fault(std::uint16_t fault_code) const noexcept
     {
-        if (monitor_ == nullptr)
+        if (monitor_ != nullptr)
+        {
+            monitor_->on_fault_latched(fault_code);
+        }
+
+        char payload[48]{};
+        static_cast<void>(std::snprintf(payload, sizeof(payload), "code=%u", static_cast<unsigned>(fault_code)));
+        publish_event(diag::topic::kFaultLatched, std::string_view(payload));
+    }
+
+    void ModeStateMachine::publish_event(std::string_view topic, std::string_view payload) const noexcept
+    {
+        if (diag_transport_ == nullptr)
         {
             return;
         }
-        monitor_->on_fault_latched(fault_code);
+
+        const time::TimePoint stamp = (clock_ != nullptr) ? clock_->now() : time::now();
+        const auto timestamp        = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(stamp.time_since_epoch()).count());
+
+        diag::DiagnosticEvent event{};
+        event.set_topic(topic);
+        event.set_payload(payload);
+        event.timestamp_ns = timestamp;
+        diag_transport_->publish(event);
     }
 
 } // namespace safety_core::sm

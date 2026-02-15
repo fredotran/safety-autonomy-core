@@ -4,10 +4,13 @@ High-assurance C++ core for safety-minded robotics and autonomous vehicles: dete
 
 ## Scope
 - Deterministic mode/state management (Init, Standby, Active, Degraded, AvoidingObstacle, LocalizationLost, Docking, SafeStop)
-- Diagnostics and health state with latched faults + pluggable health monitor callbacks
+- Diagnostics and health state with latched faults + pluggable health monitor/transport callbacks
 - Time/budget utilities, bounded task executor with platform clocks + watchdog windows
 - Safety envelope helper and config-driven motion envelope enforcement
 - Controllers & filters: Safety PID (speed/accel guards, localization timeout) and alpha-beta filter scaffold
+- Controllers & filters: Safety PID, alpha-beta, complementary filter, bounded EKF (bounded state + finite guards)
+- Startup context factory with environment overrides and config validation hook
+- Motion trajectory primitives and validator for speed/accel/jerk/time monotonicity checks
 
 ## Repository layout
 - `include/safety_core/` public headers (state machine, diagnostics, exec, control, filters, HALs)
@@ -24,7 +27,106 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-Sample wiring (hosted): instantiate `platform::SteadyClock::instance()` (or provide your own HAL clock), populate `config::SystemConfig`, pass into `exec::TaskExecutor` and `control::SafetyPidController` via `apply_config`, and use `diag::LoggingHealthMonitor` to observe transitions. See `tests/system_context_tests.cpp` for an end-to-end integration example.
+## Build profiles (presets)
+Two baseline build profiles are available via `CMakePresets.json`:
+
+```bash
+cmake --preset dev
+cmake --build --preset dev
+ctest --preset dev
+
+cmake --preset safety
+cmake --build --preset safety
+ctest --preset safety
+
+cmake --preset coverage
+cmake --build --preset coverage
+ctest --preset coverage
+```
+
+- `dev`: `RelWithDebInfo` + sanitizers + `-Werror`
+- `safety`: `Release` + sanitizers disabled + `-Werror`
+- `coverage`: `Debug` + coverage instrumentation + `-Werror`
+
+## Git hooks
+Enable repository-managed hooks:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+`pre-commit` behavior:
+- auto-formats staged C/C++ files with `clang-format -i`
+- re-stages formatted files automatically
+- runs `clang-tidy` on staged C++ files (requires `build/compile_commands.json`)
+
+Set `AUTO_FIX_FORMAT=0` to switch pre-commit back to check-only formatting mode.
+
+## Startup flow (env + migration + validation)
+Use `system::build_context(...)` to centralize startup configuration:
+
+1. Start from your default `config::SystemConfig`.
+2. Apply environment overrides via `config::load_from_env`.
+3. Migrate legacy schema versions via `config::migrate_to_current`.
+4. Validate the resulting config via `config::validate`.
+   - `ValidationPolicy::Strict` rejects warning-grade findings.
+   - `ValidationPolicy::AllowWarnings` accepts warning-grade findings.
+5. Build a ready-to-wire `SystemContext` containing config, clock, monitor, and diagnostic transport.
+
+Environment variable notes:
+- `SAFETY_CORE_CONFIG_VERSION` can be used to pin the incoming config schema version.
+- Unsupported future versions are rejected during startup.
+- Malformed numeric env values (partial tokens, non-finite values, out-of-range integers) are ignored and fallback to defaults.
+
+This flow is implemented in:
+- `include/safety_core/system/context_factory.hpp`
+- `src/system/context_factory.cpp`
+
+Example usage is covered in `tests/context_factory_tests.cpp`.
+
+## Diagnostics integration
+- `sm::ModeStateMachine` publishes transition/fault events through `diag::DiagnosticTransport`.
+- `control::SafetyPidController` publishes:
+  - `pid.localization_stale`
+  - `pid.output`
+- `exec::TaskExecutor` publishes:
+  - `executor.task_added`
+  - `executor.task_run`
+  - `executor.task_error`
+  - `executor.deadline_miss`
+  - `executor.watchdog_exceeded`
+  - `executor.catch_up_limited`
+- `diag::HealthBeaconPublisher` publishes:
+  - `health.beacon`
+
+Implementation notes:
+- `diag::DiagnosticEvent` uses fixed-capacity topic/payload buffers (no heap allocation in event payload transport path).
+- `diag::DiagnosticEvent` exposes `topic_truncated`/`payload_truncated` flags so observability pipelines can detect clipped events.
+- `diag::LoggingDiagnosticTransport` tracks cumulative truncation counters (`topic_truncation_count`, `payload_truncation_count`) for trend-based alerting.
+- `diag::HealthBeaconPublisher` emits periodic watchdog/truncation telemetry with fixed-capacity payloads.
+- Diagnostic timestamps are derived from each module's configured `platform::Clock` when available.
+- Health-monitor logs include timestamps and can use an injected clock via `diag::LoggingHealthMonitor`.
+- `system::build_context` emits startup diagnostics for:
+  - `config.migration`
+  - `config.validation_warning`
+- Diagnostic topic names are centralized in `include/safety_core/diag/topics.hpp`.
+
+## Allocation-aware executor callback API
+`TaskExecutor` uses function-pointer callbacks with opaque context to avoid `std::function` allocations in scheduling paths:
+
+```cpp
+using TaskFn = Result (*)(time::TimePoint, void*) noexcept;
+executor.add_task(task_fn, task_context, period);
+```
+
+Optional scheduler catch-up policy:
+
+```cpp
+executor.set_catch_up_policy(exec::CatchUpPolicy::SingleStep);
+executor.set_catch_up_policy(exec::CatchUpPolicy::BoundedCatchUp, 2U);
+```
+
+Use `diag::LoggingDiagnosticTransport` for host-side observability and bring your own transport implementation for embedded/production paths.
 
 Notes:
 - Sanitizers are enabled by default for non-safety builds; disable with `-DSAFETY_CORE_ENABLE_SANITIZERS=OFF` when targeting production-like safety builds.
@@ -40,7 +142,33 @@ Notes:
 - `format_check`: clang-format guard on `include/`, `src/`, `tests/`
 - `clang_tidy`: static analysis over library sources
 - `build_and_test`: CMake build + ctest (with sanitizers on by default)
+- Includes policy tests that guard no-allocation startup paths (`no_allocation_policy_tests`).
+- Includes a symbol-level guard that fails CI if `context_factory` object code references heap allocation APIs (`operator new`/`malloc` family).
+- Extends symbol-level no-allocation guards to `task_executor`, `safety_pid`, and `state_machine` objects.
+- `coverage`: GCC/gcovr coverage gate (`--fail-under-line 90`, `--fail-under-branch 80`).
 - Security templates: GitLab SAST + Secret Detection
+
+## Test coverage highlights
+- `tests/state_machine_tests.cpp`: transition and fault-latch behavior.
+- `tests/pid_controller_tests.cpp`: localization timeout guard, clamp boundaries, PID diagnostic events.
+- `tests/executor_watchdog_tests.cpp`: watchdog and deadline miss regression checks + executor diagnostics.
+- `tests/deterministic_replay_tests.cpp`: fixed-seed deterministic replay of executor diagnostics/event ordering.
+- `tests/filter_invariants_tests.cpp`: bounded EKF + complementary filter invariant/property checks.
+- `tests/motion_trajectory_tests.cpp`: emergency-stop primitive generation + trajectory validator safety checks.
+- `tests/health_beacon_tests.cpp`: beacon cadence and payload assertions.
+- `tests/safety_envelope_tests.cpp`: scenario checks and property-style monotonic boundary checks.
+- `tests/context_factory_tests.cpp`: startup env override + validation-hook integration.
+- `tests/context_factory_tests.cpp`: strict-policy startup failure guarantees (exact failure reason, no partial context wiring, no warning-topic emission).
+- `tests/diagnostic_truncation_tests.cpp`: forced topic/payload clipping and truncation observability flags.
+- `tests/no_allocation_policy_tests.cpp`: verifies startup build-context path avoids heap allocations.
+- `package_config_smoke`: verifies install/export + `find_package(safety_core CONFIG)` consumption.
+
+## Safety case artifacts
+- `docs/safety_case/traceability_matrix.md`: hazard-to-control-to-test traceability starter matrix.
+- `docs/safety_case/outline.md`: structured claims/assumptions/residual-risk starter outline.
+
+## Diagnostics integration guide
+- `docs/diagnostics/watchdog_integration_guide.md`: watchdog sizing, required topics, and beacon wiring checklist.
 
 ## Roadmap (next steps)
 - Extend filters (bounded EKF/complementary) with invariants/property tests

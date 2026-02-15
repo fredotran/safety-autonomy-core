@@ -44,6 +44,21 @@ namespace
         safety_core::time::TimePoint now_;
     };
 
+    struct FlagTaskContext
+    {
+        bool* ran;
+    };
+
+    safety_core::Result mark_ran_task(safety_core::time::TimePoint, void* opaque) noexcept
+    {
+        auto* ctx = static_cast<FlagTaskContext*>(opaque);
+        if (ctx != nullptr && ctx->ran != nullptr)
+        {
+            *(ctx->ran) = true;
+        }
+        return safety_core::Result::Ok();
+    }
+
 } // namespace
 
 int main()
@@ -70,14 +85,16 @@ int main()
     ok &= check(envelope_eval.within_envelope, "Envelope evaluation should pass for ample clearance");
 
     // Logging monitor integration via SystemContext constructor.
+    StubClock monitor_clock;
     std::ostringstream log_sink;
-    LoggingHealthMonitor monitor(log_sink);
-    SystemContext context{&config, safety_core::platform::SteadyClock::instance_ptr(), &monitor};
+    LoggingHealthMonitor monitor(log_sink, &monitor_clock);
+    SystemContext context{&config, &monitor_clock, &monitor};
 
     ModeStateMachine machine(context);
     ok &= check(machine.transition_to(Mode::Idle).ok(), "Init -> Idle via context");
     machine.latch_fault(7U);
     const std::string logs = log_sink.str();
+    ok &= check(logs.find("ts=") != std::string::npos, "Monitor should emit timestamps");
     ok &= check(logs.find("mode_transition") != std::string::npos, "Monitor should log transitions");
     ok &= check(logs.find("fault_latched") != std::string::npos, "Monitor should log faults");
 
@@ -86,15 +103,8 @@ int main()
     TaskExecutor<2U> executor(&stub_clock);
     ok &= check(executor.apply_config(config).ok(), "Executor accepts config");
     bool ran = false;
-    ok &= check(executor
-                    .add_task(
-                        [&](safety_core::time::TimePoint)
-                        {
-                            ran = true;
-                            return safety_core::Result::Ok();
-                        },
-                        safety_core::time::Duration::zero())
-                    .ok(),
+    FlagTaskContext task_ctx{&ran};
+    ok &= check(executor.add_task(mark_ran_task, &task_ctx, safety_core::time::Duration::zero()).ok(),
                 "Task add should succeed");
 
     stub_clock.advance(config.timing.control_period);

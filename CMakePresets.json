@@ -1,0 +1,81 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 20,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "dev",
+      "displayName": "Development (RelWithDebInfo + Sanitizers)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/dev",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "SAFETY_CORE_ENABLE_SANITIZERS": "ON",
+        "SAFETY_CORE_ENABLE_WERROR": "ON"
+      }
+    },
+    {
+      "name": "safety",
+      "displayName": "Safety Profile (Release, no sanitizers)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/safety",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "SAFETY_CORE_ENABLE_SANITIZERS": "OFF",
+        "SAFETY_CORE_ENABLE_WERROR": "ON"
+      }
+    },
+    {
+      "name": "coverage",
+      "displayName": "Coverage (Debug, gcov)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/coverage",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "SAFETY_CORE_ENABLE_SANITIZERS": "OFF",
+        "SAFETY_CORE_ENABLE_WERROR": "ON",
+        "SAFETY_CORE_ENABLE_COVERAGE": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev"
+    },
+    {
+      "name": "safety",
+      "configurePreset": "safety"
+    },
+    {
+      "name": "coverage",
+      "configurePreset": "coverage"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "safety",
+      "configurePreset": "safety",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "coverage",
+      "configurePreset": "coverage",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

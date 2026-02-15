@@ -5,6 +5,13 @@
 #include "safety_core/platform/clock.hpp"
 #include "safety_core/result.hpp"
 
+#include <string_view>
+
+namespace safety_core::diag
+{
+    class DiagnosticTransport;
+}
+
 namespace safety_core::control
 {
 
@@ -22,6 +29,7 @@ namespace safety_core::control
 
         void set_clock(platform::Clock* clock) noexcept;
         Result apply_config(const config::SystemConfig& cfg) noexcept;
+        void set_diagnostic_transport(diag::DiagnosticTransport* transport) noexcept;
         void set_gains(const PidGains& gains) noexcept;
         void reset() noexcept;
         void mark_localization_update(time::TimePoint stamp = time::now()) noexcept;
@@ -33,8 +41,11 @@ namespace safety_core::control
         double clamp_speed(double value) const noexcept;
         double clamp_accel(double desired, double dt) const noexcept;
 
+        void publish_event(const char* topic, std::string_view payload) const noexcept;
+
         platform::Clock* clock_{nullptr};
         const config::SystemConfig* config_{nullptr};
+        diag::DiagnosticTransport* diag_transport_{nullptr};
         PidGains gains_{};
         double integral_{0.0};
         double prev_error_{0.0};

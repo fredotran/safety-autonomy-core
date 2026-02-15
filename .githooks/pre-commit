@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+clang_format="${CLANG_FORMAT:-clang-format}"
+clang_tidy="${CLANG_TIDY:-clang-tidy}"
+build_dir="${BUILD_DIR:-build}"
+auto_fix_format="${AUTO_FIX_FORMAT:-1}"
+
+fmt_files=$(git diff --cached --name-only --diff-filter=ACM -- '*.cpp' '*.cc' '*.cxx' '*.hpp' '*.h' '*.hh' '*.hxx')
+
+# Nothing to check
+if [ -z "$fmt_files" ]; then
+    exit 0
+fi
+
+if ! command -v "$clang_format" >/dev/null 2>&1; then
+    echo "ERROR: clang-format not found (override with CLANG_FORMAT)" >&2
+    exit 1
+fi
+if [ "$auto_fix_format" = "1" ]; then
+    echo "Running clang-format auto-fix on staged files..."
+    while IFS= read -r file; do
+        [ -n "$file" ] || continue
+        "$clang_format" -i "$file"
+        git add "$file"
+    done <<< "$fmt_files"
+else
+    echo "Running clang-format check on staged files..."
+    echo "$fmt_files" | xargs -r "$clang_format" --dry-run --Werror
+fi
+
+if ! command -v "$clang_tidy" >/dev/null 2>&1; then
+    echo "ERROR: clang-tidy not found (override with CLANG_TIDY)" >&2
+    exit 1
+fi
+
+cpp_files=$(git diff --cached --name-only --diff-filter=ACM -- '*.cpp' '*.cc' '*.cxx')
+if [ -n "$cpp_files" ]; then
+    build_path="$ROOT/$build_dir"
+    if [ ! -f "$build_path/compile_commands.json" ]; then
+        echo "ERROR: $build_path/compile_commands.json is missing; generate it with:" >&2
+        echo "  cmake -S . -B $build_dir -DCMAKE_EXPORT_COMPILE_COMMANDS=ON" >&2
+        exit 1
+    fi
+
+    echo "Running clang-tidy on staged C++ sources..."
+    echo "$cpp_files" | xargs -r "$clang_tidy" --quiet -p "$build_path"
+fi
+
+exit 0

@@ -3,15 +3,22 @@
 #include "safety_core/result.hpp"
 
 #include <cstdint>
+#include <string_view>
 
 namespace safety_core::diag
 {
     class HealthMonitor;
-}
+    class DiagnosticTransport;
+} // namespace safety_core::diag
 
 namespace safety_core::system
 {
     class SystemContext;
+}
+
+namespace safety_core::platform
+{
+    class Clock;
 }
 
 namespace safety_core::sm
@@ -38,7 +45,8 @@ namespace safety_core::sm
     class ModeStateMachine
     {
       public:
-        explicit ModeStateMachine(diag::HealthMonitor* monitor = nullptr) noexcept;
+        explicit ModeStateMachine(diag::HealthMonitor* monitor         = nullptr,
+                                  diag::DiagnosticTransport* transport = nullptr) noexcept;
         explicit ModeStateMachine(const system::SystemContext& context) noexcept;
 
         [[nodiscard]] Mode mode() const noexcept
@@ -56,16 +64,21 @@ namespace safety_core::sm
         Result report_localization_lost() noexcept;
         Result recover_localization() noexcept;
         void set_monitor(diag::HealthMonitor* monitor) noexcept;
+        void set_diagnostic_transport(diag::DiagnosticTransport* transport) noexcept;
+        void set_clock(platform::Clock* clock) noexcept;
 
       private:
         [[nodiscard]] bool allowed(Mode target) const noexcept;
         void notify_transition(Mode from, Mode to) const noexcept;
         void notify_fault(std::uint16_t fault_code) const noexcept;
+        void publish_event(std::string_view topic, std::string_view payload) const noexcept;
 
         Mode mode_{Mode::Init};
         bool latched_fault_{false};
         std::uint16_t fault_code_{0U};
         diag::HealthMonitor* monitor_{nullptr};
+        diag::DiagnosticTransport* diag_transport_{nullptr};
+        platform::Clock* clock_{nullptr};
     };
 
 } // namespace safety_core::sm

@@ -1,13 +1,22 @@
 #include "safety_core/control/safety_pid.hpp"
 
+#include "safety_core/common/time.hpp"
+#include "safety_core/diag/diagnostic_transport.hpp"
+#include "safety_core/diag/topics.hpp"
+
 #include <algorithm>
+#include <cmath>
+#include <cstdio>
+#include <string_view>
 
 namespace safety_core::control
 {
     namespace
     {
         constexpr double kDefaultDtSeconds = 0.1;
-    }
+        static_assert(96U < diag::kDiagnosticPayloadCapacity);
+        static_assert(160U < diag::kDiagnosticPayloadCapacity);
+    } // namespace
 
     SafetyPidController::SafetyPidController(platform::Clock* clock) noexcept : clock_(clock)
     {
@@ -18,6 +27,11 @@ namespace safety_core::control
     void SafetyPidController::set_clock(platform::Clock* clock) noexcept
     {
         clock_ = clock;
+    }
+
+    void SafetyPidController::set_diagnostic_transport(diag::DiagnosticTransport* transport) noexcept
+    {
+        diag_transport_ = transport;
     }
 
     Result SafetyPidController::apply_config(const config::SystemConfig& cfg) noexcept
@@ -58,6 +72,9 @@ namespace safety_core::control
         {
             reset();
             last_localization_update_ = now_tp;
+            char payload[96]{};
+            static_cast<void>(std::snprintf(payload, sizeof(payload), "setpoint=%.6f", setpoint));
+            publish_event(diag::topic::kPidLocalizationStale.data(), std::string_view(payload));
             return 0.0;
         }
 
@@ -96,6 +113,11 @@ namespace safety_core::control
         last_output_  = output;
         last_update_  = now_tp;
         first_update_ = false;
+
+        char payload[160]{};
+        static_cast<void>(std::snprintf(payload, sizeof(payload), "setpoint=%.6f measurement=%.6f output=%.6f",
+                                        setpoint, measurement, output));
+        publish_event(diag::topic::kPidOutput.data(), std::string_view(payload));
 
         return output;
     }
@@ -147,6 +169,21 @@ namespace safety_core::control
             limited = last_output_ - max_delta;
         }
         return clamp_speed(limited);
+    }
+
+    void SafetyPidController::publish_event(const char* topic, std::string_view payload) const noexcept
+    {
+        if (diag_transport_ == nullptr)
+        {
+            return;
+        }
+
+        diag::DiagnosticEvent event{};
+        event.set_topic(topic);
+        event.set_payload(payload);
+        event.timestamp_ns = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(now().time_since_epoch()).count());
+        diag_transport_->publish(event);
     }
 
 } // namespace safety_core::control
