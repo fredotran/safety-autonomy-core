@@ -2,6 +2,7 @@
 #include "safety_core/platform/manual_clock.hpp"
 #include "safety_core/system/context_factory.hpp"
 
+#include <array>
 #include <chrono>
 #include <cstdlib>
 #include <iostream>
@@ -180,6 +181,42 @@ int main()
     ContextWithConfig invalid{};
     const auto invalid_result = safety_core::system::build_context(invalid, options);
     ok &= check(!invalid_result.ok(), "build_context should fail validation when max_tasks=0");
+
+    // Schema/policy matrix: ensure startup behavior is stable across version and policy combinations.
+    struct MatrixCase
+    {
+        const char* version;
+        const char* safety_buffer;
+        safety_core::config::ValidationPolicy policy;
+        bool expect_ok;
+        const char* expect_message;
+    };
+
+    const std::array<MatrixCase, 4U> matrix{{
+        {"1", "0.2", safety_core::config::ValidationPolicy::Strict, true, ""},
+        {"2", "0", safety_core::config::ValidationPolicy::AllowWarnings, true, ""},
+        {"2", "0", safety_core::config::ValidationPolicy::Strict, false, "safety buffer must be > 0 in strict mode"},
+        {"999", "0.2", safety_core::config::ValidationPolicy::Strict, false, "unsupported future config version"},
+    }};
+
+    for (const auto& c : matrix)
+    {
+        clear_env_vars();
+        setenv("SAFETY_CORE_CONFIG_VERSION", c.version, 1);
+        setenv("SAFETY_CORE_SAFETY_BUFFER_M", c.safety_buffer, 1);
+
+        ContextFactoryOptions matrix_options = options;
+        matrix_options.validation_policy     = c.policy;
+        ContextWithConfig matrix_out{};
+        const auto matrix_result = safety_core::system::build_context(matrix_out, matrix_options);
+
+        ok &= check(matrix_result.ok() == c.expect_ok, "startup matrix expectation mismatch");
+        if (!c.expect_ok)
+        {
+            ok &= check(matrix_result.message == c.expect_message,
+                        "startup matrix failure reason should match expected message");
+        }
+    }
 
     clear_env_vars();
 

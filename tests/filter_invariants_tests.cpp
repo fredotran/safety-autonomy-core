@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cmath>
 #include <iostream>
+#include <limits>
 
 namespace
 {
@@ -54,10 +55,16 @@ int main()
         BoundedEkfFilter ekf;
         ekf.apply_config(cfg);
         BoundedEkfParams params{};
-        params.max_abs_position = 100.0;
-        params.max_abs_velocity = 10.0;
+        params.max_abs_position = 5.0;
+        params.max_abs_velocity = 2.0;
+        params.max_variance     = 10.0;
         ekf.set_params(params);
-        ekf.reset(0.0, 0.0);
+        ekf.reset(1000.0, 1000.0);
+
+        ok &=
+            check(std::abs(ekf.position()) <= params.max_abs_position + 1e-9, "EKF reset should clamp position bounds");
+        ok &=
+            check(std::abs(ekf.velocity()) <= params.max_abs_velocity + 1e-9, "EKF reset should clamp velocity bounds");
 
         for (int i = 0; i < 200; ++i)
         {
@@ -73,6 +80,31 @@ int main()
         }
 
         ok &= check(!ekf.update(NAN, 0.0), "EKF should reject non-finite measurement");
+        ok &= check(!ekf.update(0.0, std::numeric_limits<double>::infinity()),
+                    "EKF should reject non-finite acceleration input");
+    }
+
+    {
+        BoundedEkfFilter ekf;
+        ekf.apply_config(cfg);
+        BoundedEkfParams params{};
+        params.max_abs_position       = 20.0;
+        params.max_abs_velocity       = 5.0;
+        params.process_noise_position = 1e5;
+        params.process_noise_velocity = 1e5;
+        params.max_variance           = 1.0;
+        ekf.set_params(params);
+        ekf.reset(0.0, 0.0);
+
+        for (int i = 0; i < 100; ++i)
+        {
+            const bool healthy = ekf.update(0.1 * static_cast<double>(i), 50.0);
+            ok &= check(healthy, "EKF should remain healthy under large but finite stimuli");
+            ok &= check(std::abs(ekf.position()) <= params.max_abs_position + 1e-9,
+                        "EKF position should stay clamped under stress");
+            ok &= check(std::abs(ekf.velocity()) <= params.max_abs_velocity + 1e-9,
+                        "EKF velocity should stay clamped under stress");
+        }
     }
 
     {

@@ -29,13 +29,25 @@ clang_tidy:
     - cmake --build ${BUILD_DIR} --target safety_core
     - clang-tidy -p ${BUILD_DIR} $(find src include -name '*.cpp')
 
+hook_smoke:
+  stage: lint
+  script:
+    - cmake -S . -B ${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug -DSAFETY_CORE_ENABLE_SANITIZERS=OFF
+    - cmake --build ${BUILD_DIR} --target safety_core
+    - git config core.hooksPath .githooks
+    - printf "\n" >> tests/pid_controller_tests.cpp
+    - git add tests/pid_controller_tests.cpp
+    - AUTO_FIX_FORMAT=1 BUILD_DIR=${BUILD_DIR} .githooks/pre-commit
+    - git checkout -- tests/pid_controller_tests.cpp
+    - git reset tests/pid_controller_tests.cpp
+
 build_and_test:
   stage: test
   script:
     - cmake -S . -B ${BUILD_DIR} ${CMAKE_FLAGS}
     - cmake --build ${BUILD_DIR}
     - |
-      for UNIT in context_factory.cpp.o task_executor.cpp.o safety_pid.cpp.o state_machine.cpp.o; do
+      for UNIT in context_factory.cpp.o task_executor.cpp.o safety_pid.cpp.o state_machine.cpp.o trajectory.cpp.o bounded_ekf_filter.cpp.o complementary_filter.cpp.o; do
         OBJ_FILE=$(find ${BUILD_DIR}/CMakeFiles/safety_core.dir -name "${UNIT}" | head -n 1)
         test -n "${OBJ_FILE}"
         if nm -u "${OBJ_FILE}" | grep -E -q '(_Znwm|_Znam|malloc|calloc|realloc)(@@.*)?$'; then

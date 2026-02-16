@@ -178,6 +178,14 @@ target_link_libraries(health_beacon_tests PRIVATE safety_core)
 
 add_test(NAME health_beacon_tests COMMAND health_beacon_tests)
 
+add_executable(fault_injection_tests
+    tests/fault_injection_tests.cpp
+)
+
+target_link_libraries(fault_injection_tests PRIVATE safety_core)
+
+add_test(NAME fault_injection_tests COMMAND fault_injection_tests)
+
 # Commentary: Package smoke test is defined inline to guarantee install/export + find_package validity.
 set(SAFETY_CORE_PACKAGE_SMOKE_ROOT "${CMAKE_BINARY_DIR}/package_smoke")
 set(SAFETY_CORE_PACKAGE_SMOKE_INSTALL_DIR "${SAFETY_CORE_PACKAGE_SMOKE_ROOT}/install")

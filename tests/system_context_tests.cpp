@@ -1,4 +1,7 @@
+#include "safety_core/diag/diagnostic_transport.hpp"
+#include "safety_core/diag/health_beacon_publisher.hpp"
 #include "safety_core/diag/logging_health_monitor.hpp"
+#include "safety_core/diag/topics.hpp"
 #include "safety_core/exec/task_executor.hpp"
 #include "safety_core/platform/clock.hpp"
 #include "safety_core/safety/safety_envelope.hpp"
@@ -8,6 +11,8 @@
 #include <chrono>
 #include <iostream>
 #include <sstream>
+#include <string_view>
+#include <vector>
 
 namespace
 {
@@ -44,6 +49,17 @@ namespace
         safety_core::time::TimePoint now_;
     };
 
+    class CaptureTransport final : public safety_core::diag::DiagnosticTransport
+    {
+      public:
+        void publish(const safety_core::diag::DiagnosticEvent& event) noexcept override
+        {
+            events.push_back(event);
+        }
+
+        std::vector<safety_core::diag::DiagnosticEvent> events{};
+    };
+
     struct FlagTaskContext
     {
         bool* ran;
@@ -66,9 +82,9 @@ int main()
     using safety_core::config::MotionEnvelopeConfig;
     using safety_core::config::SystemConfig;
     using safety_core::config::TimingConfig;
+    using safety_core::diag::HealthBeaconPublisher;
     using safety_core::diag::LoggingHealthMonitor;
     using safety_core::exec::TaskExecutor;
-    using safety_core::platform::Clock;
     using safety_core::safety::evaluate_stop_distance;
     using safety_core::sm::Mode;
     using safety_core::sm::ModeStateMachine;
@@ -84,11 +100,12 @@ int main()
     const auto envelope_eval = evaluate_stop_distance(5.0, 1.0, config.envelope);
     ok &= check(envelope_eval.within_envelope, "Envelope evaluation should pass for ample clearance");
 
-    // Logging monitor integration via SystemContext constructor.
+    // Logging monitor + diagnostic transport integration via SystemContext constructor.
     StubClock monitor_clock;
     std::ostringstream log_sink;
     LoggingHealthMonitor monitor(log_sink, &monitor_clock);
-    SystemContext context{&config, &monitor_clock, &monitor};
+    CaptureTransport transport;
+    SystemContext context{&config, &monitor_clock, &monitor, &transport};
 
     ModeStateMachine machine(context);
     ok &= check(machine.transition_to(Mode::Idle).ok(), "Init -> Idle via context");
@@ -98,18 +115,51 @@ int main()
     ok &= check(logs.find("mode_transition") != std::string::npos, "Monitor should log transitions");
     ok &= check(logs.find("fault_latched") != std::string::npos, "Monitor should log faults");
 
-    // TaskExecutor wiring with config + stub clock.
+    // TaskExecutor wiring with context clock + diagnostic transport should emit watchdog topic.
     StubClock stub_clock;
     TaskExecutor<2U> executor(&stub_clock);
+    executor.set_diagnostic_transport(&transport);
     ok &= check(executor.apply_config(config).ok(), "Executor accepts config");
     bool ran = false;
     FlagTaskContext task_ctx{&ran};
     ok &= check(executor.add_task(mark_ran_task, &task_ctx, safety_core::time::Duration::zero()).ok(),
                 "Task add should succeed");
 
-    stub_clock.advance(config.timing.control_period);
-    ok &= check(executor.run_due(stub_clock.now()).ok(), "Executor run should succeed");
-    ok &= check(ran, "Task should have executed");
+    stub_clock.advance(std::chrono::milliseconds(350));
+    const auto run_result = executor.run_due(stub_clock.now());
+    ok &= check(run_result.code == safety_core::StatusCode::kDeadlineMiss,
+                "Executor should report watchdog deadline miss under excessive lag");
+    ok &= check(!ran, "Task should not execute once watchdog violation is detected");
+
+    bool saw_watchdog_event = false;
+    for (const auto& event : transport.events)
+    {
+        if (event.topic_view() == safety_core::diag::topic::kExecutorWatchdogExceeded)
+        {
+            saw_watchdog_event = true;
+            break;
+        }
+    }
+    ok &= check(saw_watchdog_event, "Expected executor.watchdog_exceeded diagnostic event");
+
+    // Health beacon should publish on shared transport and include fault/watchdog context.
+    HealthBeaconPublisher beacon(&transport);
+    beacon.set_period(std::chrono::milliseconds(100));
+    ok &= check(beacon.publish_if_due(stub_clock.now(), machine.mode(), machine.fault_latched(), 250U, 0U, 0U),
+                "Health beacon publish should succeed");
+
+    bool saw_beacon = false;
+    for (const auto& event : transport.events)
+    {
+        if (event.topic_view() == safety_core::diag::topic::kHealthBeacon)
+        {
+            saw_beacon = true;
+            ok &= check(event.payload_view().find("fault=1") != std::string_view::npos,
+                        "Health beacon payload should report latched fault");
+            break;
+        }
+    }
+    ok &= check(saw_beacon, "Expected health.beacon diagnostic event");
 
     if (!ok)
     {

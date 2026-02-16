@@ -7,7 +7,6 @@ High-assurance C++ core for safety-minded robotics and autonomous vehicles: dete
 - Diagnostics and health state with latched faults + pluggable health monitor/transport callbacks
 - Time/budget utilities, bounded task executor with platform clocks + watchdog windows
 - Safety envelope helper and config-driven motion envelope enforcement
-- Controllers & filters: Safety PID (speed/accel guards, localization timeout) and alpha-beta filter scaffold
 - Controllers & filters: Safety PID, alpha-beta, complementary filter, bounded EKF (bounded state + finite guards)
 - Startup context factory with environment overrides and config validation hook
 - Motion trajectory primitives and validator for speed/accel/jerk/time monotonicity checks
@@ -141,10 +140,11 @@ Notes:
 ## CI pipeline
 - `format_check`: clang-format guard on `include/`, `src/`, `tests/`
 - `clang_tidy`: static analysis over library sources
+- `hook_smoke`: validates repository pre-commit auto-fix behavior on staged C++ files
 - `build_and_test`: CMake build + ctest (with sanitizers on by default)
 - Includes policy tests that guard no-allocation startup paths (`no_allocation_policy_tests`).
 - Includes a symbol-level guard that fails CI if `context_factory` object code references heap allocation APIs (`operator new`/`malloc` family).
-- Extends symbol-level no-allocation guards to `task_executor`, `safety_pid`, and `state_machine` objects.
+- Extends symbol-level no-allocation guards to `task_executor`, `safety_pid`, `state_machine`, `trajectory`, `bounded_ekf_filter`, and `complementary_filter` objects.
 - `coverage`: GCC/gcovr coverage gate (`--fail-under-line 90`, `--fail-under-branch 80`).
 - Security templates: GitLab SAST + Secret Detection
 
@@ -156,9 +156,9 @@ Notes:
 - `tests/filter_invariants_tests.cpp`: bounded EKF + complementary filter invariant/property checks.
 - `tests/motion_trajectory_tests.cpp`: emergency-stop primitive generation + trajectory validator safety checks.
 - `tests/health_beacon_tests.cpp`: beacon cadence and payload assertions.
+- `tests/fault_injection_tests.cpp`: backward-clock/transport-drop/NaN-burst robustness checks.
 - `tests/safety_envelope_tests.cpp`: scenario checks and property-style monotonic boundary checks.
-- `tests/context_factory_tests.cpp`: startup env override + validation-hook integration.
-- `tests/context_factory_tests.cpp`: strict-policy startup failure guarantees (exact failure reason, no partial context wiring, no warning-topic emission).
+- `tests/context_factory_tests.cpp`: startup env override + validation-hook integration, strict-policy failure guarantees, and schema/policy matrix checks.
 - `tests/diagnostic_truncation_tests.cpp`: forced topic/payload clipping and truncation observability flags.
 - `tests/no_allocation_policy_tests.cpp`: verifies startup build-context path avoids heap allocations.
 - `package_config_smoke`: verifies install/export + `find_package(safety_core CONFIG)` consumption.
@@ -169,12 +169,6 @@ Notes:
 
 ## Diagnostics integration guide
 - `docs/diagnostics/watchdog_integration_guide.md`: watchdog sizing, required topics, and beacon wiring checklist.
-
-## Roadmap (next steps)
-- Extend filters (bounded EKF/complementary) with invariants/property tests
-- Add motion primitives and control barrier functions / trajectory validation
-- Introduce diagnostics transport, health beacons, and watchdog integration guides
-- Provide safety case outline (hazards, mitigations, traceability)
 
 ## License
 TBD (select per-robot/per-project commercial licensing with mandatory support/maintenance).

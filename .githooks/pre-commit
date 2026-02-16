@@ -8,6 +8,7 @@ clang_format="${CLANG_FORMAT:-clang-format}"
 clang_tidy="${CLANG_TIDY:-clang-tidy}"
 build_dir="${BUILD_DIR:-build}"
 auto_fix_format="${AUTO_FIX_FORMAT:-1}"
+skip_clang_tidy="${SKIP_CLANG_TIDY:-0}"
 
 fmt_files=$(git diff --cached --name-only --diff-filter=ACM -- '*.cpp' '*.cc' '*.cxx' '*.hpp' '*.h' '*.hh' '*.hxx')
 
@@ -32,13 +33,15 @@ else
     echo "$fmt_files" | xargs -r "$clang_format" --dry-run --Werror
 fi
 
-if ! command -v "$clang_tidy" >/dev/null 2>&1; then
-    echo "ERROR: clang-tidy not found (override with CLANG_TIDY)" >&2
-    exit 1
-fi
-
 cpp_files=$(git diff --cached --name-only --diff-filter=ACM -- '*.cpp' '*.cc' '*.cxx')
-if [ -n "$cpp_files" ]; then
+if [ "$skip_clang_tidy" = "1" ]; then
+    echo "Skipping clang-tidy because SKIP_CLANG_TIDY=1"
+elif [ -n "$cpp_files" ]; then
+    if ! command -v "$clang_tidy" >/dev/null 2>&1; then
+        echo "ERROR: clang-tidy not found (override with CLANG_TIDY or set SKIP_CLANG_TIDY=1)" >&2
+        exit 1
+    fi
+
     build_path="$ROOT/$build_dir"
     if [ ! -f "$build_path/compile_commands.json" ]; then
         echo "ERROR: $build_path/compile_commands.json is missing; generate it with:" >&2
@@ -48,6 +51,8 @@ if [ -n "$cpp_files" ]; then
 
     echo "Running clang-tidy on staged C++ sources..."
     echo "$cpp_files" | xargs -r "$clang_tidy" --quiet -p "$build_path"
+else
+    echo "No staged C++ sources for clang-tidy; skipping"
 fi
 
 exit 0
