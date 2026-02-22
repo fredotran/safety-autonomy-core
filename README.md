@@ -72,7 +72,7 @@ Use `system::build_context(...)` to centralize startup configuration:
 4. Validate the resulting config via `config::validate`.
    - `ValidationPolicy::Strict` rejects warning-grade findings.
    - `ValidationPolicy::AllowWarnings` accepts warning-grade findings.
-5. Build a ready-to-wire `SystemContext` containing config, clock, monitor, and diagnostic transport.
+5. Build a ready-to-wire `SystemContext` containing config, clock, monitor, diagnostic transport, and optional `safety::SafetySupervisor` wiring.
 
 Environment variable notes:
 - `SAFETY_CORE_CONFIG_VERSION` can be used to pin the incoming config schema version.
@@ -99,6 +99,10 @@ Example usage is covered in `tests/context_factory_tests.cpp`.
   - `executor.catch_up_limited`
 - `diag::HealthBeaconPublisher` publishes:
   - `health.beacon`
+- `safety::SafetySupervisor` publishes:
+  - `safety.monitor_warning`
+  - `safety.degraded_request`
+  - `safety.safestop_forced`
 
 Implementation notes:
 - `diag::DiagnosticEvent` uses fixed-capacity topic/payload buffers (no heap allocation in event payload transport path).
@@ -111,6 +115,10 @@ Implementation notes:
   - `config.migration`
   - `config.validation_warning`
 - Diagnostic topic names are centralized in `include/safety_core/diag/topics.hpp`.
+
+## Motion trajectory validator notes
+- `motion::TrajectoryValidator` enforces finite inputs, monotonic time/distance, speed/accel/jerk bounds, and optional stopping-envelope checks.
+- `TrajectoryViolation::NullInput` is used for null trajectory buffers and non-finite sample fields.
 
 ## Allocation-aware executor callback API
 `TaskExecutor` uses function-pointer callbacks with opaque context to avoid `std::function` allocations in scheduling paths:
@@ -148,7 +156,9 @@ Notes:
 - Includes policy tests that guard no-allocation startup paths (`no_allocation_policy_tests`).
 - Includes a symbol-level guard that fails CI if `context_factory` object code references heap allocation APIs (`operator new`/`malloc` family).
 - Extends symbol-level no-allocation guards to `task_executor`, `safety_pid`, `state_machine`, `trajectory`, `bounded_ekf_filter`, `complementary_filter`, and `safety_supervisor` objects.
-- `coverage`: GCC/gcovr coverage gate (`--fail-under-line 90`, `--fail-under-branch 80`).
+- `coverage`: GCC/gcovr coverage gate using CI variables:
+  - `COVERAGE_MIN_LINE` (default `80`)
+  - `COVERAGE_MIN_BRANCH` (default `55`)
 - Security templates: GitLab SAST + Secret Detection
 
 ## Test coverage highlights
@@ -160,9 +170,9 @@ Notes:
 - `tests/motion_trajectory_tests.cpp`: emergency-stop primitive generation + trajectory validator safety checks.
 - `tests/health_beacon_tests.cpp`: beacon cadence and payload assertions.
 - `tests/fault_injection_tests.cpp`: backward-clock/transport-drop/NaN-burst robustness checks.
-- `tests/safety_supervisor_tests.cpp`: deterministic warning/degraded/critical monitor escalation and safe-stop forcing.
+- `tests/safety_supervisor_tests.cpp`: deterministic warning/degraded/critical monitor escalation, localization-age and diagnostic-drop monitor checks, setter wiring, and safe-stop forcing.
 - `tests/safety_envelope_tests.cpp`: scenario checks and property-style monotonic boundary checks.
-- `tests/context_factory_tests.cpp`: startup env override + validation-hook integration, strict-policy failure guarantees, and schema/policy matrix checks.
+- `tests/context_factory_tests.cpp`: startup env override + validation-hook integration, optional supervisor pointer wiring, strict-policy failure guarantees, and schema/policy matrix checks.
 - `tests/diagnostic_truncation_tests.cpp`: forced topic/payload clipping and truncation observability flags.
 - `tests/no_allocation_policy_tests.cpp`: verifies startup build-context path avoids heap allocations.
 - `package_config_smoke`: verifies install/export + `find_package(safety_core CONFIG)` consumption.

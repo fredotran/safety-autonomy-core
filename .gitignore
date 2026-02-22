@@ -1,3 +1,9 @@
 build/
+build-coverage/
 .vscode/
+
+# Coverage artifacts
+*.gcov
+*.gcda
+*.gcno
 .cache/clangd/index/

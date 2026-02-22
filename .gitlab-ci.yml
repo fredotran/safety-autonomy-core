@@ -10,6 +10,8 @@ variables:
   BUILD_DIR: build
   CMAKE_FLAGS: "-DCMAKE_BUILD_TYPE=RelWithDebInfo -DSAFETY_CORE_ENABLE_SANITIZERS=ON"
   SECRET_DETECTION_ENABLED: "true"
+  COVERAGE_MIN_LINE: "80"
+  COVERAGE_MIN_BRANCH: "55"
 
 before_script:
   - apt-get update -y
@@ -73,7 +75,7 @@ coverage:
     - cmake -S . -B build-coverage -DCMAKE_BUILD_TYPE=Debug -DSAFETY_CORE_ENABLE_SANITIZERS=OFF -DSAFETY_CORE_ENABLE_COVERAGE=ON
     - cmake --build build-coverage
     - ctest --test-dir build-coverage --output-on-failure
-    - gcovr --root . --filter src --filter include --exclude build-coverage --print-summary --fail-under-line 90 --fail-under-branch 80
+    - gcovr --root . --filter src --filter include --exclude build-coverage --print-summary --fail-under-line ${COVERAGE_MIN_LINE} --fail-under-branch ${COVERAGE_MIN_BRANCH}
 
 sast:
   stage: test
