@@ -16,6 +16,8 @@ High-assurance C++ core for safety-minded robotics and autonomous vehicles: dete
 - `include/safety_core/` public headers (state machine, diagnostics, exec, control, filters, HALs)
 - `src/` implementations (platform clocks, diagnostics adapters, control/filter cores)
 - `tests/` lightweight unit/property tests (state machine, safety envelope, system context integration)
+- `tools/dev/run_quality_gate.sh` one-command local maintainer gate (build + tests + policy, optional coverage)
+- `CONTRIBUTING.md` maintenance workflow, PR checklist, and safety-case update expectations
 - `CMakeLists.txt` library + smoke test target
 - `.clang-format`, `.clang-tidy` house style and lint rules
 - `.gitlab-ci.yml` CI pipeline (format, clang-tidy, build, tests, security scans)
@@ -25,6 +27,17 @@ High-assurance C++ core for safety-minded robotics and autonomous vehicles: dete
 cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DSAFETY_CORE_ENABLE_SANITIZERS=ON
 cmake --build build
 ctest --test-dir build --output-on-failure
+```
+
+## Maintainer workflow (recommended)
+```bash
+tools/dev/run_quality_gate.sh
+```
+
+Optional (includes coverage gate):
+
+```bash
+tools/dev/run_quality_gate.sh --coverage
 ```
 
 ## Build profiles (presets)

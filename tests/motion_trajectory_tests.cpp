@@ -1,5 +1,6 @@
 #include "safety_core/config/system_config.hpp"
 #include "safety_core/motion/trajectory.hpp"
+#include "test_support.hpp"
 
 #include <chrono>
 #include <iostream>
@@ -7,16 +8,7 @@
 
 namespace
 {
-
-    bool check(bool condition, const char* message)
-    {
-        if (!condition)
-        {
-            std::cerr << "[FAIL] " << message << '\n';
-            return false;
-        }
-        return true;
-    }
+    using safety_core::test_support::check;
 
     safety_core::config::SystemConfig make_defaults()
     {

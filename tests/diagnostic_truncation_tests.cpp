@@ -1,5 +1,6 @@
 #include "safety_core/diag/diagnostic_transport.hpp"
 #include "safety_core/diag/logging_diagnostic_transport.hpp"
+#include "test_support.hpp"
 
 #include <iostream>
 #include <sstream>
@@ -7,16 +8,7 @@
 
 namespace
 {
-
-    bool check(bool condition, const char* message)
-    {
-        if (!condition)
-        {
-            std::cerr << "[FAIL] " << message << '\n';
-            return false;
-        }
-        return true;
-    }
+    using safety_core::test_support::check;
 
 } // namespace
 

@@ -2,6 +2,7 @@
 #include "safety_core/diag/diagnostic_transport.hpp"
 #include "safety_core/platform/manual_clock.hpp"
 #include "safety_core/system/context_factory.hpp"
+#include "test_support.hpp"
 
 #include <atomic>
 #include <chrono>
@@ -11,7 +12,6 @@
 
 namespace
 {
-
     std::atomic<std::size_t> g_allocation_count{0U};
 
     void* operator_new_impl(std::size_t size)
@@ -29,15 +29,7 @@ namespace
         return ptr;
     }
 
-    bool check(bool condition, const char* message)
-    {
-        if (!condition)
-        {
-            std::cerr << "[FAIL] " << message << '\n';
-            return false;
-        }
-        return true;
-    }
+    using safety_core::test_support::check;
 
     class CaptureTransport final : public safety_core::diag::DiagnosticTransport
     {

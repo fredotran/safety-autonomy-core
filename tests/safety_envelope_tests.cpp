@@ -1,20 +1,12 @@
 #include "safety_core/safety/safety_envelope.hpp"
+#include "test_support.hpp"
 
 #include <cmath>
 #include <iostream>
 
 namespace
 {
-
-    bool check(bool condition, const char* message)
-    {
-        if (!condition)
-        {
-            std::cerr << "[FAIL] " << message << '\n';
-            return false;
-        }
-        return true;
-    }
+    using safety_core::test_support::check;
 
 } // namespace
 

@@ -3,24 +3,15 @@
 #include "safety_core/exec/task_executor.hpp"
 #include "safety_core/filters/bounded_ekf_filter.hpp"
 #include "safety_core/platform/clock.hpp"
+#include "test_support.hpp"
 
 #include <chrono>
 #include <cmath>
 #include <iostream>
-#include <vector>
 
 namespace
 {
-
-    bool check(bool condition, const char* message)
-    {
-        if (!condition)
-        {
-            std::cerr << "[FAIL] " << message << '\n';
-            return false;
-        }
-        return true;
-    }
+    using safety_core::test_support::check;
 
     class FaultClock final : public safety_core::platform::Clock
     {
@@ -44,16 +35,7 @@ namespace
         safety_core::time::TimePoint now_{};
     };
 
-    class CaptureTransport final : public safety_core::diag::DiagnosticTransport
-    {
-      public:
-        void publish(const safety_core::diag::DiagnosticEvent& event) noexcept override
-        {
-            events.push_back(event);
-        }
-
-        std::vector<safety_core::diag::DiagnosticEvent> events{};
-    };
+    using CaptureTransport = safety_core::test_support::CaptureTransport;
 
     class DropTransport final : public safety_core::diag::DiagnosticTransport
     {

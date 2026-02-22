@@ -3,34 +3,15 @@
 #include "safety_core/diag/topics.hpp"
 #include "safety_core/exec/task_executor.hpp"
 #include "safety_core/platform/manual_clock.hpp"
+#include "test_support.hpp"
 
 #include <chrono>
 #include <iostream>
-#include <vector>
 
 namespace
 {
-
-    bool check(bool condition, const char* message)
-    {
-        if (!condition)
-        {
-            std::cerr << "[FAIL] " << message << '\n';
-            return false;
-        }
-        return true;
-    }
-
-    class CaptureTransport final : public safety_core::diag::DiagnosticTransport
-    {
-      public:
-        void publish(const safety_core::diag::DiagnosticEvent& event) noexcept override
-        {
-            events.push_back(event);
-        }
-
-        std::vector<safety_core::diag::DiagnosticEvent> events{};
-    };
+    using safety_core::test_support::check;
+    using CaptureTransport = safety_core::test_support::CaptureTransport;
 
     struct CountTaskContext
     {
