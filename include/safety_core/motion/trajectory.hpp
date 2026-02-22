@@ -28,6 +28,7 @@ namespace safety_core::motion
         AccelOutOfBounds,
         JerkOutOfBounds,
         NonMonotonicDistance,
+        EnvelopeViolation,
     };
 
     struct TrajectoryValidationResult
@@ -50,12 +51,18 @@ namespace safety_core::motion
             max_jerk_mps3_ = (jerk_limit < 0.0) ? 0.0 : jerk_limit;
         }
 
+        void set_obstacle_distance_m(double obstacle_distance_m) noexcept
+        {
+            obstacle_distance_m_ = obstacle_distance_m;
+        }
+
         [[nodiscard]] TrajectoryValidationResult validate(const TrajectoryPoint* points,
                                                           std::size_t count) const noexcept;
 
       private:
         const config::SystemConfig* config_{nullptr};
         double max_jerk_mps3_{5.0};
+        double obstacle_distance_m_{-1.0};
     };
 
     bool generate_emergency_stop_profile(double initial_speed_mps, double max_decel_mps2, double dt_s,

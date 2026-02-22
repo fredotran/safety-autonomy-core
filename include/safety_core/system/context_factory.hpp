@@ -16,6 +16,7 @@ namespace safety_core::system
         platform::Clock* clock{nullptr};
         diag::HealthMonitor* health_monitor{nullptr};
         diag::DiagnosticTransport* diagnostic_transport{nullptr};
+        safety::SafetySupervisor* safety_supervisor{nullptr};
     };
 
     struct ContextWithConfig

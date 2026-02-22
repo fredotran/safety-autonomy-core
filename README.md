@@ -7,6 +7,7 @@ High-assurance C++ core for safety-minded robotics and autonomous vehicles: dete
 - Diagnostics and health state with latched faults + pluggable health monitor/transport callbacks
 - Time/budget utilities, bounded task executor with platform clocks + watchdog windows
 - Safety envelope helper and config-driven motion envelope enforcement
+- Deterministic safety supervisor with warning/degraded/critical escalation to SafeStop
 - Controllers & filters: Safety PID, alpha-beta, complementary filter, bounded EKF (bounded state + finite guards)
 - Startup context factory with environment overrides and config validation hook
 - Motion trajectory primitives and validator for speed/accel/jerk/time monotonicity checks
@@ -60,6 +61,7 @@ git config core.hooksPath .githooks
 - runs `clang-tidy` on staged C++ files (requires `build/compile_commands.json`)
 
 Set `AUTO_FIX_FORMAT=0` to switch pre-commit back to check-only formatting mode.
+Set `SKIP_CLANG_TIDY=1` for environments where formatting checks should run but clang-tidy is intentionally skipped.
 
 ## Startup flow (env + migration + validation)
 Use `system::build_context(...)` to centralize startup configuration:
@@ -141,10 +143,11 @@ Notes:
 - `format_check`: clang-format guard on `include/`, `src/`, `tests/`
 - `clang_tidy`: static analysis over library sources
 - `hook_smoke`: validates repository pre-commit auto-fix behavior on staged C++ files
+- `policy_guard`: banned API checks (exceptions, dynamic allocation calls, `abort`) in core safety code
 - `build_and_test`: CMake build + ctest (with sanitizers on by default)
 - Includes policy tests that guard no-allocation startup paths (`no_allocation_policy_tests`).
 - Includes a symbol-level guard that fails CI if `context_factory` object code references heap allocation APIs (`operator new`/`malloc` family).
-- Extends symbol-level no-allocation guards to `task_executor`, `safety_pid`, `state_machine`, `trajectory`, `bounded_ekf_filter`, and `complementary_filter` objects.
+- Extends symbol-level no-allocation guards to `task_executor`, `safety_pid`, `state_machine`, `trajectory`, `bounded_ekf_filter`, `complementary_filter`, and `safety_supervisor` objects.
 - `coverage`: GCC/gcovr coverage gate (`--fail-under-line 90`, `--fail-under-branch 80`).
 - Security templates: GitLab SAST + Secret Detection
 
@@ -157,6 +160,7 @@ Notes:
 - `tests/motion_trajectory_tests.cpp`: emergency-stop primitive generation + trajectory validator safety checks.
 - `tests/health_beacon_tests.cpp`: beacon cadence and payload assertions.
 - `tests/fault_injection_tests.cpp`: backward-clock/transport-drop/NaN-burst robustness checks.
+- `tests/safety_supervisor_tests.cpp`: deterministic warning/degraded/critical monitor escalation and safe-stop forcing.
 - `tests/safety_envelope_tests.cpp`: scenario checks and property-style monotonic boundary checks.
 - `tests/context_factory_tests.cpp`: startup env override + validation-hook integration, strict-policy failure guarantees, and schema/policy matrix checks.
 - `tests/diagnostic_truncation_tests.cpp`: forced topic/payload clipping and truncation observability flags.
@@ -166,6 +170,10 @@ Notes:
 ## Safety case artifacts
 - `docs/safety_case/traceability_matrix.md`: hazard-to-control-to-test traceability starter matrix.
 - `docs/safety_case/outline.md`: structured claims/assumptions/residual-risk starter outline.
+- `docs/safety_case/assumptions_register.md`: explicit assumption inventory and monitoring evidence.
+- `docs/safety_case/residual_risk_register.md`: residual risk tracking with mitigation ownership.
+- `docs/safety_case/safety_manual.md`: integration constraints and required wiring for safety use.
+- `docs/safety_case/verification_protocol_template.md`: requirement-driven verification and sign-off template.
 
 ## Diagnostics integration guide
 - `docs/diagnostics/watchdog_integration_guide.md`: watchdog sizing, required topics, and beacon wiring checklist.

@@ -23,6 +23,9 @@ namespace safety_core::diag::topic
     constexpr std::string_view kConfigMigration         = "config.migration";
     constexpr std::string_view kConfigValidationWarning = "config.validation_warning";
     constexpr std::string_view kHealthBeacon            = "health.beacon";
+    constexpr std::string_view kSafetyMonitorWarning    = "safety.monitor_warning";
+    constexpr std::string_view kSafetyDegradedRequest   = "safety.degraded_request";
+    constexpr std::string_view kSafetySafeStopForced    = "safety.safestop_forced";
 
     static_assert(kModeTransition.size() < kDiagnosticTopicCapacity);
     static_assert(kFaultLatched.size() < kDiagnosticTopicCapacity);
@@ -37,5 +40,8 @@ namespace safety_core::diag::topic
     static_assert(kConfigMigration.size() < kDiagnosticTopicCapacity);
     static_assert(kConfigValidationWarning.size() < kDiagnosticTopicCapacity);
     static_assert(kHealthBeacon.size() < kDiagnosticTopicCapacity);
+    static_assert(kSafetyMonitorWarning.size() < kDiagnosticTopicCapacity);
+    static_assert(kSafetyDegradedRequest.size() < kDiagnosticTopicCapacity);
+    static_assert(kSafetySafeStopForced.size() < kDiagnosticTopicCapacity);
 
 } // namespace safety_core::diag::topic

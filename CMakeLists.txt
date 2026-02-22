@@ -27,6 +27,7 @@ add_library(safety_core STATIC
     src/filters/complementary_filter.cpp
     src/filters/bounded_ekf_filter.cpp
     src/motion/trajectory.cpp
+    src/safety/safety_supervisor.cpp
     src/config/validation.cpp
     src/config/migration.cpp
     src/config/env_loader.cpp
@@ -185,6 +186,14 @@ add_executable(fault_injection_tests
 target_link_libraries(fault_injection_tests PRIVATE safety_core)
 
 add_test(NAME fault_injection_tests COMMAND fault_injection_tests)
+
+add_executable(safety_supervisor_tests
+    tests/safety_supervisor_tests.cpp
+)
+
+target_link_libraries(safety_supervisor_tests PRIVATE safety_core)
+
+add_test(NAME safety_supervisor_tests COMMAND safety_supervisor_tests)
 
 # Commentary: Package smoke test is defined inline to guarantee install/export + find_package validity.
 set(SAFETY_CORE_PACKAGE_SMOKE_ROOT "${CMAKE_BINARY_DIR}/package_smoke")

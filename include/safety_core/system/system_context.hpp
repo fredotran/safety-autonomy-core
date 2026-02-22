@@ -5,6 +5,11 @@
 #include "safety_core/diag/health_monitor.hpp"
 #include "safety_core/platform/clock.hpp"
 
+namespace safety_core::safety
+{
+    class SafetySupervisor;
+}
+
 namespace safety_core::system
 {
 
@@ -14,6 +19,7 @@ namespace safety_core::system
         platform::Clock* clock{nullptr};
         diag::HealthMonitor* health_monitor{nullptr};
         diag::DiagnosticTransport* diagnostic_transport{nullptr};
+        safety::SafetySupervisor* safety_supervisor{nullptr};
     };
 
 } // namespace safety_core::system

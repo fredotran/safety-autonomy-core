@@ -13,6 +13,7 @@ This matrix maps hazards to requirements, controls, executable evidence, and CI 
 | HZ-007 | SR-FILTER-001 | State-estimation divergence from bounded disturbances | Bounded EKF + complementary filter clamps and finite guards | `tests/filter_invariants_tests.cpp`, `tests/fault_injection_tests.cpp` | `build_and_test`, `coverage` |
 | HZ-008 | SR-MOTION-001 | Unsafe trajectory command violates motion limits | Trajectory validator for speed/accel/jerk/time monotonicity | `tests/motion_trajectory_tests.cpp` | `build_and_test`, `coverage` |
 | HZ-009 | SR-DIAG-002 | Late detection of runtime degradation | Periodic health beacon topic with watchdog/truncation telemetry | `tests/health_beacon_tests.cpp`, `tests/system_context_tests.cpp` | `build_and_test` |
+| HZ-010 | SR-SUP-001 | Delayed or inconsistent fail-safe response under critical monitor events | SafetySupervisor warning/degraded/critical escalation with forced safe-stop path | `tests/safety_supervisor_tests.cpp` | `build_and_test` |
 
 ## Assumptions
 - Platform clock source is monotonic and stable.
@@ -20,5 +21,5 @@ This matrix maps hazards to requirements, controls, executable evidence, and CI 
 - Runtime deployment uses a deterministic scheduler tick source.
 
 ## Open Items
-- Extend traceability down to requirement IDs once formal safety requirements are frozen.
 - Add MC/DC-oriented coverage evidence for safety-critical units.
+- Add clause-level mapping to ISO 3691-4 requirement paragraphs and validation procedures.

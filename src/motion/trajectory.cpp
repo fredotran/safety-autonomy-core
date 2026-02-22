@@ -1,5 +1,7 @@
 #include "safety_core/motion/trajectory.hpp"
 
+#include "safety_core/safety/safety_envelope.hpp"
+
 #include <algorithm>
 #include <cmath>
 
@@ -55,6 +57,17 @@ namespace safety_core::motion
             if (std::abs(p.jerk_mps3) > (max_jerk_mps3_ + 1e-12))
             {
                 return {false, TrajectoryViolation::JerkOutOfBounds, i};
+            }
+
+            if ((config_ != nullptr) && (obstacle_distance_m_ >= 0.0))
+            {
+                const double remaining_distance = obstacle_distance_m_ - p.distance_m;
+                const auto envelope_eval =
+                    safety::evaluate_stop_distance(remaining_distance, p.speed_mps, config_->envelope);
+                if (!envelope_eval.within_envelope)
+                {
+                    return {false, TrajectoryViolation::EnvelopeViolation, i};
+                }
             }
         }
 

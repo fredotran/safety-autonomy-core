@@ -1,5 +1,6 @@
 #include "safety_core/diag/topics.hpp"
 #include "safety_core/platform/manual_clock.hpp"
+#include "safety_core/safety/safety_supervisor.hpp"
 #include "safety_core/system/context_factory.hpp"
 
 #include <array>
@@ -75,6 +76,7 @@ int main()
 
     safety_core::platform::ManualClock manual_clock;
     CaptureTransport transport;
+    safety_core::safety::SafetySupervisor supervisor;
 
     // Happy-path: env values override defaults and produce a valid context.
     setenv("SAFETY_CORE_CONFIG_VERSION", "1", 1);
@@ -89,11 +91,13 @@ int main()
     options.defaults             = make_defaults();
     options.clock                = &manual_clock;
     options.diagnostic_transport = &transport;
+    options.safety_supervisor    = &supervisor;
 
     const auto result = safety_core::system::build_context(built, options);
     ok &= check(result.ok(), "build_context should succeed with valid env");
     ok &= check(built.context.config == &built.config, "context config pointer should reference owned config");
     ok &= check(built.context.clock == &manual_clock, "context should keep configured clock");
+    ok &= check(built.context.safety_supervisor == &supervisor, "context should keep configured safety supervisor");
     ok &= check(built.config.max_tasks == 6U, "env override max_tasks should apply");
     ok &= check(built.config.timing.control_period.count() == 50000000, "env override control period should apply");
     ok &= check(built.config.config_version == safety_core::config::kCurrentSystemConfigVersion,
@@ -124,6 +128,8 @@ int main()
     ok &= check(strict_invalid.context.clock == nullptr, "failed strict startup should not wire clock pointer");
     ok &= check(strict_invalid.context.diagnostic_transport == nullptr,
                 "failed strict startup should not wire diagnostic transport pointer");
+    ok &= check(strict_invalid.context.safety_supervisor == nullptr,
+                "failed strict startup should not wire safety supervisor pointer");
 
     bool saw_strict_warning_event = false;
     for (std::size_t i = strict_events_before; i < transport.events.size(); ++i)

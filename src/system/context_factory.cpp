@@ -73,6 +73,7 @@ namespace safety_core::system
         out.context.clock          = (options.clock != nullptr) ? options.clock : platform::SteadyClock::instance_ptr();
         out.context.health_monitor = options.health_monitor;
         out.context.diagnostic_transport = options.diagnostic_transport;
+        out.context.safety_supervisor    = options.safety_supervisor;
         return Result::Ok();
     }
 
