@@ -8,6 +8,11 @@
 namespace safety_core::motion
 {
 
+    namespace
+    {
+        constexpr double kNumericEpsilon = 1e-12;
+    }
+
     TrajectoryValidationResult TrajectoryValidator::validate(const TrajectoryPoint* points,
                                                              std::size_t count) const noexcept
     {
@@ -30,6 +35,7 @@ namespace safety_core::motion
             if (!std::isfinite(p.t_s) || !std::isfinite(p.speed_mps) || !std::isfinite(p.accel_mps2) ||
                 !std::isfinite(p.jerk_mps3) || !std::isfinite(p.distance_m))
             {
+                // Non-finite samples are treated as invalid input and surfaced through NullInput.
                 return {false, TrajectoryViolation::NullInput, i};
             }
 
@@ -40,21 +46,21 @@ namespace safety_core::motion
                 {
                     return {false, TrajectoryViolation::NonMonotonicTime, i};
                 }
-                if (p.distance_m + 1e-12 < prev.distance_m)
+                if (p.distance_m + kNumericEpsilon < prev.distance_m)
                 {
                     return {false, TrajectoryViolation::NonMonotonicDistance, i};
                 }
             }
 
-            if ((max_speed > 0.0) && (std::abs(p.speed_mps) > (max_speed + 1e-12)))
+            if ((max_speed > 0.0) && (std::abs(p.speed_mps) > (max_speed + kNumericEpsilon)))
             {
                 return {false, TrajectoryViolation::SpeedOutOfBounds, i};
             }
-            if ((max_accel > 0.0) && (std::abs(p.accel_mps2) > (max_accel + 1e-12)))
+            if ((max_accel > 0.0) && (std::abs(p.accel_mps2) > (max_accel + kNumericEpsilon)))
             {
                 return {false, TrajectoryViolation::AccelOutOfBounds, i};
             }
-            if (std::abs(p.jerk_mps3) > (max_jerk_mps3_ + 1e-12))
+            if (std::abs(p.jerk_mps3) > (max_jerk_mps3_ + kNumericEpsilon))
             {
                 return {false, TrajectoryViolation::JerkOutOfBounds, i};
             }

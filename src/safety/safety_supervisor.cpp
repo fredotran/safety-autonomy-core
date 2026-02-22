@@ -20,6 +20,12 @@ namespace safety_core::safety
         constexpr std::uint16_t kFaultCodeLocalizationLost = 1002U;
         constexpr std::uint16_t kFaultCodeTransportDrop    = 1003U;
 
+        constexpr MonitorEvent make_monitor_event(MonitorType type, MonitorSeverity severity, std::uint16_t code,
+                                                  std::string_view detail) noexcept
+        {
+            return MonitorEvent{type, severity, code, detail};
+        }
+
         constexpr const char* monitor_name(MonitorType type) noexcept
         {
             switch (type)
@@ -87,9 +93,9 @@ namespace safety_core::safety
 
         if (now_ns < last_clock_ns_)
         {
-            const MonitorEvent event{MonitorType::ClockRegression, MonitorSeverity::Critical, kFaultCodeClockRegression,
-                                     "clock moved backwards"};
-            last_clock_ns_ = now_ns;
+            const MonitorEvent event = make_monitor_event(MonitorType::ClockRegression, MonitorSeverity::Critical,
+                                                          kFaultCodeClockRegression, "clock moved backwards");
+            last_clock_ns_           = now_ns;
             return process_monitor_event(event);
         }
 
@@ -109,8 +115,8 @@ namespace safety_core::safety
                                              ? MonitorSeverity::Critical
                                              : MonitorSeverity::Degraded;
 
-        const MonitorEvent event{MonitorType::LocalizationStale, severity, kFaultCodeLocalizationLost,
-                                 "localization age exceeded timeout"};
+        const MonitorEvent event = make_monitor_event(MonitorType::LocalizationStale, severity,
+                                                      kFaultCodeLocalizationLost, "localization age exceeded timeout");
         return process_monitor_event(event);
     }
 
@@ -120,15 +126,17 @@ namespace safety_core::safety
     {
         if ((critical_threshold > 0U) && (dropped_since_last_sample >= critical_threshold))
         {
-            const MonitorEvent event{MonitorType::DiagnosticDrop, MonitorSeverity::Critical, kFaultCodeTransportDrop,
-                                     "diagnostic drop critical threshold exceeded"};
+            const MonitorEvent event =
+                make_monitor_event(MonitorType::DiagnosticDrop, MonitorSeverity::Critical, kFaultCodeTransportDrop,
+                                   "diagnostic drop critical threshold exceeded");
             return process_monitor_event(event);
         }
 
         if ((warning_threshold > 0U) && (dropped_since_last_sample >= warning_threshold))
         {
-            const MonitorEvent event{MonitorType::DiagnosticDrop, MonitorSeverity::Warning, kFaultCodeTransportDrop,
-                                     "diagnostic drop warning threshold exceeded"};
+            const MonitorEvent event =
+                make_monitor_event(MonitorType::DiagnosticDrop, MonitorSeverity::Warning, kFaultCodeTransportDrop,
+                                   "diagnostic drop warning threshold exceeded");
             return process_monitor_event(event);
         }
 

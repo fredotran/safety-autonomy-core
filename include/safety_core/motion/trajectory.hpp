@@ -21,7 +21,7 @@ namespace safety_core::motion
     enum class TrajectoryViolation : std::uint8_t
     {
         None = 0U,
-        NullInput,
+        NullInput, // Null trajectory buffer or non-finite sample values.
         EmptyTrajectory,
         NonMonotonicTime,
         SpeedOutOfBounds,

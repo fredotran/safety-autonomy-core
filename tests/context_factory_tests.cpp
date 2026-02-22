@@ -115,6 +115,16 @@ int main()
     }
     ok &= check(saw_migration_event, "expected config.migration startup event");
 
+    // Default-wiring path: when no supervisor is supplied, context should keep a null supervisor pointer.
+    ContextFactoryOptions default_supervisor_options = options;
+    default_supervisor_options.safety_supervisor     = nullptr;
+    ContextWithConfig default_supervisor_out{};
+    const auto default_supervisor_result =
+        safety_core::system::build_context(default_supervisor_out, default_supervisor_options);
+    ok &= check(default_supervisor_result.ok(), "build_context should succeed without explicit supervisor wiring");
+    ok &= check(default_supervisor_out.context.safety_supervisor == nullptr,
+                "context should keep null safety supervisor when options leave it unset");
+
     // Strict validation should fail if safety buffer is 0.
     setenv("SAFETY_CORE_CONFIG_VERSION", "2", 1);
     setenv("SAFETY_CORE_SAFETY_BUFFER_M", "0", 1);
