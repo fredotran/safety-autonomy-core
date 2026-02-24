@@ -2,7 +2,7 @@
 #include "safety_core/diag/diagnostic_transport.hpp"
 #include "safety_core/exec/task_executor.hpp"
 #include "safety_core/filters/bounded_ekf_filter.hpp"
-#include "safety_core/platform/clock.hpp"
+#include "safety_core/platform/manual_clock.hpp"
 #include "test_support.hpp"
 
 #include <chrono>
@@ -12,28 +12,7 @@
 namespace
 {
     using safety_core::test_support::check;
-
-    class FaultClock final : public safety_core::platform::Clock
-    {
-      public:
-        [[nodiscard]] safety_core::time::TimePoint now() const noexcept override
-        {
-            return now_;
-        }
-
-        void set(safety_core::time::TimePoint tp) noexcept
-        {
-            now_ = tp;
-        }
-
-        void advance(safety_core::time::Duration delta) noexcept
-        {
-            now_ += delta;
-        }
-
-      private:
-        safety_core::time::TimePoint now_{};
-    };
+    using FaultClock = safety_core::platform::ManualClock;
 
     using CaptureTransport = safety_core::test_support::CaptureTransport;
 

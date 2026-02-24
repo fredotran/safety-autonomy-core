@@ -10,6 +10,8 @@
 - CI baseline green (`format`, `lint`, `policy_guard`, `build_and_test`, `coverage`).
 - Deployment configuration checksum recorded.
 - Safety assumptions register reviewed.
+- ISO 3691-4 clause matrix updated for release scope (`iso_3691_4_clause_matrix.md`).
+- Release safety evidence checklist instantiated and completed (`release_safety_evidence_checklist.md`).
 
 ## 3. Requirement-Based Verification Matrix
 | Requirement ID | Test/Procedure | Expected Outcome | Pass/Fail | Evidence Artifact |

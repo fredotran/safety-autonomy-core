@@ -5,45 +5,14 @@
 #include "test_support.hpp"
 
 #include <array>
-#include <chrono>
-#include <cstdlib>
 #include <iostream>
 
 namespace
 {
     using safety_core::test_support::check;
     using CaptureTransport = safety_core::test_support::CaptureTransport;
-
-    safety_core::config::SystemConfig make_defaults()
-    {
-        using namespace std::chrono_literals;
-
-        safety_core::config::SystemConfig cfg{};
-        cfg.timing.control_period           = 100ms;
-        cfg.timing.watchdog_period          = 200ms;
-        cfg.timing.localization_timeout     = 2s;
-        cfg.envelope.max_speed_mps          = 1.2;
-        cfg.envelope.max_accel_mps2         = 0.6;
-        cfg.envelope.max_comfort_decel_mps2 = 0.8;
-        cfg.envelope.control_latency_s      = 0.1;
-        cfg.envelope.safety_buffer_m        = 0.2;
-        cfg.max_tasks                       = 4U;
-        return cfg;
-    }
-
-    void clear_env_vars()
-    {
-        unsetenv("SAFETY_CORE_CONFIG_VERSION");
-        unsetenv("SAFETY_CORE_MAX_TASKS");
-        unsetenv("SAFETY_CORE_CONTROL_PERIOD_NS");
-        unsetenv("SAFETY_CORE_WATCHDOG_PERIOD_NS");
-        unsetenv("SAFETY_CORE_LOCALIZATION_TIMEOUT_NS");
-        unsetenv("SAFETY_CORE_MAX_SPEED_MPS");
-        unsetenv("SAFETY_CORE_MAX_ACCEL_MPS2");
-        unsetenv("SAFETY_CORE_MAX_DECEL_MPS2");
-        unsetenv("SAFETY_CORE_CONTROL_LATENCY_S");
-        unsetenv("SAFETY_CORE_SAFETY_BUFFER_M");
-    }
+    using safety_core::test_support::clear_config_env_vars;
+    using safety_core::test_support::make_context_defaults;
 
 } // namespace
 
@@ -53,7 +22,7 @@ int main()
     using safety_core::system::ContextWithConfig;
 
     bool ok = true;
-    clear_env_vars();
+    clear_config_env_vars();
 
     safety_core::platform::ManualClock manual_clock;
     CaptureTransport transport;
@@ -69,7 +38,7 @@ int main()
 
     ContextWithConfig built{};
     ContextFactoryOptions options{};
-    options.defaults             = make_defaults();
+    options.defaults             = make_context_defaults();
     options.clock                = &manual_clock;
     options.diagnostic_transport = &transport;
     options.safety_supervisor    = &supervisor;
@@ -198,7 +167,7 @@ int main()
 
     for (const auto& c : matrix)
     {
-        clear_env_vars();
+        clear_config_env_vars();
         setenv("SAFETY_CORE_CONFIG_VERSION", c.version, 1);
         setenv("SAFETY_CORE_SAFETY_BUFFER_M", c.safety_buffer, 1);
 
@@ -215,7 +184,7 @@ int main()
         }
     }
 
-    clear_env_vars();
+    clear_config_env_vars();
 
     if (!ok)
     {

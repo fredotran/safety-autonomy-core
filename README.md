@@ -17,7 +17,7 @@ High-assurance C++ core for safety-minded robotics and autonomous vehicles: dete
 - `src/` implementations (platform clocks, diagnostics adapters, control/filter cores)
 - `tests/` lightweight unit/property tests (state machine, safety envelope, system context integration)
 - `tools/dev/run_quality_gate.sh` one-command local maintainer gate (build + tests + policy, optional coverage)
-- `CONTRIBUTING.md` maintenance workflow, PR checklist, and safety-case update expectations
+- `markdown/CONTRIBUTING.md` maintenance workflow, PR checklist, and safety-case update expectations
 - `CMakeLists.txt` library + smoke test target
 - `.clang-format`, `.clang-tidy` house style and lint rules
 - `.gitlab-ci.yml` CI pipeline (format, clang-tidy, build, tests, security scans)
@@ -165,6 +165,7 @@ Notes:
 - `clang_tidy`: static analysis over library sources
 - `hook_smoke`: validates repository pre-commit auto-fix behavior on staged C++ files
 - `policy_guard`: banned API checks (exceptions, dynamic allocation calls, `abort`) in core safety code
+- `safety_case_guard`: verifies required safety-case artifacts and release-checklist structure are present
 - `build_and_test`: CMake build + ctest (with sanitizers on by default)
 - Includes policy tests that guard no-allocation startup paths (`no_allocation_policy_tests`).
 - Includes a symbol-level guard that fails CI if `context_factory` object code references heap allocation APIs (`operator new`/`malloc` family).
@@ -191,15 +192,26 @@ Notes:
 - `package_config_smoke`: verifies install/export + `find_package(safety_core CONFIG)` consumption.
 
 ## Safety case artifacts
-- `docs/safety_case/traceability_matrix.md`: hazard-to-control-to-test traceability starter matrix.
-- `docs/safety_case/outline.md`: structured claims/assumptions/residual-risk starter outline.
-- `docs/safety_case/assumptions_register.md`: explicit assumption inventory and monitoring evidence.
-- `docs/safety_case/residual_risk_register.md`: residual risk tracking with mitigation ownership.
-- `docs/safety_case/safety_manual.md`: integration constraints and required wiring for safety use.
-- `docs/safety_case/verification_protocol_template.md`: requirement-driven verification and sign-off template.
+- `markdown/docs/safety_case/traceability_matrix.md`: hazard-to-control-to-test traceability starter matrix.
+- `markdown/docs/safety_case/outline.md`: structured claims/assumptions/residual-risk starter outline.
+- `markdown/docs/safety_case/assumptions_register.md`: explicit assumption inventory and monitoring evidence.
+- `markdown/docs/safety_case/residual_risk_register.md`: residual risk tracking with mitigation ownership.
+- `markdown/docs/safety_case/safety_manual.md`: integration constraints and required wiring for safety use.
+- `markdown/docs/safety_case/verification_protocol_template.md`: requirement-driven verification and sign-off template.
+- `markdown/docs/safety_case/iso_3691_4_clause_matrix.md`: clause-level conformance starter matrix with explicit certification-gap tracking.
+- `markdown/docs/safety_case/iso26262_iso13849_crosswalk.md`: repository-level crosswalk of expected ISO 26262/ISO 13849 evidence domains.
+- `markdown/docs/safety_case/functional_safety_plan.md`: functional safety activity, role, and release-gate plan.
+- `markdown/docs/safety_case/vv_strategy.md`: verification and validation strategy baseline for safety requirements.
+- `markdown/docs/safety_case/tool_confidence_register.md`: tool confidence controls for safety evidence toolchain.
+- `markdown/docs/safety_case/change_impact_assessment_template.md`: template for safety change-impact evaluation.
+- `markdown/docs/safety_case/release_safety_evidence_checklist.md`: release gating checklist for safety evidence completeness.
+
+### Standards readiness note
+This repository includes process and evidence scaffolding intended to support ISO 26262 and ISO 13849 readiness activities.
+Formal compliance/certification claims still require project-specific system integration evidence, independent assessment, and organizational process records.
 
 ## Diagnostics integration guide
-- `docs/diagnostics/watchdog_integration_guide.md`: watchdog sizing, required topics, and beacon wiring checklist.
+- `markdown/docs/diagnostics/watchdog_integration_guide.md`: watchdog sizing, required topics, and beacon wiring checklist.
 
 ## License
 TBD (select per-robot/per-project commercial licensing with mandatory support/maintenance).

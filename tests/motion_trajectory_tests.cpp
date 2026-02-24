@@ -1,32 +1,13 @@
-#include "safety_core/config/system_config.hpp"
 #include "safety_core/motion/trajectory.hpp"
 #include "test_support.hpp"
 
-#include <chrono>
 #include <iostream>
 #include <limits>
 
 namespace
 {
     using safety_core::test_support::check;
-
-    safety_core::config::SystemConfig make_defaults()
-    {
-        using namespace std::chrono_literals;
-
-        safety_core::config::SystemConfig cfg{};
-        cfg.config_version                  = safety_core::config::kCurrentSystemConfigVersion;
-        cfg.timing.control_period           = 100ms;
-        cfg.timing.watchdog_period          = 200ms;
-        cfg.timing.localization_timeout     = 2s;
-        cfg.envelope.max_speed_mps          = 2.0;
-        cfg.envelope.max_accel_mps2         = 1.0;
-        cfg.envelope.max_comfort_decel_mps2 = 1.0;
-        cfg.envelope.control_latency_s      = 0.1;
-        cfg.envelope.safety_buffer_m        = 0.2;
-        cfg.max_tasks                       = 4U;
-        return cfg;
-    }
+    using safety_core::test_support::make_motion_defaults;
 
 } // namespace
 
@@ -49,7 +30,7 @@ int main()
 
     // Commentary: validator enforces monotonic timeline and bounded kinematics from system config.
     TrajectoryValidator validator;
-    const auto cfg = make_defaults();
+    const auto cfg = make_motion_defaults();
     validator.apply_config(cfg);
     validator.set_max_jerk_mps3(4.0);
 

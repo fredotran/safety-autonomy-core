@@ -1,9 +1,8 @@
-#include "safety_core/diag/diagnostic_transport.hpp"
 #include "safety_core/diag/health_beacon_publisher.hpp"
 #include "safety_core/diag/logging_health_monitor.hpp"
 #include "safety_core/diag/topics.hpp"
 #include "safety_core/exec/task_executor.hpp"
-#include "safety_core/platform/clock.hpp"
+#include "safety_core/platform/manual_clock.hpp"
 #include "safety_core/safety/safety_envelope.hpp"
 #include "safety_core/state_machine/state_machine.hpp"
 #include "safety_core/system/system_context.hpp"
@@ -17,28 +16,7 @@
 namespace
 {
     using safety_core::test_support::check;
-
-    class StubClock : public safety_core::platform::Clock
-    {
-      public:
-        StubClock()
-        {
-            now_ = safety_core::time::TimePoint{};
-        }
-
-        [[nodiscard]] safety_core::time::TimePoint now() const noexcept override
-        {
-            return now_;
-        }
-
-        void advance(safety_core::time::Duration delta) noexcept
-        {
-            now_ += delta;
-        }
-
-      private:
-        safety_core::time::TimePoint now_;
-    };
+    using StubClock = safety_core::platform::ManualClock;
 
     using CaptureTransport = safety_core::test_support::CaptureTransport;
 

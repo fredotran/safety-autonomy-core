@@ -1,47 +1,15 @@
 #include "safety_core/config/env_loader.hpp"
 #include "test_support.hpp"
 
-#include <chrono>
 #include <cmath>
-#include <cstdlib>
 #include <iostream>
 #include <string>
 
 namespace
 {
     using safety_core::test_support::check;
-
-    safety_core::config::SystemConfig make_defaults()
-    {
-        using namespace std::chrono_literals;
-
-        safety_core::config::SystemConfig cfg{};
-        cfg.config_version                  = 2U;
-        cfg.timing.control_period           = 100ms;
-        cfg.timing.watchdog_period          = 200ms;
-        cfg.timing.localization_timeout     = 2s;
-        cfg.envelope.max_speed_mps          = 1.2;
-        cfg.envelope.max_accel_mps2         = 0.6;
-        cfg.envelope.max_comfort_decel_mps2 = 0.8;
-        cfg.envelope.control_latency_s      = 0.1;
-        cfg.envelope.safety_buffer_m        = 0.2;
-        cfg.max_tasks                       = 4U;
-        return cfg;
-    }
-
-    void clear_env_vars()
-    {
-        unsetenv("SAFETY_CORE_CONFIG_VERSION");
-        unsetenv("SAFETY_CORE_MAX_TASKS");
-        unsetenv("SAFETY_CORE_CONTROL_PERIOD_NS");
-        unsetenv("SAFETY_CORE_WATCHDOG_PERIOD_NS");
-        unsetenv("SAFETY_CORE_LOCALIZATION_TIMEOUT_NS");
-        unsetenv("SAFETY_CORE_MAX_SPEED_MPS");
-        unsetenv("SAFETY_CORE_MAX_ACCEL_MPS2");
-        unsetenv("SAFETY_CORE_MAX_DECEL_MPS2");
-        unsetenv("SAFETY_CORE_CONTROL_LATENCY_S");
-        unsetenv("SAFETY_CORE_SAFETY_BUFFER_M");
-    }
+    using safety_core::test_support::clear_config_env_vars;
+    using safety_core::test_support::make_context_defaults;
 
 } // namespace
 
@@ -50,9 +18,9 @@ int main()
     using safety_core::config::load_from_env;
 
     bool ok                                          = true;
-    const safety_core::config::SystemConfig defaults = make_defaults();
+    const safety_core::config::SystemConfig defaults = make_context_defaults();
 
-    clear_env_vars();
+    clear_config_env_vars();
 
     // Leading space and plus sign should parse.
     setenv("SAFETY_CORE_MAX_TASKS", "+7", 1);
@@ -124,7 +92,7 @@ int main()
                     "mixed-token max_speed input should fallback to default");
     }
 
-    clear_env_vars();
+    clear_config_env_vars();
 
     if (!ok)
     {

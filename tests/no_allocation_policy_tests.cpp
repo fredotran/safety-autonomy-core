@@ -5,7 +5,6 @@
 #include "test_support.hpp"
 
 #include <atomic>
-#include <chrono>
 #include <cstdlib>
 #include <iostream>
 #include <new>
@@ -30,6 +29,7 @@ namespace
     }
 
     using safety_core::test_support::check;
+    using safety_core::test_support::make_context_defaults;
 
     class CaptureTransport final : public safety_core::diag::DiagnosticTransport
     {
@@ -43,24 +43,6 @@ namespace
         std::size_t publish_count{0U};
         safety_core::diag::DiagnosticEvent last_event{};
     };
-
-    safety_core::config::SystemConfig make_defaults()
-    {
-        using namespace std::chrono_literals;
-
-        safety_core::config::SystemConfig cfg{};
-        cfg.config_version                  = safety_core::config::kCurrentSystemConfigVersion;
-        cfg.timing.control_period           = 100ms;
-        cfg.timing.watchdog_period          = 200ms;
-        cfg.timing.localization_timeout     = 2s;
-        cfg.envelope.max_speed_mps          = 1.2;
-        cfg.envelope.max_accel_mps2         = 0.6;
-        cfg.envelope.max_comfort_decel_mps2 = 0.8;
-        cfg.envelope.control_latency_s      = 0.1;
-        cfg.envelope.safety_buffer_m        = 0.2;
-        cfg.max_tasks                       = 4U;
-        return cfg;
-    }
 
 } // namespace
 
@@ -139,7 +121,7 @@ int main()
     CaptureTransport transport;
 
     ContextFactoryOptions options{};
-    options.defaults             = make_defaults();
+    options.defaults             = make_context_defaults();
     options.validation_policy    = ValidationPolicy::AllowWarnings;
     options.clock                = &clock;
     options.diagnostic_transport = &transport;
