@@ -29,6 +29,22 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
+### Packaging
+Generate installable archives (library + headers + demo app):
+
+```bash
+cmake --build build --target package
+```
+
+This produces both `.tar.gz` and `.zip` artifacts under `build/` with platform-specific names such as
+`safety-core-0.1.0-Linux-x86_64.{tar.gz,zip}`. To create a source-only bundle:
+
+```bash
+cmake --build build --target package_source
+```
+
+Artifacts include the exported CMake config files so downstream projects can `find_package(safety_core CONFIG)`.
+
 ## Maintainer workflow (recommended)
 ```bash
 tools/dev/run_quality_gate.sh

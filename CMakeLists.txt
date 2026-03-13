@@ -40,6 +40,12 @@ target_include_directories(safety_core
         $<INSTALL_INTERFACE:include>
 )
 
+add_executable(safety_core_app
+    src/app/safety_core_app.cpp
+)
+
+target_link_libraries(safety_core_app PRIVATE safety_core)
+
 target_compile_options(safety_core PRIVATE
     -Wall
     -Wextra
@@ -265,3 +271,15 @@ install(FILES
 export(EXPORT safety_core_targets
     FILE "${CMAKE_CURRENT_BINARY_DIR}/safety_coreTargets.cmake"
     NAMESPACE safety_core::)
+
+# Packaging configuration
+include(CPack)
+set(CPACK_PACKAGE_NAME "safety-core")
+set(CPACK_PACKAGE_VENDOR "Safety Autonomy Team")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Safety Autonomy Core library and demo application")
+set(CPACK_PACKAGE_CONTACT "safety-core@example.com")
+set(CPACK_PACKAGE_FILE_NAME
+    "${CPACK_PACKAGE_NAME}-${PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
+set(CPACK_GENERATOR "TGZ;ZIP")
+set(CPACK_SOURCE_GENERATOR "TGZ")
+set(CPACK_SOURCE_IGNORE_FILES "/build/;/build-coverage/;/.git/;.gitlab-ci.yml" )
