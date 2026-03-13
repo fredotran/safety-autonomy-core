@@ -45,6 +45,22 @@ cmake --build build --target package_source
 
 Artifacts include the exported CMake config files so downstream projects can `find_package(safety_core CONFIG)`.
 
+### ROS 2 package usage
+This repository can be built as an `ament_cmake` ROS 2 package (`package.xml` at repo root):
+
+```bash
+colcon build --packages-select safety_autonomy_core --cmake-args -DSAFETY_CORE_ENABLE_AMENT=ON
+```
+
+After sourcing the workspace, downstream ROS 2 packages can link the library with:
+
+```cmake
+find_package(safety_autonomy_core REQUIRED)
+target_link_libraries(my_node PRIVATE safety_core::safety_core)
+```
+
+If you prefer non-ROS standalone builds, keep `SAFETY_CORE_ENABLE_AMENT=OFF` (default).
+
 ## Maintainer workflow (recommended)
 ```bash
 tools/dev/run_quality_gate.sh

@@ -13,6 +13,12 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include(CMakePackageConfigHelpers)
 
+option(SAFETY_CORE_ENABLE_AMENT "Enable ROS 2 ament package integration" OFF)
+
+if(SAFETY_CORE_ENABLE_AMENT)
+    find_package(ament_cmake REQUIRED)
+endif()
+
 add_library(safety_core STATIC
     src/result.cpp
     src/common/time.cpp
@@ -256,6 +262,9 @@ install(TARGETS safety_core
     RUNTIME DESTINATION bin
     INCLUDES DESTINATION include)
 
+install(TARGETS safety_core_app
+    RUNTIME DESTINATION bin)
+
 install(DIRECTORY include/ DESTINATION include)
 
 install(EXPORT safety_core_targets
@@ -273,7 +282,6 @@ export(EXPORT safety_core_targets
     NAMESPACE safety_core::)
 
 # Packaging configuration
-include(CPack)
 set(CPACK_PACKAGE_NAME "safety-core")
 set(CPACK_PACKAGE_VENDOR "Safety Autonomy Team")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Safety Autonomy Core library and demo application")
@@ -283,3 +291,14 @@ set(CPACK_PACKAGE_FILE_NAME
 set(CPACK_GENERATOR "TGZ;ZIP")
 set(CPACK_SOURCE_GENERATOR "TGZ")
 set(CPACK_SOURCE_IGNORE_FILES "/build/;/build-coverage/;/.git/;.gitlab-ci.yml" )
+include(CPack)
+
+if(SAFETY_CORE_ENABLE_AMENT)
+    install(EXPORT safety_core_targets
+        FILE safety_coreTargets.cmake
+        NAMESPACE safety_core::
+        DESTINATION share/${PROJECT_NAME}/cmake)
+    ament_export_targets(safety_core_targets HAS_LIBRARY_TARGET)
+    ament_export_include_directories(include)
+    ament_package()
+endif()
