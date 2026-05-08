@@ -1,0 +1,72 @@
+# Build directories
+build/
+build-coverage/
+install/
+log/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# C++ coverage
+*.gcov
+*.gcda
+*.gcno
+.cache/
+
+# Documentation
+markdown/docs/
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Demo artifacts
+demo_output.txt
+
+# Node modules (if any)
+node_modules/
+
+# Temporary files
+*.tmp
+*.bak
+*.log
+
+# ROS2 specific
+ros2/build/
+ros2/install/
+ros2/log/
+ros2/.colcon_workspace/
+
+# Safety case artifacts (not needed for runtime)
+markdown/docs/safety_case/
+
+# Developer tools
+tools/
