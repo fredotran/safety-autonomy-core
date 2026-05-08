@@ -7,11 +7,13 @@ on:
       - "ec/**"
       - "devin/**"
       - "feature/**"
+      - "fix/**"
   pull_request:
     branches:
       - main
       - "ec/**"
       - "feature/**"
+      - "fix/**"
   workflow_dispatch:
 
 concurrency:
@@ -20,6 +22,7 @@ concurrency:
 
 permissions:
   contents: read
+  checks: write
 
 env:
   BUILD_DIR: build
@@ -33,12 +36,13 @@ jobs:
   format_check:
     name: format_check (clang-format)
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Install build deps
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends clang-format
+      - name: Cache apt packages
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: clang-format
       - name: Run clang-format --dry-run --Werror
         run: |
           clang-format --version
@@ -47,18 +51,34 @@ jobs:
   clang_tidy:
     name: clang_tidy (static analysis)
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     # Pre-existing readability/bugprone findings in the core C++ library; tracked as known
     # debt and intentionally non-blocking until a dedicated cleanup pass lands.
     continue-on-error: true
+    strategy:
+      matrix:
+        compiler: [clang, gcc]
     steps:
       - uses: actions/checkout@v4
-      - name: Install build deps
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            build-essential cmake ninja-build clang clang-tidy
+      - name: Cache apt packages
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: build-essential cmake ninja-build clang clang-tidy gcc g++
+      - name: Cache CMake build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.BUILD_DIR }}
+            ~/.ccache
+          key: ${{ runner.os }}-clang-tidy-${{ matrix.compiler }}-${{ hashFiles('**/CMakeLists.txt', '**/*.cpp', '**/*.hpp') }}
+          restore-keys: |
+            ${{ runner.os }}-clang-tidy-${{ matrix.compiler }}-
+            ${{ runner.os }}-clang-tidy-
       - name: Configure
-        run: cmake -S . -B ${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug -DSAFETY_CORE_ENABLE_SANITIZERS=OFF
+        run: |
+          CC=${{ matrix.compiler == 'gcc' && 'gcc' || 'clang' }}
+          CXX=${{ matrix.compiler == 'gcc' && 'g++' || 'clang++' }}
+          cmake -S . -B ${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug -DSAFETY_CORE_ENABLE_SANITIZERS=OFF
       - name: Build safety_core
         run: cmake --build ${BUILD_DIR} --target safety_core
       - name: clang-tidy
@@ -67,13 +87,21 @@ jobs:
   hook_smoke:
     name: hook_smoke (pre-commit hook)
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: Install build deps
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            build-essential cmake ninja-build clang clang-tidy clang-format git
+      - name: Cache apt packages
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: build-essential cmake ninja-build clang clang-tidy clang-format git
+      - name: Cache CMake build
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.BUILD_DIR }}
+          key: ${{ runner.os }}-hook-smoke-${{ hashFiles('**/CMakeLists.txt', '**/*.cpp', '**/*.hpp') }}
+          restore-keys: |
+            ${{ runner.os }}-hook-smoke-
+            ${{ runner.os }}-
       - name: Configure + build safety_core
         run: |
           cmake -S . -B ${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug -DSAFETY_CORE_ENABLE_SANITIZERS=OFF
@@ -94,6 +122,7 @@ jobs:
   policy_guard:
     name: policy_guard (banned API check)
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - name: Run policy verifier
@@ -104,6 +133,7 @@ jobs:
   safety_case_guard:
     name: safety_case_guard (artifact presence)
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - name: Run safety case verifier
@@ -114,15 +144,32 @@ jobs:
   build_and_test:
     name: build_and_test (sanitizers + ctest)
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        compiler: [clang, gcc]
     steps:
       - uses: actions/checkout@v4
-      - name: Install build deps
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            build-essential cmake ninja-build clang clang-tidy clang-format gcovr ccache
+      - name: Cache apt packages
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: build-essential cmake ninja-build clang clang-tidy clang-format gcovr ccache gcc g++
+      - name: Cache CMake build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.BUILD_DIR }}
+            ~/.ccache
+          key: ${{ runner.os }}-build-test-${{ matrix.compiler }}-${{ hashFiles('**/CMakeLists.txt', '**/*.cpp', '**/*.hpp') }}
+          restore-keys: |
+            ${{ runner.os }}-build-test-${{ matrix.compiler }}-
+            ${{ runner.os }}-build-test-
+            ${{ runner.os }}-
       - name: Configure
-        run: cmake -S . -B ${BUILD_DIR} ${CMAKE_FLAGS}
+        run: |
+          CC=${{ matrix.compiler == 'gcc' && 'gcc' || 'clang' }}
+          CXX=${{ matrix.compiler == 'gcc' && 'g++' || 'clang++' }}
+          cmake -S . -B ${BUILD_DIR} ${CMAKE_FLAGS}
       - name: Build
         run: cmake --build ${BUILD_DIR}
       - name: No-heap symbol guard
@@ -138,20 +185,36 @@ jobs:
           done
       - name: ctest
         run: ctest --test-dir ${BUILD_DIR} --output-on-failure
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.compiler }}
+          path: |
+            ${{ env.BUILD_DIR }}/Testing/
+            ${{ env.BUILD_DIR }}/test-results/
 
   coverage:
     name: coverage (gcovr gate)
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     env:
       CC: gcc
       CXX: g++
     steps:
       - uses: actions/checkout@v4
-      - name: Install build deps
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            build-essential cmake ninja-build gcovr
+      - name: Cache apt packages
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: build-essential cmake ninja-build gcovr
+      - name: Cache coverage build
+        uses: actions/cache@v4
+        with:
+          path: build-coverage
+          key: ${{ runner.os }}-coverage-${{ hashFiles('**/CMakeLists.txt', '**/*.cpp', '**/*.hpp') }}
+          restore-keys: |
+            ${{ runner.os }}-coverage-
+            ${{ runner.os }}-
       - name: Configure (coverage)
         run: cmake -S . -B build-coverage -DCMAKE_BUILD_TYPE=Debug -DSAFETY_CORE_ENABLE_SANITIZERS=OFF -DSAFETY_CORE_ENABLE_COVERAGE=ON
       - name: Build (coverage)
@@ -164,14 +227,41 @@ jobs:
             --print-summary \
             --fail-under-line ${COVERAGE_MIN_LINE} \
             --fail-under-branch ${COVERAGE_MIN_BRANCH}
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            build-coverage/coverage.info
+            build-coverage/coverage.xml
 
   ros2_build:
     name: ros2_build (colcon)
     runs-on: ubuntu-24.04
     container:
       image: ros:jazzy-ros-base
+      options: --user root
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          force-node24: true
+      - name: Install ccache
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends ccache
+      - name: Cache colcon build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ros2/build
+            ros2/install
+            ~/.ccache
+          key: ${{ runner.os }}-ros2-build-${{ hashFiles('ros2/**/CMakeLists.txt', 'ros2/**/*.cpp', 'ros2/**/*.py') }}
+          restore-keys: |
+            ${{ runner.os }}-ros2-build-
+            ${{ runner.os }}-
       - name: Install ros-gz
         run: |
           apt-get update -qq
@@ -191,7 +281,8 @@ jobs:
             --base-paths . ${ROS_WORKSPACE}/src \
             --cmake-args -DSAFETY_CORE_ENABLE_AMENT=ON \
                          -DSAFETY_CORE_ENABLE_SANITIZERS=OFF \
-                         -DSAFETY_CORE_ENABLE_WERROR=OFF
+                         -DSAFETY_CORE_ENABLE_WERROR=OFF \
+            --build-tool-args --cache-dir=$(pwd)/.ccache_cache
           source install/setup.bash
           echo "ROS 2 build successful"
 
@@ -200,10 +291,24 @@ jobs:
     runs-on: ubuntu-24.04
     container:
       image: ros:jazzy-ros-base
+      options: --user root
+    timeout-minutes: 20
     # Copyright check is non-blocking due to SPDX license identifier format not being recognized by ament_copyright
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
+        with:
+          force-node24: true
+      - name: Cache colcon build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ros2/build
+            ros2/install
+          key: ${{ runner.os }}-ros2-lint-strict-${{ hashFiles('ros2/**/CMakeLists.txt', 'ros2/**/*.cpp', 'ros2/**/*.py') }}
+          restore-keys: |
+            ${{ runner.os }}-ros2-lint-strict-
+            ${{ runner.os }}-
       - name: Install ros-gz + ament linters
         run: |
           apt-get update -qq
@@ -236,11 +341,25 @@ jobs:
     runs-on: ubuntu-24.04
     container:
       image: ros:jazzy-ros-base
+      options: --user root
+    timeout-minutes: 15
     # Style checks are non-blocking: ament_flake8/ament_pep257 findings in demo scripts
     # don't affect functionality. Strict checks (ament_lint_cmake, ament_copyright) are in ros2_lint_strict.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
+        with:
+          force-node24: true
+      - name: Cache colcon build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ros2/build
+            ros2/install
+          key: ${{ runner.os }}-ros2-lint-style-${{ hashFiles('ros2/**/CMakeLists.txt', 'ros2/**/*.py') }}
+          restore-keys: |
+            ${{ runner.os }}-ros2-lint-style-
+            ${{ runner.os }}-
       - name: Install ros-gz + ament linters
         run: |
           apt-get update -qq
@@ -272,8 +391,27 @@ jobs:
     runs-on: ubuntu-24.04
     container:
       image: ros:jazzy-ros-base
+      options: --user root
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+        with:
+          force-node24: true
+      - name: Cache colcon build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ros2/build
+            ros2/install
+            ~/.ccache
+          key: ${{ runner.os }}-ros2-test-${{ hashFiles('ros2/**/CMakeLists.txt', 'ros2/**/*.cpp', 'ros2/**/*.py') }}
+          restore-keys: |
+            ${{ runner.os }}-ros2-test-
+            ${{ runner.os }}-
+      - name: Install ccache
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends ccache
       - name: Install ros-gz
         run: |
           apt-get update -qq
@@ -292,7 +430,16 @@ jobs:
             --base-paths . ${ROS_WORKSPACE}/src \
             --cmake-args -DSAFETY_CORE_ENABLE_AMENT=ON \
                          -DSAFETY_CORE_ENABLE_SANITIZERS=OFF \
-                         -DSAFETY_CORE_ENABLE_WERROR=OFF
+                         -DSAFETY_CORE_ENABLE_WERROR=OFF \
+            --build-tool-args --cache-dir=$(pwd)/.ccache_cache
           source install/setup.bash
           colcon test --packages-select safety_core_ros --event-handlers console_direct+
           colcon test-result --all
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ros2-test-results
+          path: |
+            ros2/build/safety_core_ros/test_results/
+            ros2/log/
