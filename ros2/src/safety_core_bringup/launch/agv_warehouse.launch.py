@@ -77,7 +77,7 @@ def generate_launch_description():
     # SLAM disabled by default — the demo runs in pure wheel-odometry mode.
     declare_slam = DeclareLaunchArgument("slam", default_value="false")
     declare_nav2 = DeclareLaunchArgument("nav2", default_value="true")
-    # EKF localization enabled by default for better odometry in outdoor/mixed environments.
+    # EKF localization disabled by default due to YAML parsing issues in container
     declare_ekf = DeclareLaunchArgument("ekf", default_value="false")
     declare_gps = DeclareLaunchArgument(
         "gps",
@@ -94,6 +94,26 @@ def generate_launch_description():
         default_value="false",
         description="Enable teleoperation node for manual control",
     )
+    declare_environment = DeclareLaunchArgument(
+        "environment",
+        default_value="outdoor",
+        description="Environment type: 'outdoor' (EKF+GPS+Nav2), 'indoor' (EKF+SLAM+Nav2), 'warehouse' (EKF+Nav2, map-based)",
+        choices=["outdoor", "indoor", "warehouse"],
+    )
+
+    # Environment-specific configuration
+    # Outdoor: EKF + GPS + Nav2 (default)
+    # Indoor: EKF + SLAM + Nav2
+    # Warehouse: EKF + Nav2 with map-based navigation
+    use_ekf_env = PythonExpression([
+        ekf
+    ])
+    use_gps_env = PythonExpression([
+        "'true' if '", environment, "' == 'outdoor' else 'false'"
+    ])
+    use_slam_env = PythonExpression([
+        "'true' if '", environment, "' == 'indoor' else 'false'"
+    ])
 
     # 1. Simulation (Gazebo + AGV + ros_gz_bridge + robot_state_publisher).
     sim = IncludeLaunchDescription(

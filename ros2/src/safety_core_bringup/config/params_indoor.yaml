@@ -1,0 +1,30 @@
+# Environment-specific parameters for indoor navigation
+# Optimized for GPS-denied indoor environments with SLAM
+
+localization:
+  ekf_enabled: true
+  gps_enabled: false
+  slam_enabled: true
+  visual_odom_enabled: true
+  adaptive_noise_enabled: true
+  
+ekf:
+  config_file: ekf_config.yaml
+  process_noise_base: 0.03  # Lower noise for indoor precision
+  process_noise_slip: 0.3
+  
+slam:
+  config_file: slam_toolbox_warehouse.yaml
+  map_update_interval: 3.0
+  resolution: 0.05
+  
+sensors:
+  wheel_odom_timeout: 0.2
+  imu_timeout: 0.2
+  gps_timeout: 999.0  # Disabled
+  visual_odom_timeout: 0.3
+  
+navigation:
+  max_speed: 1.0
+  max_acceleration: 0.8
+  safety_distance: 0.8
