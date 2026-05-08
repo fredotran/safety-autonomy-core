@@ -83,8 +83,9 @@ def generate_launch_description():
             "-topic", "/robot_description",
             "-x", spawn_x,
             "-y", spawn_y,
-            "-z", "0.05",
+            "-z", "0.1",
             "-Y", spawn_yaw,
+            "-allow_renaming", "false",
         ],
         output="screen",
     )

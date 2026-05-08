@@ -251,31 +251,20 @@
     </model>
 
     <!-- ===========================================================
-         WORKER ACTOR (animated pedestrian crossing the aisle)
-         Uses Gazebo's actor system; falls back gracefully if the
-         skin asset is absent (visualized as a simple animated cube).
+         WORKER MODEL (simple box representing a worker)
+         Static obstacle to avoid Fuel asset loading issues
     =========================================================== -->
-    <actor name="warehouse_worker">
-      <pose>-9 -1.0 0 0 0 0</pose>
-      <skin>
-        <filename>https://fuel.gazebosim.org/1.0/openrobotics/models/actor/tip/files/meshes/walk.dae</filename>
-        <scale>1.0</scale>
-      </skin>
-      <animation name="walking">
-        <filename>https://fuel.gazebosim.org/1.0/openrobotics/models/actor/tip/files/meshes/walk.dae</filename>
-        <interpolate_x>true</interpolate_x>
-      </animation>
-      <script>
-        <loop>true</loop>
-        <delay_start>0</delay_start>
-        <auto_start>true</auto_start>
-        <trajectory id="0" type="walking">
-          <waypoint><time>0</time><pose>-9 -1.0 0 0 0 0</pose></waypoint>
-          <waypoint><time>4</time><pose>-9  1.0 0 0 0 1.5708</pose></waypoint>
-          <waypoint><time>8</time><pose>-9 -1.0 0 0 0 -1.5708</pose></waypoint>
-        </trajectory>
-      </script>
-    </actor>
+    <model name="warehouse_worker">
+      <pose>-9 0 0.9 0 0 0</pose>
+      <static>true</static>
+      <link name="link">
+        <collision name="c"><geometry><box><size>0.5 0.5 1.8</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>0.5 0.5 1.8</size></box></geometry>
+          <material><ambient>0.4 0.6 0.8 1</ambient><diffuse>0.5 0.7 0.9 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
 
   </world>
 </sdf>
