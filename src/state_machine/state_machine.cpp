@@ -44,12 +44,10 @@ namespace safety_core::sm
 
         // Atomic transition using compare-and-swap to prevent race conditions
         Mode prev = mode_.load(std::memory_order_acquire);
-        while (!mode_.compare_exchange_weak(prev, target,
-                                             std::memory_order_acq_rel,
-                                             std::memory_order_acquire))
+        while (!mode_.compare_exchange_weak(prev, target, std::memory_order_acq_rel, std::memory_order_acquire))
         {
             // CAS failed: prev now contains the current mode
-            // Re-validate that transition is still allowed from the new current state
+            // Re-validate that transition is still allowed from the updated current state
             if (!allowed(target))
             {
                 return Result::InvalidState("transition not allowed");
@@ -86,9 +84,7 @@ namespace safety_core::sm
 
         // Atomic transition to Idle mode after clearing fault
         Mode prev = mode_.load(std::memory_order_acquire);
-        while (!mode_.compare_exchange_weak(prev, Mode::Idle,
-                                             std::memory_order_acq_rel,
-                                             std::memory_order_acquire))
+        while (!mode_.compare_exchange_weak(prev, Mode::Idle, std::memory_order_acq_rel, std::memory_order_acquire))
         {
             // CAS failed: prev now contains the current mode
             // Allow transition even if state changed (fault clearing takes precedence)
@@ -120,9 +116,7 @@ namespace safety_core::sm
 
         // Atomic transition to Degraded mode
         Mode prev = current;
-        while (!mode_.compare_exchange_weak(prev, Mode::Degraded,
-                                             std::memory_order_acq_rel,
-                                             std::memory_order_acquire))
+        while (!mode_.compare_exchange_weak(prev, Mode::Degraded, std::memory_order_acq_rel, std::memory_order_acquire))
         {
             // CAS failed: state changed, check if still valid
             if (prev != Mode::LocalizationLost)

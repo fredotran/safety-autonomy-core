@@ -61,7 +61,7 @@ namespace safety_core::exec
             {
                 return Result::Fault("configured max tasks exceeds executor capacity");
             }
-            max_tasks_       = static_cast<std::size_t>(cfg.max_tasks);
+            max_tasks_ = static_cast<std::size_t>(cfg.max_tasks);
             // Safety: ensure max_tasks_ never exceeds template parameter
             if (max_tasks_ > MaxTasks)
             {

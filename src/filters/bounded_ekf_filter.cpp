@@ -14,7 +14,7 @@ namespace safety_core::filters
     {
         // Allow 10x expected period for sensor delays and stale measurements
         constexpr double kStaleMeasurementMultiplier = 10.0;
-    }
+    } // namespace
 
     void BoundedEkfFilter::reset(double position, double velocity) noexcept
     {

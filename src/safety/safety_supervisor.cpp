@@ -194,7 +194,7 @@ namespace safety_core::safety
     {
         // Cache pointers to prevent race conditions
         auto* transport = transport_;
-        auto* clock = clock_;
+        auto* clock     = clock_;
         if (transport == nullptr)
         {
             return;

@@ -46,8 +46,7 @@ namespace safety_core::filters
 
             // Validate parameter ranges
             if (params.min_variance < 0.0 || params.max_variance < params.min_variance ||
-                params.max_abs_position < 0.0 || params.max_abs_velocity < 0.0 ||
-                params.innovation_gate_sigma < 0.0)
+                params.max_abs_position < 0.0 || params.max_abs_velocity < 0.0 || params.innovation_gate_sigma < 0.0)
             {
                 // Keep default parameters if range validation fails
                 return;
