@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  safety-autonomy-demo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    image: safety-autonomy-core:latest
+    container_name: safety-autonomy-demo
+    
+    # Environment variables
+    environment:
+      - DISPLAY=${DISPLAY:-:0}
+      - ROS_DOMAIN_ID=0
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - PYTHONUNBUFFERED=1
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - NVIDIA_VISIBLE_DEVICES=all
+    
+    # Network configuration for ROS2
+    network_mode: host
+    
+    # Display forwarding for GUI applications (Gazebo, RViz)
+    volumes:
+      # Mount X11 socket for display forwarding
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      # Mount X11 authorization
+      - ${XAUTHORITY:-/home/$USER/.Xauthority}:/root/.Xauthority:rw
+      # Mount the entire repository for development
+      - .:/workspace/safety-autonomy-core:rw
+      # Persistent build artifacts
+      - ros2-build:/workspace/ros2_ws/build
+      - ros2-install:/workspace/ros2_ws/install
+      - ros2-log:/workspace/ros2_ws/log
+    
+    # GPU support and resource limits (robotics-specific requirements)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+          cpus: '2'
+          memory: 4G
+        limits:
+          cpus: '4'
+          memory: 8G
+    
+    # Privileged mode for hardware access (sensors, etc.)
+    privileged: true
+    
+    # Capabilities for hardware access
+    cap_add:
+      - SYS_ADMIN
+      - NET_ADMIN
+    
+    # Devices for sensor access (if using real hardware)
+    devices:
+      - /dev/dri:/dev/dri
+      - /dev/ttyUSB0:/dev/ttyUSB0
+      - /dev/ttyACM0:/dev/ttyACM0
+    
+    # Working directory
+    working_dir: /workspace/ros2_ws
+    
+    # Health check for production monitoring
+    healthcheck:
+      test: ["CMD", "/bin/bash", "-c", "source /opt/ros/jazzy/setup.bash && source /workspace/ros2_ws/install/setup.bash && ros2 node list || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    
+    # Keep container running
+    stdin_open: true
+    tty: true
+    
+    # Restart policy for production reliability
+    restart: unless-stopped
+    
+    # Command to run by default
+    command: /bin/bash
+
+volumes:
+  ros2-build:
+  ros2-install:
+  ros2-log:

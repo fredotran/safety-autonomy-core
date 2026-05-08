@@ -46,11 +46,21 @@ The project includes a comprehensive ROS 2 demo system with Gazebo simulation fo
 
 ### Quick Demo Start
 
+**Default: Docker (recommended, no ROS2 installation required)**
+
 ```bash
-cd ros2
 ./setup_demo.sh
+# Select demo option from the menu
+```
+
+**Alternative: Local ROS2 installation**
+
+```bash
+./setup_demo.sh --local
 # Select option 1 (Full demo) or option 2 (Safety stack only)
 ```
+
+See [DOCKER.md](DOCKER.md) for complete Docker deployment guide, including GPU support, display forwarding, and hardware integration.
 
 ### Demo Modes
 
@@ -71,6 +81,7 @@ cd ros2
 
 ### Documentation
 
+- [DOCKER.md](DOCKER.md) - Complete Docker deployment guide, including GPU support, display forwarding, and hardware integration
 - [DEMO_GUIDE.md](DEMO_GUIDE.md) - Complete demo documentation, including detailed instructions for each demo mode, best practices, and advanced usage examples
 - [DEMO_TROUBLESHOOTING.md](DEMO_TROUBLESHOOTING.md) - Comprehensive troubleshooting guide for simulation, safety nodes, demo scripts, and performance issues
 - [ROS 2 README](ros2/README.md) - ROS 2 integration details and package documentation
