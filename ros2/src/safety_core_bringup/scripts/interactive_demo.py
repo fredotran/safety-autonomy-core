@@ -1,21 +1,22 @@
 #!/usr/bin/env python3
 """
-Interactive Safety Autonomy Core Demo
+Interactive Safety Autonomy Core Demo.
 
 An interactive menu-driven demo that allows users to trigger specific safety scenarios on demand.
 Perfect for testing individual features or demonstrating specific capabilities.
 """
 
-import rclpy
-from rclpy.node import Node
-from geometry_msgs.msg import Twist
-from safety_core_msgs.msg import SafetyState, EnvelopeStatus
-from std_msgs.msg import Bool
-import time
 import math
-import sys
 import os
+import sys
 import threading
+import time
+
+import rclpy
+from geometry_msgs.msg import Twist
+from rclpy.node import Node
+from safety_core_msgs.msg import EnvelopeStatus, SafetyState
+from std_msgs.msg import Bool
 
 # Add demo utils to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -23,7 +24,10 @@ from demo_utils import DemoLogger, MetricsDisplay
 
 
 class InteractiveDemo(Node):
+    """Interactive demo for safety autonomy core system."""
+
     def __init__(self):
+        """Initialize the interactive demo node."""
         super().__init__('interactive_demo')
         
         # Initialize demo logger with colored output

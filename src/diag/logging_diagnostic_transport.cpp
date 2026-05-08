@@ -1,3 +1,6 @@
+// Copyright (c) 2026 RedEarth OS
+// SPDX-License-Identifier: MIT
+
 #include "safety_core/diag/logging_diagnostic_transport.hpp"
 
 namespace safety_core::diag

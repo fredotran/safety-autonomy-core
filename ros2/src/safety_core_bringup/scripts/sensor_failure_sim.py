@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Sensor Failure Simulation Node
+Sensor Failure Simulation Node.
 
 Simulates realistic sensor failures for testing safety systems:
 - Noise injection (Gaussian noise on sensor readings)
@@ -10,22 +10,26 @@ Simulates realistic sensor failures for testing safety systems:
 - Intermittent failures (periodic issues)
 """
 
-import rclpy
-from rclpy.node import Node
-from sensor_msgs.msg import LaserScan, Imu
-from nav_msgs.msg import Odometry
-import random
-import time
-import sys
 import os
+import random
+import sys
+import time
+
+import rclpy
+from nav_msgs.msg import Odometry
+from rclpy.node import Node
+from sensor_msgs.msg import Imu, LaserScan
 
 # Add demo utils to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from demo_utils import DemoLogger, Color
+from demo_utils import Color, DemoLogger
 
 
 class SensorFailureSim(Node):
+    """Sensor failure simulation node for testing safety systems."""
+
     def __init__(self):
+        """Initialize the sensor failure simulation node."""
         super().__init__('sensor_failure_sim')
         
         # Initialize demo logger

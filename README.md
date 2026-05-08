@@ -377,4 +377,6 @@ See `CONTRIBUTING.md` for:
 
 ## License
 
-Proprietary -- per-robot/per-project commercial licensing with mandatory support/maintenance.
+MIT License - see [LICENSE](LICENSE) file for details.
+
+Copyright (c) 2026 RedEarth OS
