@@ -19,6 +19,7 @@ required_files=(
   "markdown/docs/safety_case/vv_strategy.md"
   "markdown/docs/safety_case/tool_confidence_register.md"
   "markdown/docs/safety_case/change_impact_assessment_template.md"
+  "markdown/docs/safety_case/misra_compliance_tools.md"
 )
 
 for file in "${required_files[@]}"; do

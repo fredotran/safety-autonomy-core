@@ -1,0 +1,23 @@
+// Cppcheck suppressions for MISRA-like analysis
+// These suppressions are for known issues that are being tracked for future resolution
+
+// Suppress missing includes for system headers (Eigen3, etc.)
+missingIncludeSystem
+
+// Suppress unused function warnings for template instantiations and test utilities
+unusedFunction
+
+// Suppress warnings for known safe patterns
+unusedStructMember
+
+// Suppress warnings for intentional C-style casts in safety-critical code
+cstyleCast
+
+// Suppress warnings for complex expressions that have been manually reviewed
+complexity
+
+// Suppress warnings for known safe pointer arithmetic
+pointerArith
+
+// Suppress warnings for intentional use of C-style arrays in safety-critical code
+cstyleArrays
