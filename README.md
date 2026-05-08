@@ -185,7 +185,6 @@ safety-autonomy-core/
 ├── .clang-format              # Code style
 ├── .clang-tidy                # Static analysis rules
 ├── .github/workflows/         # GitHub Actions CI + release-please pipeline
-├── .gitlab-ci.yml             # Legacy GitLab CI pipeline (kept for parity)
 └── package.xml                # ROS 2 ament package manifest
 ```
 
@@ -398,9 +397,7 @@ GitHub Actions workflows live under [`.github/workflows/`](.github/workflows/):
 | Policy | `safety_case_guard` | Safety artifact presence verification |
 | Build | `build_and_test` | CMake build + ctest (sanitizers enabled) |
 | Coverage | `coverage` | gcovr gate (line: 80%, branch: 55%) |
-| ROS 2 | `ros2_build` | `colcon build` of all ROS 2 packages (skips `safety_core_nav2`) |
-| ROS 2 | `ros2_lint` | `ament_lint_cmake`, `ament_copyright`, `ament_flake8`, `ament_pep257` |
-| ROS 2 | `ros2_test` | `colcon test --packages-select safety_core_ros` |
+| ROS 2 | `docker_build` | Docker Compose build of ROS 2 packages (Jazzy + Gazebo + Nav2) |
 
 ## Release Process
 
