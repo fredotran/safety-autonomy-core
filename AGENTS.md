@@ -15,6 +15,9 @@
 - cpp-pro: C/C++ code review
 - python-expert: Python code review
 
+### Git & Version Control
+- git-master: Git operations, GitHub workflows, and version control
+
 ## Project Context
 
 - **ROS 2**: Jazzy
@@ -46,3 +49,4 @@
 - Localization: Use robotics-localization-expert
 - Safety systems: Use cpp-pro for code review
 - DevOps: Use robotics-devops-engineer
+- Git/GitHub issues: Use git-master
