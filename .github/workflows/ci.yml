@@ -231,6 +231,7 @@ jobs:
       image: ros:jazzy-ros-base
     timeout-minutes: 20
     # Copyright check is non-blocking due to SPDX license identifier format not being recognized by ament_copyright
+    # ament_lint_cmake check is kept as-is for CMake linting
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
@@ -259,7 +260,6 @@ jobs:
           source install/setup.bash
           ament_lint_cmake ${ROS_WORKSPACE}/src/safety_core_msgs
           ament_lint_cmake ${ROS_WORKSPACE}/src/safety_core_ros
-          ament_copyright ${ROS_WORKSPACE}/src/safety_core_msgs ${ROS_WORKSPACE}/src/safety_core_ros
 
   ros2_lint_style:
     name: ros2_lint_style (ament_flake8 + ament_pep257)
@@ -280,6 +280,7 @@ jobs:
             ros-${ROS_DISTRO}-robot-localization \
             ros-${ROS_DISTRO}-ament-flake8 \
             ros-${ROS_DISTRO}-ament-pep257 \
+            ros-${ROS_DISTRO}-ament-cmake-copyright \
             python3-colcon-common-extensions
       - name: colcon build (lint targets)
         shell: bash
@@ -297,6 +298,7 @@ jobs:
           source install/setup.bash
           ament_flake8 ${ROS_WORKSPACE}/src/safety_core_ros
           ament_pep257 ${ROS_WORKSPACE}/src/safety_core_ros
+          ament_copyright ${ROS_WORKSPACE}/src/safety_core_msgs ${ROS_WORKSPACE}/src/safety_core_ros
 
   ros2_test:
     name: ros2_test (colcon test)
