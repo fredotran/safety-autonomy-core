@@ -1,3 +1,6 @@
+// Copyright (c) 2026 RedEarth OS
+// SPDX-License-Identifier: MIT
+
 #pragma once
 
 #include "safety_core/diag/health_monitor.hpp"
