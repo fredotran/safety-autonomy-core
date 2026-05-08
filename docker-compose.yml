@@ -13,10 +13,11 @@ services:
     environment:
       - DISPLAY=${DISPLAY:-:0}
       - ROS_DOMAIN_ID=0
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      # RMW_IMPLEMENTATION=rmw_cyclonedds_cpp  # Uncomment if installed
       - PYTHONUNBUFFERED=1
-      - NVIDIA_DRIVER_CAPABILITIES=all
-      - NVIDIA_VISIBLE_DEVICES=all
+      # NVIDIA-specific variables (uncomment if using NVIDIA runtime)
+      # - NVIDIA_DRIVER_CAPABILITIES=all
+      # - NVIDIA_VISIBLE_DEVICES=all
     
     # Network configuration for ROS2
     network_mode: host
@@ -34,19 +35,14 @@ services:
       - ros2-install:/workspace/ros2_ws/install
       - ros2-log:/workspace/ros2_ws/log
     
-    # GPU support and resource limits (robotics-specific requirements)
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-          cpus: '2'
-          memory: 4G
-        limits:
-          cpus: '4'
-          memory: 8G
+    # Resource limits (basic CPU/memory limits)
+    # Note: Advanced reservations require Docker Swarm or specific Compose versions
+    # For basic usage, these limits help prevent resource exhaustion
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '4'
+    #       memory: 8G
     
     # Privileged mode for hardware access (sensors, etc.)
     privileged: true
@@ -58,7 +54,7 @@ services:
     
     # Devices for sensor access (if using real hardware)
     devices:
-      - /dev/dri:/dev/dri
+      # - /dev/dri:/dev/dri  # Uncomment for GPU support
       - /dev/ttyUSB0:/dev/ttyUSB0
       - /dev/ttyACM0:/dev/ttyACM0
     
