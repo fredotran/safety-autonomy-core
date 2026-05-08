@@ -253,7 +253,7 @@ jobs:
         shell: bash
         run: |
           source /opt/ros/${ROS_DISTRO}/setup.bash
-          colcon build --packages-skip safety_core_nav2 \
+          colcon build --packages-skip safety_core_nav2 safety_core_bringup \
             --base-paths . ${ROS_WORKSPACE}/src \
             --cmake-args -DSAFETY_CORE_ENABLE_AMENT=ON \
                          -DSAFETY_CORE_ENABLE_SANITIZERS=OFF \
