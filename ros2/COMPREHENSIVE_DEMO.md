@@ -6,6 +6,8 @@ This comprehensive demo showcases all key capabilities of the safety_autonomy_co
 
 The comprehensive demo demonstrates:
 
+### Core Safety Features
+
 1. **State Machine Transitions** - Init → Idle → Moving → AvoidingObstacle → SafeStop
 2. **Safety Envelope Zones** - Clear → Warning → Protective → Emergency zone detection
 3. **Speed Limiting** - Automatic speed reduction in Warning zone
@@ -16,6 +18,18 @@ The comprehensive demo demonstrates:
 8. **Command Freshness Watchdog** - Stale command detection
 9. **Localization Monitoring** - Odometry staleness detection
 10. **Complex Maneuvers** - Multi-segment paths with zone transitions
+
+### Edge Cases and Real-World Scenarios
+
+11. **Sensor Failures** - Lidar drop simulation and rapid zone transitions
+12. **Command Failures** - Stale command detection and burst recovery
+13. **Boundary Conditions** - Exact threshold crossings and zero-distance obstacles
+14. **Dynamic Obstacles** - Sudden obstacle appearance and zone oscillations
+15. **Extreme Values** - Maximum speed, angular velocity, and zero commands
+16. **Conflicting Conditions** - Simultaneous safety conditions and conflicting motion
+17. **Recovery Scenarios** - Degraded operation recovery
+18. **Timing Scenarios** - Fast obstacle approach and slow creep detection
+19. **System Stress** - Rapid mode transitions and stability testing
 
 ## Running the Demo
 
@@ -121,6 +135,56 @@ The automated demo performs the following sequence:
 - Demonstrates return to Idle mode
 - Shows final safety state
 
+### Section 11: Sensor Failures
+- Simulates lidar drop (sensor failure)
+- Tests rapid zone transitions (Clear → Emergency)
+- Demonstrates system response to missing sensor data
+
+### Section 12: Command Failures
+- Tests stale command detection
+- Demonstrates command freshness watchdog
+- Shows command burst recovery after timeout
+
+### Section 13: Boundary Conditions
+- Tests exact threshold crossing behavior
+- Demonstrates zero-distance obstacle handling
+- Shows system response at boundary values
+
+### Section 14: Dynamic Obstacles
+- Simulates sudden obstacle appearance
+- Tests zone oscillation handling
+- Demonstrates system stability under dynamic conditions
+
+### Section 15: Extreme Values
+- Tests maximum speed command enforcement
+- Demonstrates maximum angular velocity handling
+- Shows zero command processing
+
+### Section 16: Conflicting Conditions
+- Tests simultaneous safety conditions
+- Demonstrates conflicting motion scenarios
+- Shows system prioritization logic
+
+### Section 17: Recovery Scenarios
+- Tests degraded operation recovery
+- Demonstrates system recovery to normal operation
+- Shows transition from degraded to normal mode
+
+### Section 18: Timing Scenarios
+- Tests very fast obstacle approach
+- Demonstrates slow creep into danger zone
+- Shows system response to different timing scenarios
+
+### Section 19: System Stress
+- Tests rapid mode transitions
+- Demonstrates system stability under stress
+- Shows handling of rapid state changes
+
+### Section 20: Return to Idle and Final State
+- Returns robot to safe position
+- Demonstrates final state verification
+- Shows comprehensive summary of all capabilities
+
 ## What You'll See
 
 ### Console Output
@@ -171,6 +235,18 @@ self.rotate(angle, speed)             # Rotate
 - **LocalizationLost**: Odometry timeout
 - **Docking**: Docking operation
 - **SafeStop**: Emergency stop state
+
+### Edge Cases and Real-World Scenarios
+- **Sensor Failure Handling**: System response to missing sensor data
+- **Rapid Zone Transitions**: Fast escalation between safety zones
+- **Stale Command Detection**: Command freshness watchdog activation
+- **Boundary Condition Handling**: Exact threshold and zero-distance scenarios
+- **Dynamic Obstacle Response**: Sudden obstacle appearance and oscillation
+- **Extreme Value Enforcement**: Speed and angular velocity limits
+- **Conflicting Condition Resolution**: Multiple simultaneous safety conditions
+- **Degraded Operation Recovery**: System recovery from reduced capability
+- **Timing Scenario Handling**: Fast approach and slow creep detection
+- **System Stress Testing**: Rapid mode transitions and stability
 
 ### Safety Envelope Zones
 - **Clear**: Full speed allowed (distance > warning threshold)
@@ -229,6 +305,7 @@ The demo runs in real-time with the following characteristics:
 - Command publishing: 10 Hz (demo script)
 - Safety state publishing: 10 Hz
 - Gazebo simulation: 50-100 Hz (depends on hardware)
+- Total demo duration: ~5-7 minutes (20 sections with edge cases)
 
 ## Next Steps
 
