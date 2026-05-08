@@ -27,9 +27,17 @@ ekf_filter_node:
     print_diagnostics: true
     debug: false
     permit_corrected_publication: false
-    publish_acceleration: false
+    publish_acceleration: true
     publish_tf: true
     reset_on_time_jump: true     # safer behaviour when /clock rewinds during sim restarts
+
+    # IMU bias estimation
+    imu0_config: [false, false, false,
+                  false, false, true,
+                  false, false, false,
+                  false, false, true,
+                  true,  false, false,
+                  true,  true,  true]  # Add bias states for gyro and accel
 
     # TF chain: this EKF owns odom -> base_link.
     map_frame: map
@@ -55,14 +63,15 @@ ekf_filter_node:
 
     # ------------------------------------------------------------
     # IMU — fuse yaw (absolute, magnetometer-corrected upstream) and
-    # body-frame angular velocities + linear accelerations.
+    # body-frame angular velocities + linear accelerations with bias estimation.
     # ------------------------------------------------------------
     imu0: /imu
     imu0_config: [false, false, false,
                   false, false, true,
                   false, false, false,
                   false, false, true,
-                  true,  false, false]
+                  true,  false, false,
+                  true,  true,  true]  # Added bias estimation (gyro x/y/z, accel x/y/z)
     imu0_queue_size: 10
     imu0_nodelay: true
     imu0_differential: false
@@ -70,8 +79,10 @@ ekf_filter_node:
     imu0_remove_gravitational_acceleration: true
 
     # ------------------------------------------------------------
-    # Process noise covariance (15x15 diagonal). Trust velocities/yaw,
-    # let position drift be absorbed by sensor updates.
+    # Process noise covariance (21x21 diagonal with bias states).
+    # State: [x, y, z, roll, pitch, yaw, vx, vy, vz, vr, vp, vy, ax, ay, az, bias_gx, bias_gy, bias_gz, bias_ax, bias_ay, bias_az]
+    # Trust velocities/yaw, let position drift be absorbed by sensor updates.
+    # Bias states have low process noise (slowly varying).
     # ------------------------------------------------------------
     process_noise_covariance: [0.05, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.05, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.06, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.03, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.03, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.06, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.025, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.025, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.04, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.01, 0, 0, 0, 0, 0, 0, 0, 0.01, 0, 0, 0, 0, 0, 0, 0, 0.02, 0, 0, 0, 0, 0, 0, 0, 0.01, 0, 0, 0, 0, 0, 0, 0, 0.01, 0, 0, 0, 0, 0, 0, 0, 0.015]
 

@@ -1,0 +1,31 @@
+# Environment-specific parameters for warehouse navigation
+# Optimized for structured warehouse environments with pre-existing maps
+
+localization:
+  ekf_enabled: true
+  gps_enabled: false
+  slam_enabled: false
+  amcl_enabled: true
+  visual_odom_enabled: true
+  adaptive_noise_enabled: true
+  
+ekf:
+  config_file: ekf_config.yaml
+  process_noise_base: 0.02  # Very low noise for precise warehouse navigation
+  process_noise_slip: 0.2
+  
+amcl:
+  config_file: amcl_config.yaml
+  max_particles: 2000
+  min_particles: 500
+  
+sensors:
+  wheel_odom_timeout: 0.15  # Stricter timeout for precision
+  imu_timeout: 0.15
+  gps_timeout: 999.0  # Disabled
+  visual_odom_timeout: 0.2
+  
+navigation:
+  max_speed: 1.2
+  max_acceleration: 0.6
+  safety_distance: 0.6  # Tighter safety margins in warehouses

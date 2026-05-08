@@ -94,6 +94,26 @@ def generate_launch_description():
         default_value="false",
         description="Enable teleoperation node for manual control",
     )
+    declare_environment = DeclareLaunchArgument(
+        "environment",
+        default_value="outdoor",
+        description="Environment type: 'outdoor' (EKF+GPS+Nav2), 'indoor' (EKF+SLAM+Nav2), 'warehouse' (EKF+Nav2, map-based)",
+        choices=["outdoor", "indoor", "warehouse"],
+    )
+
+    # Environment-specific configuration
+    # Outdoor: EKF + GPS + Nav2 (default)
+    # Indoor: EKF + SLAM + Nav2
+    # Warehouse: EKF + Nav2 with map-based navigation
+    use_ekf_env = PythonExpression([
+        ekf
+    ])
+    use_gps_env = PythonExpression([
+        "'true' if '", environment, "' == 'outdoor' else 'false'"
+    ])
+    use_slam_env = PythonExpression([
+        "'true' if '", environment, "' == 'indoor' else 'false'"
+    ])
 
     # 1. Simulation (Gazebo + AGV + ros_gz_bridge + robot_state_publisher).
     sim = IncludeLaunchDescription(
