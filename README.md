@@ -146,6 +146,9 @@ A complete ROS 2 Jazzy + Gazebo Harmonic + Nav2 wrapper with a self-contained in
 # Quick setup (build + launch)
 ./setup_demo.sh
 
+# Comprehensive demo (showcases all safety capabilities)
+ros2 launch safety_core_bringup comprehensive_demo.launch.py
+
 # Or manually
 cd ros2
 source /opt/ros/jazzy/setup.bash
@@ -158,6 +161,8 @@ ros2 launch safety_core_bringup agv_warehouse.launch.py
 ```
 
 See [`ros2/README.md`](ros2/README.md) for full architecture, topic map, parameter list, and run instructions.
+
+For a comprehensive demonstration of all safety capabilities (state machine transitions, safety zones, fault handling, emergency stops), see the [comprehensive demo documentation](ros2/COMPREHENSIVE_DEMO.md).
 
 ## Architecture Overview
 
