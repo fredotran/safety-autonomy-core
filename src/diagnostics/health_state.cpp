@@ -1,3 +1,6 @@
+// Copyright (c) 2026 RedEarth OS
+// SPDX-License-Identifier: MIT
+
 #include "safety_core/diagnostics/health_state.hpp"
 
 namespace safety_core::diag

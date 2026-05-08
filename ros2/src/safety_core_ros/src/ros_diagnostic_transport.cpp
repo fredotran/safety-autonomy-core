@@ -1,3 +1,6 @@
+// Copyright (c) 2026 RedEarth OS
+// SPDX-License-Identifier: MIT
+
 #include "safety_core_ros/ros_diagnostic_transport.hpp"
 
 #include <rclcpp/rclcpp.hpp>

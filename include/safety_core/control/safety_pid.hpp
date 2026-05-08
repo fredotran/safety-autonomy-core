@@ -1,5 +1,8 @@
 #pragma once
 
+// Copyright (c) 2026 RedEarth OS
+// SPDX-License-Identifier: MIT
+
 #include "safety_core/common/time.hpp"
 #include "safety_core/config/system_config.hpp"
 #include "safety_core/platform/clock.hpp"

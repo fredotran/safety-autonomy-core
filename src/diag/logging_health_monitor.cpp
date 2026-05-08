@@ -1,3 +1,6 @@
+// Copyright (c) 2026 RedEarth OS
+// SPDX-License-Identifier: MIT
+
 #include "safety_core/diag/logging_health_monitor.hpp"
 
 #include "safety_core/common/time.hpp"

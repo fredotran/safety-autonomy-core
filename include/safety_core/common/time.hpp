@@ -1,5 +1,8 @@
 #pragma once
 
+// Copyright (c) 2026 RedEarth OS
+// SPDX-License-Identifier: MIT
+
 #include <chrono>
 
 namespace safety_core::time

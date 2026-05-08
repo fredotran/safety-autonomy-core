@@ -1,5 +1,8 @@
 #pragma once
 
+// Copyright (c) 2026 RedEarth OS
+// SPDX-License-Identifier: MIT
+
 namespace safety_core::platform::watchdog
 {
 
