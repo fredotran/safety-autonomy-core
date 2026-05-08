@@ -13,25 +13,28 @@ namespace safety_core_ros
     SafetySupervisorNode::SafetySupervisorNode(const rclcpp::NodeOptions& options)
         : rclcpp::Node("safety_supervisor_node", options)
     {
-        declare_params();
+        // Load parameters
+        params_.localization_timeout_s     = ParamLoader::load_double(this, "localization_timeout_s", 0.5);
+        params_.auto_recover_from_obstacle = ParamLoader::load_bool(this, "auto_recover_from_obstacle", true);
+        localization_timeout_ns_           = TimeUtils::seconds_to_nanoseconds(params_.localization_timeout_s);
 
-        const double localization_timeout_s = get_parameter("localization_timeout_s").as_double();
-        localization_timeout_ns_            = static_cast<std::uint64_t>(localization_timeout_s * 1e9);
+        // Create ROS interfaces with standardized QoS
+        diag_pub_ =
+            create_publisher<safety_core_msgs::msg::DiagnosticEvent>("safety/diagnostics", QosConfig::state_qos());
+        state_pub_     = create_publisher<safety_core_msgs::msg::SafetyState>("safety/state", QosConfig::state_qos());
+        safe_stop_pub_ = create_publisher<std_msgs::msg::Bool>("safety/safe_stop", QosConfig::state_qos());
 
-        // Optimized QoS settings
-        rclcpp::QoS reliable_qos(10);
-        reliable_qos.durability_volatile(); // Volatile durability for faster publishing
+        envelope_sub_ = create_subscription<safety_core_msgs::msg::EnvelopeStatus>(
+            "safety/envelope_status", QosConfig::sensor_qos(), std::bind(&SafetySupervisorNode::on_envelope, this, _1));
+        odom_sub_ = create_subscription<nav_msgs::msg::Odometry>("odom", QosConfig::sensor_qos(),
+                                                                 std::bind(&SafetySupervisorNode::on_odom, this, _1));
 
-        rclcpp::SensorDataQoS sensor_qos;
-        sensor_qos.keep_last(5);  // Reduced history depth for lower latency
-        sensor_qos.best_effort(); // Use best-effort for sensor data (faster)
+        // Create timer for periodic checks
+        timer_ = create_wall_timer(50ms, std::bind(&SafetySupervisorNode::timer_tick, this));
 
-        // Order matters: build adapters first, then publishers (used by transport),
-        // then state machine / supervisor (which use clock + transport).
-        clock_          = std::make_unique<RosClock>(get_clock());
-        health_monitor_ = std::make_unique<RosHealthMonitor>(get_logger());
-
-        diag_pub_ = create_publisher<safety_core_msgs::msg::DiagnosticEvent>("safety/diagnostics", reliable_qos);
+        // Initialize safety core components
+        clock_                = std::make_unique<RosClock>(get_clock());
+        health_monitor_       = std::make_unique<RosHealthMonitor>(get_logger());
         diagnostic_transport_ = std::make_shared<RosDiagnosticTransport>(diag_pub_);
 
         machine_ =
@@ -41,32 +44,16 @@ namespace safety_core_ros
         supervisor_ = std::make_unique<safety_core::safety::SafetySupervisor>(
             machine_.get(), diagnostic_transport_.get(), clock_.get());
 
-        // Idle by default; explicit Idle->Moving requested by external
-        // command (e.g. Nav2 starts a goal).
+        // Initialize in Idle state
         (void)machine_->transition_to(Mode::Idle);
 
-        state_pub_     = create_publisher<safety_core_msgs::msg::SafetyState>("safety/state", reliable_qos);
-        safe_stop_pub_ = create_publisher<std_msgs::msg::Bool>("safety/safe_stop", reliable_qos);
-
-        envelope_sub_ = create_subscription<safety_core_msgs::msg::EnvelopeStatus>(
-            "safety/envelope_status", sensor_qos, std::bind(&SafetySupervisorNode::on_envelope, this, _1));
-        odom_sub_ = create_subscription<nav_msgs::msg::Odometry>("odom", sensor_qos,
-                                                                 std::bind(&SafetySupervisorNode::on_odom, this, _1));
-
-        timer_ = create_wall_timer(50ms, std::bind(&SafetySupervisorNode::timer_tick, this));
-
-        RCLCPP_INFO(get_logger(), "safety_supervisor_node up | localization_timeout=%.3fs", localization_timeout_s);
-    }
-
-    void SafetySupervisorNode::declare_params()
-    {
-        declare_parameter<double>("localization_timeout_s", 0.5);
-        declare_parameter<bool>("auto_recover_from_obstacle", true);
+        RCLCPP_INFO(get_logger(), "safety_supervisor_node initialized | localization_timeout=%.3fs",
+                    params_.localization_timeout_s);
     }
 
     std::uint64_t SafetySupervisorNode::now_ns() const noexcept
     {
-        return static_cast<std::uint64_t>(get_clock()->now().nanoseconds());
+        return TimeUtils::now_nanoseconds(get_clock());
     }
 
     void SafetySupervisorNode::on_odom(const nav_msgs::msg::Odometry::ConstSharedPtr msg)
@@ -79,17 +66,19 @@ namespace safety_core_ros
     void SafetySupervisorNode::on_envelope(const safety_core_msgs::msg::EnvelopeStatus::ConstSharedPtr msg)
     {
         latest_zone_ = static_cast<SafetyZone>(msg->zone.zone);
+        handle_zone_transition(latest_zone_);
+    }
 
+    void SafetySupervisorNode::handle_zone_transition(safety_core::safety::SafetyZone new_zone)
+    {
         const Mode current_mode = machine_->mode();
-        const bool auto_recover = get_parameter("auto_recover_from_obstacle").as_bool();
 
-        switch (latest_zone_)
+        switch (new_zone)
         {
         case SafetyZone::Clear:
         case SafetyZone::Warning:
-            // Recover from obstacle hold if we're paused and the path is now
-            // clear enough.
-            if (current_mode == Mode::AvoidingObstacle && auto_recover)
+            // Recover from obstacle hold if path is clear enough
+            if (current_mode == Mode::AvoidingObstacle && params_.auto_recover_from_obstacle)
             {
                 (void)machine_->transition_to(Mode::Moving);
                 safe_stop_requested_ = false;
@@ -97,6 +86,7 @@ namespace safety_core_ros
             break;
 
         case SafetyZone::Protective:
+            // Request obstacle hold when in Protective zone
             if (current_mode == Mode::Moving)
             {
                 (void)machine_->request_obstacle_hold();
@@ -104,8 +94,8 @@ namespace safety_core_ros
             break;
 
         case SafetyZone::Emergency:
-            // Latch a fault; downstream bridge will execute jerk-limited stop.
-            // Fault code 0xE001 == "envelope emergency zone breached".
+            // Latch fault and transition to SafeStop
+            // Fault code 0xE001 == "envelope emergency zone breached"
             (void)machine_->latch_fault(0xE001U);
             (void)machine_->transition_to(Mode::SafeStop);
             safe_stop_requested_ = true;
@@ -119,23 +109,34 @@ namespace safety_core_ros
         const std::uint64_t current_time_ns = now_ns();
         const Mode current_mode             = machine_->mode();
 
-        // Localization staleness check.
-        if (last_odom_time_ns_.has_value())
-        {
-            const std::uint64_t age_ns = current_time_ns - last_odom_time_ns_.value();
-            (void)supervisor_->observe_localization_age(age_ns, localization_timeout_ns_);
+        // Check localization staleness
+        check_localization_staleness();
 
-            // Only check for localization lost if not already in SafeStop or LocalizationLost
-            if (age_ns > localization_timeout_ns_ && current_mode != Mode::LocalizationLost &&
-                current_mode != Mode::SafeStop)
-            {
-                (void)machine_->report_localization_lost();
-            }
-        }
-
+        // Observe clock sample
         (void)supervisor_->observe_clock_sample(current_time_ns);
 
+        // Publish current state
         publish_state(current_mode);
+    }
+
+    void SafetySupervisorNode::check_localization_staleness()
+    {
+        if (!last_odom_time_ns_.has_value())
+        {
+            return; // No odometry received yet
+        }
+
+        const std::uint64_t current_time_ns = now_ns();
+        const std::uint64_t age_ns          = TimeUtils::calculate_age_ns(last_odom_time_ns_.value(), current_time_ns);
+
+        (void)supervisor_->observe_localization_age(age_ns, localization_timeout_ns_);
+
+        const Mode current_mode = machine_->mode();
+        if (TimeUtils::is_stale(last_odom_time_ns_.value(), current_time_ns, localization_timeout_ns_) &&
+            current_mode != Mode::LocalizationLost && current_mode != Mode::SafeStop)
+        {
+            (void)machine_->report_localization_lost();
+        }
     }
 
     safety_core_msgs::msg::SafetyState SafetySupervisorNode::build_state_msg(Mode current_mode) const
@@ -145,7 +146,7 @@ namespace safety_core_ros
         msg.header.frame_id     = "base_link";
         msg.mode                = static_cast<std::uint8_t>(current_mode);
         msg.fault_latched       = machine_->fault_latched();
-        msg.fault_code          = 0U; // Library does not currently expose code; leave 0.
+        msg.fault_code          = 0U; // Library does not currently expose code
         msg.zone.zone           = static_cast<std::uint8_t>(latest_zone_);
         msg.safe_stop_requested = safe_stop_requested_ || (current_mode == Mode::SafeStop);
         return msg;

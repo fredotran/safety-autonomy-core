@@ -2,6 +2,10 @@
 
 #include "safety_core/motion/trajectory.hpp"
 #include "safety_core/platform/actuators/drive_actuator.hpp"
+#include "safety_core_ros/math_utils.hpp"
+#include "safety_core_ros/param_loader.hpp"
+#include "safety_core_ros/qos_config.hpp"
+#include "safety_core_ros/time_utils.hpp"
 
 #include <atomic>
 #include <cstdint>
@@ -16,39 +20,57 @@
 namespace safety_core_ros
 {
 
-    // Sits between Nav2 (publishes /cmd_vel_nav) and Gazebo's diff-drive plugin
-    // (subscribes /cmd_vel). Applies the safety_core motion envelope:
-    //   * clamp linear/angular based on EnvelopeStatus.recommended_speed_limit
-    //   * detect stale Nav2 commands via DriveActuator::is_command_fresh()
-    //   * generate a jerk-limited deceleration ramp on safe-stop assertion
-    //   * never publish if the upstream supervisor latched a fault
+    /**
+     * @brief Safety drive bridge node for command filtering and safe-stop execution
+     *
+     * Sits between Nav2 (publishes /cmd_vel_nav) and Gazebo's diff-drive plugin
+     * (subscribes /cmd_vel). Applies the safety_core motion envelope:
+     *   - Clamp linear/angular based on EnvelopeStatus.recommended_speed_limit
+     *   - Detect stale Nav2 commands via DriveActuator::is_command_fresh()
+     *   - Generate a jerk-limited deceleration ramp on safe-stop assertion
+     *   - Never publish if the upstream supervisor latched a fault
+     *
+     * The bridge ensures that all commands respect safety constraints and
+     * provides smooth, controlled stopping when safety conditions are violated.
+     */
     class SafetyDriveBridgeNode : public rclcpp::Node
     {
       public:
         explicit SafetyDriveBridgeNode(const rclcpp::NodeOptions& options = rclcpp::NodeOptions{});
 
       private:
-        void declare_params();
-
+        // Callbacks
         void on_cmd_vel_nav(const geometry_msgs::msg::Twist::ConstSharedPtr msg);
         void on_envelope(const safety_core_msgs::msg::EnvelopeStatus::ConstSharedPtr msg);
         void on_safe_stop(const std_msgs::msg::Bool::ConstSharedPtr msg);
         void on_state(const safety_core_msgs::msg::SafetyState::ConstSharedPtr msg);
         void on_odom(const nav_msgs::msg::Odometry::ConstSharedPtr msg);
 
+        // Control loop
         void control_tick();
-        void publish_zero_twist();
-        void start_jerk_limited_stop();
 
+        // Command processing
+        void process_and_publish_command();
+        geometry_msgs::msg::Twist clamp_command(const geometry_msgs::msg::Twist& cmd, double speed_limit);
+        void publish_zero_twist();
+
+        // Safe-stop handling
+        void start_jerk_limited_stop();
+        bool execute_stop_profile();
+
+        // Time utilities
         [[nodiscard]] std::uint64_t now_ns() const noexcept;
 
-        // Parameters
-        double max_linear_mps_{1.5};
-        double max_angular_radps_{1.5};
-        double max_decel_mps2_{1.0};
-        double max_jerk_mps3_{2.0};
-        double cmd_freshness_s_{0.25};
-        double control_period_s_{0.05};
+        // Configuration
+        struct Params
+        {
+            double max_linear_mps{1.5};
+            double max_angular_radps{1.5};
+            double max_decel_mps2{1.0};
+            double max_jerk_mps3{2.0};
+            double cmd_freshness_s{0.25};
+            double control_period_s{0.05};
+        } params_;
 
         // State
         std::atomic<bool> safe_stop_active_{false};
@@ -59,6 +81,7 @@ namespace safety_core_ros
         // Latest Nav2 command + arrival timestamp
         std::optional<geometry_msgs::msg::Twist> latest_nav_cmd_;
         std::uint64_t latest_nav_cmd_time_ns_{0U};
+        std::uint64_t cmd_freshness_timeout_ns_{250'000'000ULL}; // 0.25s in ns
 
         // Jerk-limited stop state
         bool stop_profile_active_{false};
@@ -68,6 +91,7 @@ namespace safety_core_ros
         safety_core::motion::TrajectoryPoint stop_profile_[kStopProfileCapacity]{};
         double last_published_linear_{0.0};
 
+        // ROS interfaces
         rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_nav_sub_;
         rclcpp::Subscription<safety_core_msgs::msg::EnvelopeStatus>::SharedPtr envelope_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr safe_stop_sub_;

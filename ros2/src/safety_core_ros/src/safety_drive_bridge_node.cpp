@@ -3,6 +3,7 @@
 #include "safety_core/motion/trajectory.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 
 using std::placeholders::_1;
@@ -13,58 +14,43 @@ namespace safety_core_ros
     SafetyDriveBridgeNode::SafetyDriveBridgeNode(const rclcpp::NodeOptions& options)
         : rclcpp::Node("safety_drive_bridge_node", options)
     {
-        declare_params();
+        // Load parameters
+        params_.max_linear_mps    = ParamLoader::load_double(this, "max_linear_mps", 1.5);
+        params_.max_angular_radps = ParamLoader::load_double(this, "max_angular_radps", 1.5);
+        params_.max_decel_mps2    = ParamLoader::load_double(this, "max_decel_mps2", 1.0);
+        params_.max_jerk_mps3     = ParamLoader::load_double(this, "max_jerk_mps3", 2.0);
+        params_.cmd_freshness_s   = ParamLoader::load_double(this, "cmd_freshness_s", 0.25);
+        params_.control_period_s  = ParamLoader::load_double(this, "control_period_s", 0.05);
 
-        max_linear_mps_    = get_parameter("max_linear_mps").as_double();
-        max_angular_radps_ = get_parameter("max_angular_radps").as_double();
-        max_decel_mps2_    = get_parameter("max_decel_mps2").as_double();
-        max_jerk_mps3_     = get_parameter("max_jerk_mps3").as_double();
-        cmd_freshness_s_   = get_parameter("cmd_freshness_s").as_double();
-        control_period_s_  = get_parameter("control_period_s").as_double();
+        cmd_freshness_timeout_ns_ = TimeUtils::seconds_to_nanoseconds(params_.cmd_freshness_s);
 
-        // Optimized QoS settings
-        rclcpp::QoS reliable_qos(10);
-        reliable_qos.durability_volatile(); // Volatile durability for faster publishing
-
-        rclcpp::SensorDataQoS sensor_qos;
-        sensor_qos.keep_last(5);  // Reduced history depth for lower latency
-        sensor_qos.best_effort(); // Use best-effort for sensor data (faster)
-
+        // Create ROS interfaces with standardized QoS
         cmd_vel_nav_sub_ = create_subscription<geometry_msgs::msg::Twist>(
-            "cmd_vel_nav", reliable_qos, std::bind(&SafetyDriveBridgeNode::on_cmd_vel_nav, this, _1));
+            "cmd_vel_nav", QosConfig::state_qos(), std::bind(&SafetyDriveBridgeNode::on_cmd_vel_nav, this, _1));
         envelope_sub_ = create_subscription<safety_core_msgs::msg::EnvelopeStatus>(
-            "safety/envelope_status", reliable_qos, std::bind(&SafetyDriveBridgeNode::on_envelope, this, _1));
+            "safety/envelope_status", QosConfig::state_qos(), std::bind(&SafetyDriveBridgeNode::on_envelope, this, _1));
         safe_stop_sub_ = create_subscription<std_msgs::msg::Bool>(
-            "safety/safe_stop", reliable_qos, std::bind(&SafetyDriveBridgeNode::on_safe_stop, this, _1));
+            "safety/safe_stop", QosConfig::state_qos(), std::bind(&SafetyDriveBridgeNode::on_safe_stop, this, _1));
         state_sub_ = create_subscription<safety_core_msgs::msg::SafetyState>(
-            "safety/state", reliable_qos, std::bind(&SafetyDriveBridgeNode::on_state, this, _1));
-        odom_sub_ = create_subscription<nav_msgs::msg::Odometry>("odom", sensor_qos,
+            "safety/state", QosConfig::state_qos(), std::bind(&SafetyDriveBridgeNode::on_state, this, _1));
+        odom_sub_ = create_subscription<nav_msgs::msg::Odometry>("odom", QosConfig::sensor_qos(),
                                                                  std::bind(&SafetyDriveBridgeNode::on_odom, this, _1));
 
-        cmd_vel_pub_ = create_publisher<geometry_msgs::msg::Twist>("cmd_vel", reliable_qos);
+        cmd_vel_pub_ = create_publisher<geometry_msgs::msg::Twist>("cmd_vel", QosConfig::state_qos());
 
-        const auto period = std::chrono::nanoseconds(static_cast<std::int64_t>(control_period_s_ * 1e9));
+        const auto period = std::chrono::duration<double>(params_.control_period_s);
         timer_            = create_wall_timer(period, std::bind(&SafetyDriveBridgeNode::control_tick, this));
 
         RCLCPP_INFO(get_logger(),
-                    "safety_drive_bridge_node up | linear<=%.2fm/s ang<=%.2frad/s | "
+                    "safety_drive_bridge_node initialized | linear<=%.2fm/s ang<=%.2frad/s | "
                     "decel=%.2fm/s^2 jerk=%.2fm/s^3 | freshness=%.3fs",
-                    max_linear_mps_, max_angular_radps_, max_decel_mps2_, max_jerk_mps3_, cmd_freshness_s_);
-    }
-
-    void SafetyDriveBridgeNode::declare_params()
-    {
-        declare_parameter<double>("max_linear_mps", 1.5);
-        declare_parameter<double>("max_angular_radps", 1.5);
-        declare_parameter<double>("max_decel_mps2", 1.0);
-        declare_parameter<double>("max_jerk_mps3", 2.0);
-        declare_parameter<double>("cmd_freshness_s", 0.25);
-        declare_parameter<double>("control_period_s", 0.05);
+                    params_.max_linear_mps, params_.max_angular_radps, params_.max_decel_mps2, params_.max_jerk_mps3,
+                    params_.cmd_freshness_s);
     }
 
     std::uint64_t SafetyDriveBridgeNode::now_ns() const noexcept
     {
-        return static_cast<std::uint64_t>(get_clock()->now().nanoseconds());
+        return TimeUtils::now_nanoseconds(get_clock());
     }
 
     void SafetyDriveBridgeNode::on_cmd_vel_nav(const geometry_msgs::msg::Twist::ConstSharedPtr msg)
@@ -80,7 +66,7 @@ namespace safety_core_ros
         const double recommended = msg->recommended_speed_limit_mps;
         if (msg->zone.zone == 0U /* CLEAR */)
         {
-            recommended_speed_limit_mps_.store(max_linear_mps_, std::memory_order_relaxed);
+            recommended_speed_limit_mps_.store(params_.max_linear_mps, std::memory_order_relaxed);
         }
         else
         {
@@ -115,8 +101,8 @@ namespace safety_core_ros
     {
         const double speed = std::max(0.0, measured_forward_speed_mps_.load(std::memory_order_relaxed));
         const bool ok      = safety_core::motion::generate_jerk_limited_stop_profile(
-            speed, max_decel_mps2_, max_jerk_mps3_, control_period_s_, stop_profile_, kStopProfileCapacity,
-            stop_profile_count_);
+            speed, params_.max_decel_mps2, params_.max_jerk_mps3, params_.control_period_s, stop_profile_,
+            kStopProfileCapacity, stop_profile_count_);
 
         stop_profile_index_  = 0U;
         stop_profile_active_ = ok && (stop_profile_count_ > 0U);
@@ -140,70 +126,84 @@ namespace safety_core_ros
         last_published_linear_ = 0.0;
     }
 
+    geometry_msgs::msg::Twist SafetyDriveBridgeNode::clamp_command(const geometry_msgs::msg::Twist& cmd,
+                                                                   double speed_limit)
+    {
+        geometry_msgs::msg::Twist clamped_cmd;
+        const double v_limit  = std::min(params_.max_linear_mps, speed_limit);
+        clamped_cmd.linear.x  = std::clamp(cmd.linear.x, -v_limit, v_limit);
+        clamped_cmd.angular.z = std::clamp(cmd.angular.z, -params_.max_angular_radps, params_.max_angular_radps);
+        return clamped_cmd;
+    }
+
+    bool SafetyDriveBridgeNode::execute_stop_profile()
+    {
+        if (stop_profile_active_ && stop_profile_index_ < stop_profile_count_)
+        {
+            geometry_msgs::msg::Twist cmd;
+            cmd.linear.x           = stop_profile_[stop_profile_index_].speed_mps;
+            cmd.angular.z          = 0.0;
+            last_published_linear_ = cmd.linear.x;
+            cmd_vel_pub_->publish(std::move(cmd));
+            ++stop_profile_index_;
+            return true;
+        }
+        return false;
+    }
+
+    void SafetyDriveBridgeNode::process_and_publish_command()
+    {
+        const double speed_limit      = recommended_speed_limit_mps_.load(std::memory_order_relaxed);
+        geometry_msgs::msg::Twist cmd = clamp_command(*latest_nav_cmd_, speed_limit);
+        cmd_vel_pub_->publish(std::move(cmd));
+        last_published_linear_ = cmd.linear.x;
+    }
+
     void SafetyDriveBridgeNode::control_tick()
     {
-        // Load atomic variables once to avoid repeated loads
-        const bool fault_latched    = fault_latched_.load(std::memory_order_relaxed);
-        const bool safe_stop_active = safe_stop_active_.load(std::memory_order_relaxed);
-        const double speed_limit    = recommended_speed_limit_mps_.load(std::memory_order_relaxed);
+        // Cache atomic variables and current time to avoid repeated loads
+        const bool fault_latched            = fault_latched_.load(std::memory_order_relaxed);
+        const bool safe_stop_active         = safe_stop_active_.load(std::memory_order_relaxed);
+        const std::uint64_t current_time_ns = now_ns();
 
-        // 1. Hard fault latched: always stop.
+        // 1. Hard fault latched: always stop
         if (fault_latched)
         {
             publish_zero_twist();
             return;
         }
 
-        // 2. Safe-stop active: follow jerk-limited deceleration profile.
+        // 2. Safe-stop active: follow jerk-limited deceleration profile
         if (safe_stop_active)
         {
-            if (stop_profile_active_ && stop_profile_index_ < stop_profile_count_)
-            {
-                geometry_msgs::msg::Twist cmd;
-                cmd.linear.x           = stop_profile_[stop_profile_index_].speed_mps;
-                cmd.angular.z          = 0.0;
-                last_published_linear_ = cmd.linear.x;
-                cmd_vel_pub_->publish(std::move(cmd));
-                ++stop_profile_index_;
-            }
-            else
+            if (!execute_stop_profile())
             {
                 publish_zero_twist();
             }
             return;
         }
 
-        // 3. No fresh Nav2 command? Stop.
+        // 3. No fresh Nav2 command: stop
         if (!latest_nav_cmd_.has_value())
         {
             publish_zero_twist();
             return;
         }
 
-        const std::uint64_t current_time_ns = now_ns();
-        const std::uint64_t age_ns          = current_time_ns - latest_nav_cmd_time_ns_;
-        const std::uint64_t max_age_ns      = static_cast<std::uint64_t>(cmd_freshness_s_ * 1e9);
-        if (age_ns > max_age_ns)
+        // Check command staleness
+        const std::uint64_t age_ns = TimeUtils::calculate_age_ns(latest_nav_cmd_time_ns_, current_time_ns);
+        if (TimeUtils::is_stale(latest_nav_cmd_time_ns_, current_time_ns, cmd_freshness_timeout_ns_))
         {
             RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000,
-                                 "[drive_bridge] Nav2 command stale (age=%.3fs, limit=%.3fs); zeroing", age_ns * 1e-9,
-                                 max_age_ns * 1e-9);
+                                 "[drive_bridge] Nav2 command stale (age=%.3fs, limit=%.3fs); zeroing",
+                                 TimeUtils::nanoseconds_to_seconds(age_ns),
+                                 TimeUtils::nanoseconds_to_seconds(cmd_freshness_timeout_ns_));
             publish_zero_twist();
             return;
         }
 
-        // 4. Apply safety envelope clamp.
-        const double v_request = latest_nav_cmd_->linear.x;
-        const double w_request = latest_nav_cmd_->angular.z;
-
-        const double v_limit = std::min(max_linear_mps_, speed_limit);
-
-        geometry_msgs::msg::Twist cmd;
-        cmd.linear.x  = std::clamp(v_request, -v_limit, v_limit);
-        cmd.angular.z = std::clamp(w_request, -max_angular_radps_, max_angular_radps_);
-
-        cmd_vel_pub_->publish(std::move(cmd));
-        last_published_linear_ = cmd.linear.x;
+        // 4. Apply safety envelope clamp and publish
+        process_and_publish_command();
     }
 
 } // namespace safety_core_ros

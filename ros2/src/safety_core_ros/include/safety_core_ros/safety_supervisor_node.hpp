@@ -3,9 +3,13 @@
 #include "safety_core/safety/safety_envelope.hpp"
 #include "safety_core/safety/safety_supervisor.hpp"
 #include "safety_core/state_machine/state_machine.hpp"
+#include "safety_core_ros/math_utils.hpp"
+#include "safety_core_ros/param_loader.hpp"
+#include "safety_core_ros/qos_config.hpp"
 #include "safety_core_ros/ros_clock.hpp"
 #include "safety_core_ros/ros_diagnostic_transport.hpp"
 #include "safety_core_ros/ros_health_monitor.hpp"
+#include "safety_core_ros/time_utils.hpp"
 
 #include <memory>
 #include <nav_msgs/msg/odometry.hpp>
@@ -19,24 +23,40 @@
 namespace safety_core_ros
 {
 
-    // Owns the safety_core ModeStateMachine + SafetySupervisor and exposes them
-    // through ROS topics. Triggers state transitions in response to envelope
-    // zone changes and localization staleness, latches faults, and emits a
-    // /safety/safe_stop boolean that downstream actuator bridges respect.
+    /**
+     * @brief Safety supervisor node for state machine management
+     *
+     * Owns the safety_core ModeStateMachine + SafetySupervisor and exposes them
+     * through ROS topics. Triggers state transitions in response to envelope
+     * zone changes and localization staleness, latches faults, and emits a
+     * /safety/safe_stop boolean that downstream actuator bridges respect.
+     *
+     * The supervisor coordinates the overall safety system by:
+     * - Monitoring envelope status and triggering appropriate state transitions
+     * - Checking localization staleness and triggering LocalizationLost mode
+     * - Latching faults on critical safety violations
+     * - Publishing safety state and safe stop signals
+     */
     class SafetySupervisorNode : public rclcpp::Node
     {
       public:
         explicit SafetySupervisorNode(const rclcpp::NodeOptions& options = rclcpp::NodeOptions{});
 
       private:
-        void declare_params();
+        // Callbacks
         void on_envelope(const safety_core_msgs::msg::EnvelopeStatus::ConstSharedPtr msg);
         void on_odom(const nav_msgs::msg::Odometry::ConstSharedPtr msg);
         void timer_tick();
 
+        // State management
+        void handle_zone_transition(safety_core::safety::SafetyZone new_zone);
+        void check_localization_staleness();
         void publish_state(safety_core::sm::Mode current_mode);
+
+        // State message building
         safety_core_msgs::msg::SafetyState build_state_msg(safety_core::sm::Mode current_mode) const;
 
+        // Time utilities
         [[nodiscard]] std::uint64_t now_ns() const noexcept;
 
         // Supervisor + state machine ownership
@@ -46,16 +66,20 @@ namespace safety_core_ros
         std::unique_ptr<safety_core::sm::ModeStateMachine> machine_;
         std::unique_ptr<safety_core::safety::SafetySupervisor> supervisor_;
 
-        // Latest received envelope evaluation
-        safety_core::safety::SafetyZone latest_zone_{safety_core::safety::SafetyZone::Clear};
+        // Configuration
+        struct Params
+        {
+            double localization_timeout_s{0.5};
+            bool auto_recover_from_obstacle{true};
+        } params_;
 
-        // Localization staleness tracking
+        // State
+        safety_core::safety::SafetyZone latest_zone_{safety_core::safety::SafetyZone::Clear};
         std::optional<std::uint64_t> last_odom_time_ns_;
         std::uint64_t localization_timeout_ns_{500'000'000ULL};
-
-        // Latched safe-stop request driven by envelope or supervisor escalation
         bool safe_stop_requested_{false};
 
+        // ROS interfaces
         rclcpp::Subscription<safety_core_msgs::msg::EnvelopeStatus>::SharedPtr envelope_sub_;
         rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
         rclcpp::Publisher<safety_core_msgs::msg::SafetyState>::SharedPtr state_pub_;

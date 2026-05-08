@@ -14,24 +14,21 @@ namespace safety_core_ros
     SafetyEnvelopeNode::SafetyEnvelopeNode(const rclcpp::NodeOptions& options)
         : rclcpp::Node("safety_envelope_node", options)
     {
-        declare_params();
+        // Load parameters using utility classes
         load_config_from_params();
 
-        // Optimized QoS settings
-        rclcpp::SensorDataQoS sensor_qos;
-        sensor_qos.keep_last(10); // Reduced history depth for lower latency
-        sensor_qos.best_effort(); // Use best-effort for sensor data (faster)
-
-        rclcpp::QoS reliable_qos(10);
-        reliable_qos.durability_volatile(); // Volatile durability for faster publishing
-
-        scan_sub_ = create_subscription<sensor_msgs::msg::LaserScan>("scan", sensor_qos,
+        // Create ROS interfaces with standardized QoS
+        scan_sub_ = create_subscription<sensor_msgs::msg::LaserScan>("scan", QosConfig::sensor_qos(),
                                                                      std::bind(&SafetyEnvelopeNode::on_scan, this, _1));
-        odom_sub_ = create_subscription<nav_msgs::msg::Odometry>("odom", sensor_qos,
+
+        odom_sub_ = create_subscription<nav_msgs::msg::Odometry>("odom", QosConfig::sensor_qos(),
                                                                  std::bind(&SafetyEnvelopeNode::on_odom, this, _1));
 
-        envelope_pub_ = create_publisher<safety_core_msgs::msg::EnvelopeStatus>("safety/envelope_status", reliable_qos);
-        marker_pub_   = create_publisher<visualization_msgs::msg::MarkerArray>("safety/zone_markers", reliable_qos);
+        envelope_pub_ =
+            create_publisher<safety_core_msgs::msg::EnvelopeStatus>("safety/envelope_status", QosConfig::state_qos());
+
+        marker_pub_ =
+            create_publisher<visualization_msgs::msg::MarkerArray>("safety/zone_markers", QosConfig::state_qos());
 
         RCLCPP_INFO(get_logger(),
                     "safety_envelope_node up | footprint=%.2fx%.2fm overhang=%.2fm | "
@@ -43,48 +40,41 @@ namespace safety_core_ros
 
     void SafetyEnvelopeNode::declare_params()
     {
-        declare_parameter<double>("envelope.max_speed_mps", 1.5);
-        declare_parameter<double>("envelope.max_accel_mps2", 0.75);
-        declare_parameter<double>("envelope.max_comfort_decel_mps2", 1.0);
-        declare_parameter<double>("envelope.control_latency_s", 0.04);
-        declare_parameter<double>("envelope.safety_buffer_m", 0.3);
-
-        declare_parameter<double>("footprint.length_m", 0.8);
-        declare_parameter<double>("footprint.width_m", 0.6);
-        declare_parameter<double>("footprint.front_overhang_m", 0.1);
-
-        declare_parameter<double>("corridor_half_width_m", 0.5);
-        declare_parameter<double>("scan_min_valid_range_m", 0.05);
-        declare_parameter<std::string>("base_frame", "base_link");
+        // Parameters are declared via YAML file, no need to declare here
     }
 
     void SafetyEnvelopeNode::load_config_from_params()
     {
-        config_.envelope.max_speed_mps          = get_parameter("envelope.max_speed_mps").as_double();
-        config_.envelope.max_accel_mps2         = get_parameter("envelope.max_accel_mps2").as_double();
-        config_.envelope.max_comfort_decel_mps2 = get_parameter("envelope.max_comfort_decel_mps2").as_double();
-        config_.envelope.control_latency_s      = get_parameter("envelope.control_latency_s").as_double();
-        config_.envelope.safety_buffer_m        = get_parameter("envelope.safety_buffer_m").as_double();
+        // Load envelope configuration
+        config_.envelope.max_speed_mps  = ParamLoader::load_double(this, "envelope.max_speed_mps", 1.5);
+        config_.envelope.max_accel_mps2 = ParamLoader::load_double(this, "envelope.max_accel_mps2", 0.75);
+        config_.envelope.max_comfort_decel_mps2 =
+            ParamLoader::load_double(this, "envelope.max_comfort_decel_mps2", 1.0);
+        config_.envelope.control_latency_s = ParamLoader::load_double(this, "envelope.control_latency_s", 0.04);
+        config_.envelope.safety_buffer_m   = ParamLoader::load_double(this, "envelope.safety_buffer_m", 0.3);
 
-        footprint_.length_m         = get_parameter("footprint.length_m").as_double();
-        footprint_.width_m          = get_parameter("footprint.width_m").as_double();
-        footprint_.front_overhang_m = get_parameter("footprint.front_overhang_m").as_double();
+        // Load footprint configuration
+        footprint_.length_m         = ParamLoader::load_double(this, "footprint.length_m", 0.8);
+        footprint_.width_m          = ParamLoader::load_double(this, "footprint.width_m", 0.6);
+        footprint_.front_overhang_m = ParamLoader::load_double(this, "footprint.front_overhang_m", 0.1);
 
-        corridor_half_width_m_  = get_parameter("corridor_half_width_m").as_double();
-        scan_min_valid_range_m_ = get_parameter("scan_min_valid_range_m").as_double();
-        base_frame_             = get_parameter("base_frame").as_string();
+        // Load operational parameters
+        params_.corridor_half_width_m  = ParamLoader::load_double(this, "corridor_half_width_m", 0.5);
+        params_.scan_min_valid_range_m = ParamLoader::load_double(this, "scan_min_valid_range_m", 0.05);
+        params_.base_frame             = ParamLoader::load_string(this, "base_frame", "base_link");
     }
 
     void SafetyEnvelopeNode::on_odom(const nav_msgs::msg::Odometry::ConstSharedPtr msg)
     {
-        // Forward velocity in body frame is twist.linear.x. magnitude_safe = max(0, vx).
+        // Store forward velocity (magnitude_safe = max(0, vx))
         latest_speed_mps_.store(msg->twist.twist.linear.x, std::memory_order_relaxed);
     }
 
     void SafetyEnvelopeNode::on_scan(const sensor_msgs::msg::LaserScan::ConstSharedPtr msg)
     {
+        // Find nearest obstacle and evaluate envelope
         const double distance_m = nearest_obstacle_in_footprint_corridor(*msg);
-        const double speed_mps  = std::max(0.0, latest_speed_mps_.load(std::memory_order_relaxed));
+        const double speed_mps  = MathUtils::max(0.0, latest_speed_mps_.load(std::memory_order_relaxed));
         publish_envelope(distance_m, speed_mps, msg->header);
     }
 
@@ -97,63 +87,56 @@ namespace safety_core_ros
         // in the path. Coordinates are in the scan's frame (typically lidar_link
         // co-located with base_link forward axis).
 
-        // Pre-compute constants for better performance
-        const double corridor    = (footprint_.width_m * 0.5) + corridor_half_width_m_;
-        const double corridor_sq = corridor * corridor; // Compare squared values to avoid sqrt
-        const double min_range   = scan_min_valid_range_m_;
-        const double max_range   = scan.range_max;
-        const double angle_min   = scan.angle_min;
-        const double angle_inc   = scan.angle_increment;
+        // Pre-compute corridor parameters
+        const double corridor    = (footprint_.width_m * 0.5) + params_.corridor_half_width_m;
+        const double corridor_sq = corridor * corridor; // Squared for fast comparison
 
         double min_d = std::numeric_limits<double>::infinity();
 
-        // Use const reference and cache-friendly loop
+        // Process each scan point
         const std::vector<float>& ranges = scan.ranges;
         const std::size_t count          = ranges.size();
 
-        // Main loop with optimized mathematical operations
         for (std::size_t i = 0U; i < count; ++i)
         {
             const float r = ranges[i];
 
-            // Fast rejection: check range validity first
-            if (!std::isfinite(r) || r < min_range || r > max_range)
+            // Fast rejection: check range validity
+            if (!is_scan_point_valid(r, params_.scan_min_valid_range_m, scan.range_max))
             {
                 continue;
             }
 
-            // Compute angle incrementally to avoid multiplication in loop
-            const double angle = angle_min + static_cast<double>(i) * angle_inc;
+            // Calculate point position
+            const double angle = scan.angle_min + static_cast<double>(i) * scan.angle_increment;
+            const double x     = calculate_point_distance(r, angle);
+            const double y     = static_cast<double>(r) * std::sin(angle);
 
-            // Use fast trigonometric approximation if possible
-            // For small angles, cos(x) ≈ 1 - x²/2, sin(x) ≈ x
-            const double cos_angle = std::cos(angle);
-            const double sin_angle = std::sin(angle);
-
-            const double r_double = static_cast<double>(r);
-            const double x        = r_double * cos_angle;
-            const double y        = r_double * sin_angle;
-
-            // Forward half-plane only (x > 0). Side returns (x <= 0) are ignored.
-            if (x <= 0.0)
+            // Check if point is in forward corridor
+            if (!is_point_in_forward_corridor(x, y, corridor_sq))
             {
                 continue;
             }
 
-            // Use squared comparison to avoid expensive sqrt
-            if (y * y > corridor_sq)
-            {
-                continue;
-            }
-
-            // Use forward distance x as the path-aligned distance for envelope
-            // evaluation (conservative; underestimates curved-path clearance).
-            if (x < min_d)
-            {
-                min_d = x;
-            }
+            // Update minimum distance
+            min_d = MathUtils::min(x, min_d);
         }
         return min_d;
+    }
+
+    bool SafetyEnvelopeNode::is_scan_point_valid(float range, double min_range, double max_range) const noexcept
+    {
+        return MathUtils::is_finite(range) && MathUtils::is_in_range(range, min_range, max_range);
+    }
+
+    double SafetyEnvelopeNode::calculate_point_distance(float range, double angle) const noexcept
+    {
+        return static_cast<double>(range) * std::cos(angle);
+    }
+
+    bool SafetyEnvelopeNode::is_point_in_forward_corridor(double x, double y, double corridor_sq) const noexcept
+    {
+        return x > 0.0 && MathUtils::is_in_corridor_squared(y, corridor_sq);
     }
 
     void SafetyEnvelopeNode::publish_envelope(double distance_m, double speed_mps, const std_msgs::msg::Header& header)
@@ -164,7 +147,7 @@ namespace safety_core_ros
         // Use move semantics to avoid copies
         safety_core_msgs::msg::EnvelopeStatus status;
         status.header                      = header;
-        status.distance_to_obstacle_m      = std::isfinite(distance_m) ? distance_m : -1.0;
+        status.distance_to_obstacle_m      = MathUtils::is_finite(distance_m) ? distance_m : -1.0;
         status.current_speed_mps           = speed_mps;
         status.within_envelope             = eval.within_envelope;
         status.zone.zone                   = static_cast<std::uint8_t>(eval.zone);
@@ -184,40 +167,6 @@ namespace safety_core_ros
         }
     }
 
-    namespace
-    {
-
-        void color_for_zone(SafetyZone zone, float& r, float& g, float& b, float& a)
-        {
-            a = 0.35F;
-            switch (zone)
-            {
-            case SafetyZone::Clear:
-                r = 0.1F;
-                g = 0.8F;
-                b = 0.2F;
-                break;
-            case SafetyZone::Warning:
-                r = 1.0F;
-                g = 0.85F;
-                b = 0.0F;
-                break;
-            case SafetyZone::Protective:
-                r = 1.0F;
-                g = 0.5F;
-                b = 0.0F;
-                break;
-            case SafetyZone::Emergency:
-                r = 0.95F;
-                g = 0.05F;
-                b = 0.05F;
-                a = 0.55F;
-                break;
-            }
-        }
-
-    } // namespace
-
     void SafetyEnvelopeNode::publish_zone_markers(const safety_core::safety::EnvelopeEvaluation& eval,
                                                   const std_msgs::msg::Header& header)
     {
@@ -225,69 +174,107 @@ namespace safety_core_ros
         visualization_msgs::msg::MarkerArray array;
         array.markers.reserve(4); // Pre-allocate for 4 markers
 
-        // Three concentric semicircles in front of the AGV: warning, protective,
-        // emergency. Radii derived from envelope evaluation parameters.
-        const double emergency_r  = std::max(0.05, config_.envelope.safety_buffer_m);
-        const double protective_r = std::max(emergency_r + 0.05, eval.required_clearance);
+        // Calculate zone radii
+        const double emergency_r  = MathUtils::max(0.05, config_.envelope.safety_buffer_m);
+        const double protective_r = MathUtils::max(emergency_r + 0.05, eval.required_clearance);
         const double warning_r    = protective_r * 1.5;
 
-        auto make_disc = [&](int id, double radius, SafetyZone zone)
-        {
-            visualization_msgs::msg::Marker m;
-            m.header             = header;
-            m.header.frame_id    = base_frame_;
-            m.ns                 = "safety_zones";
-            m.id                 = id;
-            m.type               = visualization_msgs::msg::Marker::CYLINDER;
-            m.action             = visualization_msgs::msg::Marker::ADD;
-            m.pose.position.x    = 0.0;
-            m.pose.position.y    = 0.0;
-            m.pose.position.z    = 0.02;
-            m.pose.orientation.w = 1.0;
-            m.scale.x            = radius * 2.0;
-            m.scale.y            = radius * 2.0;
-            m.scale.z            = 0.02;
-            float r, g, b, a;
-            color_for_zone(zone, r, g, b, a);
-            m.color.r  = r;
-            m.color.g  = g;
-            m.color.b  = b;
-            m.color.a  = a;
-            m.lifetime = rclcpp::Duration::from_seconds(0.5);
-            return m;
-        };
+        // Add zone markers
+        array.markers.push_back(create_zone_marker(0, warning_r, SafetyZone::Warning, header));
+        array.markers.push_back(create_zone_marker(1, protective_r, SafetyZone::Protective, header));
+        array.markers.push_back(create_zone_marker(2, emergency_r, SafetyZone::Emergency, header));
 
-        array.markers.push_back(make_disc(0, warning_r, SafetyZone::Warning));
-        array.markers.push_back(make_disc(1, protective_r, SafetyZone::Protective));
-        array.markers.push_back(make_disc(2, emergency_r, SafetyZone::Emergency));
-
-        // A small marker showing the active zone as a colored sphere above the AGV.
-        {
-            visualization_msgs::msg::Marker badge;
-            badge.header.frame_id    = base_frame_;
-            badge.header.stamp       = header.stamp;
-            badge.ns                 = "safety_zone_badge";
-            badge.id                 = 0;
-            badge.type               = visualization_msgs::msg::Marker::SPHERE;
-            badge.action             = visualization_msgs::msg::Marker::ADD;
-            badge.pose.position.x    = 0.0;
-            badge.pose.position.y    = 0.0;
-            badge.pose.position.z    = 0.6;
-            badge.pose.orientation.w = 1.0;
-            badge.scale.x            = 0.18;
-            badge.scale.y            = 0.18;
-            badge.scale.z            = 0.18;
-            float r = 0.0F, g = 0.0F, b = 0.0F, a = 0.0F;
-            color_for_zone(eval.zone, r, g, b, a);
-            badge.color.r  = r;
-            badge.color.g  = g;
-            badge.color.b  = b;
-            badge.color.a  = 1.0F;
-            badge.lifetime = rclcpp::Duration::from_seconds(0.5);
-            array.markers.push_back(std::move(badge));
-        }
+        // Add status badge marker
+        array.markers.push_back(create_status_marker(eval.zone, header));
 
         marker_pub_->publish(std::move(array));
+    }
+
+    visualization_msgs::msg::Marker SafetyEnvelopeNode::create_zone_marker(int id, double radius, SafetyZone zone,
+                                                                           const std_msgs::msg::Header& header) const
+    {
+        visualization_msgs::msg::Marker marker;
+        marker.header             = header;
+        marker.header.frame_id    = params_.base_frame;
+        marker.ns                 = "safety_zones";
+        marker.id                 = id;
+        marker.type               = visualization_msgs::msg::Marker::CYLINDER;
+        marker.action             = visualization_msgs::msg::Marker::ADD;
+        marker.pose.position.x    = 0.0;
+        marker.pose.position.y    = 0.0;
+        marker.pose.position.z    = 0.02;
+        marker.pose.orientation.w = 1.0;
+        marker.scale.x            = radius * 2.0;
+        marker.scale.y            = radius * 2.0;
+        marker.scale.z            = 0.02;
+
+        float r = 0.0F, g = 0.0F, b = 0.0F, a = 0.0F;
+        get_zone_color(zone, r, g, b, a);
+        marker.color.r  = r;
+        marker.color.g  = g;
+        marker.color.b  = b;
+        marker.color.a  = a;
+        marker.lifetime = rclcpp::Duration::from_seconds(0.5);
+
+        return marker;
+    }
+
+    visualization_msgs::msg::Marker SafetyEnvelopeNode::create_status_marker(SafetyZone zone,
+                                                                             const std_msgs::msg::Header& header) const
+    {
+        visualization_msgs::msg::Marker marker;
+        marker.header.frame_id    = params_.base_frame;
+        marker.header.stamp       = header.stamp;
+        marker.ns                 = "safety_zone_badge";
+        marker.id                 = 0;
+        marker.type               = visualization_msgs::msg::Marker::SPHERE;
+        marker.action             = visualization_msgs::msg::Marker::ADD;
+        marker.pose.position.x    = 0.0;
+        marker.pose.position.y    = 0.0;
+        marker.pose.position.z    = 0.6;
+        marker.pose.orientation.w = 1.0;
+        marker.scale.x            = 0.18;
+        marker.scale.y            = 0.18;
+        marker.scale.z            = 0.18;
+
+        float r = 0.0F, g = 0.0F, b = 0.0F, a = 0.0F;
+        get_zone_color(zone, r, g, b, a);
+        marker.color.r  = r;
+        marker.color.g  = g;
+        marker.color.b  = b;
+        marker.color.a  = 1.0F;
+        marker.lifetime = rclcpp::Duration::from_seconds(0.5);
+
+        return marker;
+    }
+
+    void SafetyEnvelopeNode::get_zone_color(SafetyZone zone, float& r, float& g, float& b, float& a) const
+    {
+        a = 0.35F;
+        switch (zone)
+        {
+        case SafetyZone::Clear:
+            r = 0.1F;
+            g = 0.8F;
+            b = 0.2F;
+            break;
+        case SafetyZone::Warning:
+            r = 1.0F;
+            g = 0.85F;
+            b = 0.0F;
+            break;
+        case SafetyZone::Protective:
+            r = 1.0F;
+            g = 0.5F;
+            b = 0.0F;
+            break;
+        case SafetyZone::Emergency:
+            r = 0.95F;
+            g = 0.05F;
+            b = 0.05F;
+            a = 0.55F;
+            break;
+        }
     }
 
 } // namespace safety_core_ros
