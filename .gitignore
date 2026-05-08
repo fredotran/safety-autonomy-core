@@ -1,5 +1,7 @@
 build/
 build-coverage/
+install/
+log/
 .vscode/
 
 # Coverage artifacts
