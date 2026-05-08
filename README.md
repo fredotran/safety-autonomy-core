@@ -278,6 +278,41 @@ See [`ros2/README.md`](ros2/README.md) for full architecture, topic map, paramet
 
 For a comprehensive demonstration of all safety capabilities (state machine transitions, safety zones, fault handling, emergency stops), see the [comprehensive demo documentation](ros2/COMPREHENSIVE_DEMO.md).
 
+### Advanced Localization Stack
+
+The ROS 2 integration includes a comprehensive localization stack with advanced sensor fusion, fault detection, and environment-specific configurations:
+
+**Multi-Sensor Fusion:**
+- **Visual Odometry Node**: ORB feature tracking using OpenCV for camera-based pose estimation
+- **Adaptive EKF**: Dynamic process noise adjustment based on wheel slip detection
+- **IMU Bias Estimation**: 21-state EKF with online gyro/accel bias calibration
+- **Sensor Fault Detection**: Comprehensive fault monitoring for wheel odometry, IMU, GPS, and visual odometry
+
+**Enhanced SLAM:**
+- **Warehouse-Optimized SLAM**: Extended loop closure parameters for structured environments
+- **Localization Mode**: Switch from mapping to localization using pre-built maps
+- **Environment-Specific Presets**: Optimized parameters for outdoor (GPS), indoor (GPS-denied), and warehouse (map-based) scenarios
+
+**Robustness Features:**
+- **Kidnapping Detection**: Pose jump analysis for detecting unexpected robot repositioning
+- **Localization Confidence Scoring**: Real-time uncertainty assessment
+- **TF Tree Consistency Monitoring**: Detect and report coordinate system issues
+- **Sensor Timeout Monitoring**: Detect and handle sensor unavailability
+
+**Configuration Files:**
+- `config/ekf_config_with_bias.yaml` - EKF with IMU bias estimation
+- `config/slam_toolbox_warehouse.yaml` - Warehouse-optimized SLAM parameters
+- `config/slam_toolbox_localization.yaml` - Localization mode configuration
+- `config/params_outdoor.yaml` - Outdoor navigation with GPS
+- `config/params_indoor.yaml` - Indoor GPS-denied SLAM
+- `config/params_warehouse.yaml` - Warehouse map-based navigation
+
+**New Scripts:**
+- `scripts/visual_odometry_node.py` - Visual odometry with ORB features
+- `scripts/adaptive_ekf_node.py` - Adaptive EKF with wheel slip detection
+- `scripts/sensor_fault_detector.py` - Comprehensive sensor fault monitoring
+- `scripts/enhanced_localization_monitor.py` - Kidnapping detection and confidence scoring
+
 ## Architecture Overview
 
 ### Startup Flow
