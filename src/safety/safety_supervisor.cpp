@@ -156,13 +156,15 @@ namespace safety_core::safety
     {
         publish_monitor_event(diag::topic::kSafetyDegradedRequest, event);
 
-        if (machine_ == nullptr)
+        // Cache pointer to prevent race condition where machine_ could become null
+        auto* machine = machine_;
+        if (machine == nullptr)
         {
             return Result::Ok();
         }
 
-        const auto res = machine_->transition_to(sm::Mode::Degraded);
-        if (!res.ok() && (machine_->mode() != sm::Mode::Degraded) && (machine_->mode() != sm::Mode::SafeStop))
+        const auto res = machine->transition_to(sm::Mode::Degraded);
+        if (!res.ok() && (machine->mode() != sm::Mode::Degraded) && (machine->mode() != sm::Mode::SafeStop))
         {
             return Result::Fault("failed to request degraded mode");
         }
@@ -173,12 +175,14 @@ namespace safety_core::safety
     {
         publish_monitor_event(diag::topic::kSafetySafeStopForced, event);
 
-        if (machine_ == nullptr)
+        // Cache pointer to prevent race condition where machine_ could become null
+        auto* machine = machine_;
+        if (machine == nullptr)
         {
             return Result::Fault("critical event without state machine");
         }
 
-        const auto res = machine_->latch_fault(event.code);
+        const auto res = machine->latch_fault(event.code);
         if (res.code != StatusCode::kFault)
         {
             return Result::Fault("critical escalation did not latch fault");
@@ -188,7 +192,10 @@ namespace safety_core::safety
 
     void SafetySupervisor::publish_monitor_event(std::string_view topic, const MonitorEvent& event) const noexcept
     {
-        if (transport_ == nullptr)
+        // Cache pointers to prevent race conditions
+        auto* transport = transport_;
+        auto* clock = clock_;
+        if (transport == nullptr)
         {
             return;
         }
@@ -199,14 +206,14 @@ namespace safety_core::safety
                                         static_cast<unsigned>(event.code), static_cast<int>(event.detail.size()),
                                         event.detail.data()));
 
-        const time::TimePoint stamp = (clock_ != nullptr) ? clock_->now() : time::now();
+        const time::TimePoint stamp = (clock != nullptr) ? clock->now() : time::now();
 
         diag::DiagnosticEvent diag_event{};
         diag_event.set_topic(topic);
         diag_event.set_payload(payload);
         diag_event.timestamp_ns = static_cast<std::uint64_t>(
             std::chrono::duration_cast<std::chrono::nanoseconds>(stamp.time_since_epoch()).count());
-        transport_->publish(diag_event);
+        transport->publish(diag_event);
     }
 
 } // namespace safety_core::safety
