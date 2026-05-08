@@ -29,7 +29,7 @@ namespace safety_core::sm
 
     Result ModeStateMachine::transition_to(Mode target) noexcept
     {
-        if (latched_fault_ && target != Mode::SafeStop)
+        if (latched_fault_.load(std::memory_order_acquire) && target != Mode::SafeStop)
         {
             return Result::InvalidState("fault latched; only SafeStop allowed");
         }
@@ -39,17 +39,17 @@ namespace safety_core::sm
             return Result::InvalidState("transition not allowed");
         }
 
-        const Mode prev = mode_;
-        mode_           = target;
+        const Mode prev = mode_.load(std::memory_order_acquire);
+        mode_.store(target, std::memory_order_release);
         notify_transition(prev, target);
         return Result::Ok();
     }
 
     Result ModeStateMachine::latch_fault(std::uint16_t fault_code) noexcept
     {
-        latched_fault_ = true;
-        fault_code_    = fault_code;
-        mode_          = Mode::SafeStop;
+        latched_fault_.store(true, std::memory_order_release);
+        fault_code_ = fault_code;
+        mode_.store(Mode::SafeStop, std::memory_order_release);
         notify_fault(fault_code);
         return Result::Fault("fault latched");
     }
@@ -67,22 +67,23 @@ namespace safety_core::sm
     Result ModeStateMachine::recover_localization() noexcept
     {
         // Recovery goes to Degraded to avoid immediate full-performance until validated.
-        if (mode_ != Mode::LocalizationLost)
+        if (mode_.load(std::memory_order_acquire) != Mode::LocalizationLost)
         {
             return Result::InvalidState("not in LocalizationLost");
         }
-        mode_ = Mode::Degraded;
+        mode_.store(Mode::Degraded, std::memory_order_release);
         return Result::Ok();
     }
 
     bool ModeStateMachine::allowed(Mode target) const noexcept
     {
-        if (mode_ == target)
+        const Mode current = mode_.load(std::memory_order_acquire);
+        if (current == target)
         {
             return true;
         }
 
-        switch (mode_)
+        switch (current)
         {
         case Mode::Init:
             return target == Mode::Idle || target == Mode::SafeStop;

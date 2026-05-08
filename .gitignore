@@ -1,5 +1,7 @@
 build/
 build-coverage/
+install/
+log/
 .vscode/
 
 # Coverage artifacts
@@ -7,3 +9,7 @@ build-coverage/
 *.gcda
 *.gcno
 .cache/clangd/index/
+
+# CI caching
+apt-cache/
+ccache/

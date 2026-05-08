@@ -11,6 +11,4 @@ Checks: >
   ,-cppcoreguidelines-pro-type-union-access
 WarningsAsErrors: '*'
 HeaderFilterRegex: '^(include|src)/'
-AnalyzeTemporaryDtors: false
 FormatStyle: none
-User: safety-core

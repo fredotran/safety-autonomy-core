@@ -1,0 +1,539 @@
+<?xml version="1.0" ?>
+<sdf version="1.10">
+  <world name="industrial_warehouse">
+
+    <physics name="default_physics" default="0" type="ode">
+      <max_step_size>0.005</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+      <real_time_update_rate>200</real_time_update_rate>
+    </physics>
+
+    <plugin filename="gz-sim-physics-system"        name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system"  name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system"
+            name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu"/>
+    <plugin filename="gz-sim-contact-system" name="gz::sim::systems::Contact"/>
+
+    <gravity>0 0 -9.81</gravity>
+    <magnetic_field>5.5645e-6 22.8758e-6 -42.3884e-6</magnetic_field>
+    <atmosphere type="adiabatic"/>
+
+    <scene>
+      <ambient>0.5 0.5 0.5 1</ambient>
+      <background>0.7 0.7 0.7 1</background>
+      <shadows>true</shadows>
+    </scene>
+
+    <light name="ceiling_light_1" type="point">
+      <pose>5 -3 4 0 0 0</pose>
+      <intensity>0.8</intensity>
+      <diffuse>1 1 1 1</diffuse>
+      <specular>0.3 0.3 0.3 1</specular>
+      <attenuation><range>20</range><constant>0.5</constant><linear>0.01</linear><quadratic>0.001</quadratic></attenuation>
+      <cast_shadows>false</cast_shadows>
+    </light>
+
+    <light name="ceiling_light_2" type="point">
+      <pose>5 3 4 0 0 0</pose>
+      <intensity>0.8</intensity>
+      <diffuse>1 1 1 1</diffuse>
+      <attenuation><range>20</range><constant>0.5</constant><linear>0.01</linear><quadratic>0.001</quadratic></attenuation>
+      <cast_shadows>false</cast_shadows>
+    </light>
+
+    <light name="ceiling_light_3" type="point">
+      <pose>-5 0 4 0 0 0</pose>
+      <intensity>0.8</intensity>
+      <diffuse>1 1 1 1</diffuse>
+      <attenuation><range>20</range><constant>0.5</constant><linear>0.01</linear><quadratic>0.001</quadratic></attenuation>
+      <cast_shadows>false</cast_shadows>
+    </light>
+
+    <light name="sun" type="directional">
+      <pose>0 0 10 0 0 0</pose>
+      <cast_shadows>false</cast_shadows>
+      <diffuse>0.4 0.4 0.4 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+
+    <!-- ===========================================================
+         FLOOR (concrete)
+    =========================================================== -->
+    <model name="floor">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry><plane><normal>0 0 1</normal><size>30 20</size></plane></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><plane><normal>0 0 1</normal><size>30 20</size></plane></geometry>
+          <material>
+            <ambient>0.55 0.55 0.55 1</ambient>
+            <diffuse>0.65 0.65 0.65 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ===========================================================
+         OUTER WALLS (rectangular warehouse 24m x 14m)
+    =========================================================== -->
+    <model name="wall_north">
+      <static>true</static>
+      <pose>0 7 1.5 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>24 0.2 3</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>24 0.2 3</size></box></geometry>
+          <material><ambient>0.85 0.85 0.85 1</ambient><diffuse>0.85 0.85 0.85 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_south">
+      <static>true</static>
+      <pose>0 -7 1.5 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>24 0.2 3</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>24 0.2 3</size></box></geometry>
+          <material><ambient>0.85 0.85 0.85 1</ambient><diffuse>0.85 0.85 0.85 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_east">
+      <static>true</static>
+      <pose>12 0 1.5 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>0.2 14 3</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>0.2 14 3</size></box></geometry>
+          <material><ambient>0.85 0.85 0.85 1</ambient><diffuse>0.85 0.85 0.85 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_west">
+      <static>true</static>
+      <pose>-12 0 1.5 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>0.2 14 3</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>0.2 14 3</size></box></geometry>
+          <material><ambient>0.85 0.85 0.85 1</ambient><diffuse>0.85 0.85 0.85 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ===========================================================
+         PALLET RACKS (industrial shelving) - two rows along the
+         long axis with a center aisle
+    =========================================================== -->
+    <model name="rack_north_1">
+      <static>true</static>
+      <pose>-7 4 1.0 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>4 1 2</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>4 1 2</size></box></geometry>
+          <material><ambient>0.3 0.3 0.4 1</ambient><diffuse>0.4 0.4 0.5 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="rack_north_2">
+      <static>true</static>
+      <pose>-1 4 1.0 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>4 1 2</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>4 1 2</size></box></geometry>
+          <material><ambient>0.3 0.3 0.4 1</ambient><diffuse>0.4 0.4 0.5 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="rack_north_3">
+      <static>true</static>
+      <pose>5 4 1.0 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>4 1 2</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>4 1 2</size></box></geometry>
+          <material><ambient>0.3 0.3 0.4 1</ambient><diffuse>0.4 0.4 0.5 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="rack_south_1">
+      <static>true</static>
+      <pose>-7 -4 1.0 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>4 1 2</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>4 1 2</size></box></geometry>
+          <material><ambient>0.3 0.3 0.4 1</ambient><diffuse>0.4 0.4 0.5 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="rack_south_2">
+      <static>true</static>
+      <pose>-1 -4 1.0 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>4 1 2</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>4 1 2</size></box></geometry>
+          <material><ambient>0.3 0.3 0.4 1</ambient><diffuse>0.4 0.4 0.5 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="rack_south_3">
+      <static>true</static>
+      <pose>5 -4 1.0 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>4 1 2</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>4 1 2</size></box></geometry>
+          <material><ambient>0.3 0.3 0.4 1</ambient><diffuse>0.4 0.4 0.5 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ===========================================================
+         PALLETS (low static obstacles in the aisle)
+    =========================================================== -->
+    <model name="pallet_1">
+      <static>true</static>
+      <pose>3 0.2 0.075 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>1.2 0.8 0.15</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>1.2 0.8 0.15</size></box></geometry>
+          <material><ambient>0.55 0.35 0.15 1</ambient><diffuse>0.65 0.45 0.20 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="pallet_2">
+      <static>true</static>
+      <pose>-5 -0.3 0.075 0 0 0.4</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>1.2 0.8 0.15</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>1.2 0.8 0.15</size></box></geometry>
+          <material><ambient>0.55 0.35 0.15 1</ambient><diffuse>0.65 0.45 0.20 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ===========================================================
+         FORKLIFT-SHAPED OBSTACLE (detailed multi-link model)
+         Placed in aisle to trigger safety zones
+    =========================================================== -->
+    <model name="forklift_obstacle">
+      <static>true</static>
+      <pose>9 0 0.0 0 0 1.5708</pose>
+      
+      <!-- Main body -->
+      <link name="body">
+        <pose>0 0 0.6 0 0 0</pose>
+        <collision name="c">
+          <geometry><box><size>2.0 1.0 1.2</size></box></geometry>
+        </collision>
+        <visual name="v">
+          <geometry><box><size>2.0 1.0 1.2</size></box></geometry>
+          <material><ambient>0.95 0.55 0.05 1</ambient><diffuse>1.0 0.65 0.10 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <!-- Forks -->
+      <link name="forks">
+        <pose>1.2 0 0.2 0 0 0</pose>
+        <collision name="c">
+          <geometry><box><size>0.8 0.1 0.05</size></box></geometry>
+        </collision>
+        <visual name="v">
+          <geometry><box><size>0.8 0.1 0.05</size></box></geometry>
+          <material><ambient>0.4 0.4 0.4 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <!-- Mast -->
+      <link name="mast">
+        <pose>0.8 0 1.0 0 0 0</pose>
+        <collision name="c">
+          <geometry><box><size>0.1 0.3 1.5</size></box></geometry>
+        </collision>
+        <visual name="v">
+          <geometry><box><size>0.1 0.3 1.5</size></box></geometry>
+          <material><ambient>0.3 0.3 0.3 1</ambient><diffuse>0.4 0.4 0.4 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <!-- Cabin/Overhead guard -->
+      <link name="cabin">
+        <pose>-0.5 0 1.4 0 0 0</pose>
+        <collision name="c">
+          <geometry><box><size>0.8 0.9 0.6</size></box></geometry>
+        </collision>
+        <visual name="v">
+          <geometry><box><size>0.8 0.9 0.6</size></box></geometry>
+          <material><ambient>0.8 0.7 0.5 1</ambient><diffuse>0.9 0.8 0.6 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <!-- Wheels (visual only) -->
+      <link name="front_left_wheel">
+        <pose>0.8 0.45 0.15 0 0 0</pose>
+        <visual name="v">
+          <geometry><cylinder><radius>0.15</radius><length>0.1</length></cylinder></geometry>
+          <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <link name="front_right_wheel">
+        <pose>0.8 -0.45 0.15 0 0 0</pose>
+        <visual name="v">
+          <geometry><cylinder><radius>0.15</radius><length>0.1</length></cylinder></geometry>
+          <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <link name="rear_left_wheel">
+        <pose>-0.8 0.45 0.15 0 0 0</pose>
+        <visual name="v">
+          <geometry><cylinder><radius>0.15</radius><length>0.1</length></cylinder></geometry>
+          <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <link name="rear_right_wheel">
+        <pose>-0.8 -0.45 0.15 0 0 0</pose>
+        <visual name="v">
+          <geometry><cylinder><radius>0.15</radius><length>0.1</length></cylinder></geometry>
+          <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ===========================================================
+         WORKER MODEL (realistic human-like figure)
+         Multi-link model with head, torso, and legs for better visualization
+    =========================================================== -->
+    <model name="warehouse_worker">
+      <pose>-9 0 0.0 0 0 0</pose>
+      <static>true</static>
+      
+      <!-- Torso -->
+      <link name="torso">
+        <pose>0 0 1.0 0 0 0</pose>
+        <collision name="c">
+          <geometry><box><size>0.4 0.3 0.8</size></box></geometry>
+        </collision>
+        <visual name="v">
+          <geometry><box><size>0.4 0.3 0.8</size></box></geometry>
+          <material><ambient>0.2 0.4 0.7 1</ambient><diffuse>0.3 0.5 0.8 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <!-- Head -->
+      <link name="head">
+        <pose>0 0 1.55 0 0 0</pose>
+        <collision name="c">
+          <geometry><sphere><radius>0.15</radius></sphere></geometry>
+        </collision>
+        <visual name="v">
+          <geometry><sphere><radius>0.15</radius></sphere></geometry>
+          <material><ambient>0.8 0.7 0.6 1</ambient><diffuse>0.9 0.8 0.7 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <!-- Left Leg -->
+      <link name="left_leg">
+        <pose>-0.1 0 0.4 0 0 0</pose>
+        <collision name="c">
+          <geometry><box><size>0.15 0.15 0.8</size></box></geometry>
+        </collision>
+        <visual name="v">
+          <geometry><box><size>0.15 0.15 0.8</size></box></geometry>
+          <material><ambient>0.2 0.2 0.3 1</ambient><diffuse>0.3 0.3 0.4 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <!-- Right Leg -->
+      <link name="right_leg">
+        <pose>0.1 0 0.4 0 0 0</pose>
+        <collision name="c">
+          <geometry><box><size>0.15 0.15 0.8</size></box></geometry>
+        </collision>
+        <visual name="v">
+          <geometry><box><size>0.15 0.15 0.8</size></box></geometry>
+          <material><ambient>0.2 0.2 0.3 1</ambient><diffuse>0.3 0.3 0.4 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <!-- Left Arm -->
+      <link name="left_arm">
+        <pose>-0.3 0 1.2 0 0 0</pose>
+        <collision name="c">
+          <geometry><box><size>0.12 0.12 0.5</size></box></geometry>
+        </collision>
+        <visual name="v">
+          <geometry><box><size>0.12 0.12 0.5</size></box></geometry>
+          <material><ambient>0.8 0.7 0.6 1</ambient><diffuse>0.9 0.8 0.7 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <!-- Right Arm -->
+      <link name="right_arm">
+        <pose>0.3 0 1.2 0 0 0</pose>
+        <collision name="c">
+          <geometry><box><size>0.12 0.12 0.5</size></box></geometry>
+        </collision>
+        <visual name="v">
+          <geometry><box><size>0.12 0.12 0.5</size></box></geometry>
+          <material><ambient>0.8 0.7 0.6 1</ambient><diffuse>0.9 0.8 0.7 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <!-- Hard hat (safety equipment) -->
+      <link name="hard_hat">
+        <pose>0 0 1.72 0 0 0</pose>
+        <collision name="c">
+          <geometry><cylinder><radius>0.18</radius><length>0.12</length></cylinder></geometry>
+        </collision>
+        <visual name="v">
+          <geometry><cylinder><radius>0.18</radius><length>0.12</length></cylinder></geometry>
+          <material><ambient>1.0 0.8 0.1 1</ambient><diffuse>1.0 0.9 0.2 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ===========================================================
+         MOVING CONVEYOR BELT (dynamic obstacle)
+         NOTE: Animation system requires gz-sim-animation-system plugin
+         Currently disabled - conveyor is static
+    =========================================================== -->
+    <model name="conveyor_belt">
+      <pose>0 2 0.5 0 0 0</pose>
+      <static>true</static>
+      <link name="link">
+        <inertial><mass>50</mass></inertial>
+        <collision name="c"><geometry><box><size>3 0.5 0.2</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>3 0.5 0.2</size></box></geometry>
+          <material><ambient>0.3 0.3 0.3 1</ambient><diffuse>0.4 0.4 0.4 1</diffuse></material>
+        </visual>
+      </link>
+      <!-- Animation system plugin not available in current Gazebo version -->
+    </model>
+
+    <!-- ===========================================================
+         MOVING FORKLIFT (dynamic obstacle with detailed model)
+         NOTE: Animation system requires gz-sim-animation-system plugin
+         Currently disabled - forklift is static
+    =========================================================== -->
+    <model name="moving_forklift">
+      <pose>-8 5 0.0 0 0 0</pose>
+      <static>true</static>
+      
+      <!-- Main body -->
+      <link name="body">
+        <pose>0 0 0.6 0 0 0</pose>
+        <inertial><mass>200</mass></inertial>
+        <collision name="c">
+          <geometry><box><size>2.0 1.0 1.2</size></box></geometry>
+        </collision>
+        <visual name="v">
+          <geometry><box><size>2.0 1.0 1.2</size></box></geometry>
+          <material><ambient>0.95 0.55 0.05 1</ambient><diffuse>1.0 0.65 0.10 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <!-- Forks -->
+      <link name="forks">
+        <pose>1.2 0 0.2 0 0 0</pose>
+        <collision name="c">
+          <geometry><box><size>0.8 0.1 0.05</size></box></geometry>
+        </collision>
+        <visual name="v">
+          <geometry><box><size>0.8 0.1 0.05</size></box></geometry>
+          <material><ambient>0.4 0.4 0.4 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <!-- Mast -->
+      <link name="mast">
+        <pose>0.8 0 1.0 0 0 0</pose>
+        <collision name="c">
+          <geometry><box><size>0.1 0.3 1.5</size></box></geometry>
+        </collision>
+        <visual name="v">
+          <geometry><box><size>0.1 0.3 1.5</size></box></geometry>
+          <material><ambient>0.3 0.3 0.3 1</ambient><diffuse>0.4 0.4 0.4 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <!-- Cabin/Overhead guard -->
+      <link name="cabin">
+        <pose>-0.5 0 1.4 0 0 0</pose>
+        <collision name="c">
+          <geometry><box><size>0.8 0.9 0.6</size></box></geometry>
+        </collision>
+        <visual name="v">
+          <geometry><box><size>0.8 0.9 0.6</size></box></geometry>
+          <material><ambient>0.8 0.7 0.5 1</ambient><diffuse>0.9 0.8 0.6 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <!-- Wheels (visual only) -->
+      <link name="front_left_wheel">
+        <pose>0.8 0.45 0.15 0 0 0</pose>
+        <visual name="v">
+          <geometry><cylinder><radius>0.15</radius><length>0.1</length></cylinder></geometry>
+          <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <link name="front_right_wheel">
+        <pose>0.8 -0.45 0.15 0 0 0</pose>
+        <visual name="v">
+          <geometry><cylinder><radius>0.15</radius><length>0.1</length></cylinder></geometry>
+          <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <link name="rear_left_wheel">
+        <pose>-0.8 0.45 0.15 0 0 0</pose>
+        <visual name="v">
+          <geometry><cylinder><radius>0.15</radius><length>0.1</length></cylinder></geometry>
+          <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <link name="rear_right_wheel">
+        <pose>-0.8 -0.45 0.15 0 0 0</pose>
+        <visual name="v">
+          <geometry><cylinder><radius>0.15</radius><length>0.1</length></cylinder></geometry>
+          <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <!-- Animation system plugin not available in current Gazebo version -->
+    </model>
+
+    <!-- ===========================================================
+         AGV ROBOT (spawned by launch file, not included here)
+    =========================================================== -->
+
+  </world>
+</sdf>

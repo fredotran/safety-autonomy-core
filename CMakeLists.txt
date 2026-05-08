@@ -13,6 +13,12 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include(CMakePackageConfigHelpers)
 
+option(SAFETY_CORE_ENABLE_AMENT "Enable ROS 2 ament package integration" OFF)
+
+if(SAFETY_CORE_ENABLE_AMENT)
+    find_package(ament_cmake REQUIRED)
+endif()
+
 add_library(safety_core STATIC
     src/result.cpp
     src/common/time.cpp
@@ -201,6 +207,20 @@ target_link_libraries(safety_supervisor_tests PRIVATE safety_core)
 
 add_test(NAME safety_supervisor_tests COMMAND safety_supervisor_tests)
 
+add_executable(production_improvements_tests
+    tests/production_improvements_tests.cpp
+)
+
+target_link_libraries(production_improvements_tests PRIVATE safety_core)
+
+add_test(NAME production_improvements_tests COMMAND production_improvements_tests)
+
+add_executable(agv_safety_demo
+    examples/agv_safety_demo.cpp
+)
+
+target_link_libraries(agv_safety_demo PRIVATE safety_core)
+
 # Commentary: Package smoke test is defined inline to guarantee install/export + find_package validity.
 set(SAFETY_CORE_PACKAGE_SMOKE_ROOT "${CMAKE_BINARY_DIR}/package_smoke")
 set(SAFETY_CORE_PACKAGE_SMOKE_INSTALL_DIR "${SAFETY_CORE_PACKAGE_SMOKE_ROOT}/install")
@@ -256,6 +276,9 @@ install(TARGETS safety_core
     RUNTIME DESTINATION bin
     INCLUDES DESTINATION include)
 
+install(TARGETS safety_core_app
+    RUNTIME DESTINATION bin)
+
 install(DIRECTORY include/ DESTINATION include)
 
 install(EXPORT safety_core_targets
@@ -273,7 +296,6 @@ export(EXPORT safety_core_targets
     NAMESPACE safety_core::)
 
 # Packaging configuration
-include(CPack)
 set(CPACK_PACKAGE_NAME "safety-core")
 set(CPACK_PACKAGE_VENDOR "Safety Autonomy Team")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Safety Autonomy Core library and demo application")
@@ -283,3 +305,14 @@ set(CPACK_PACKAGE_FILE_NAME
 set(CPACK_GENERATOR "TGZ;ZIP")
 set(CPACK_SOURCE_GENERATOR "TGZ")
 set(CPACK_SOURCE_IGNORE_FILES "/build/;/build-coverage/;/.git/;.gitlab-ci.yml" )
+include(CPack)
+
+if(SAFETY_CORE_ENABLE_AMENT)
+    install(EXPORT safety_core_targets
+        FILE safety_coreTargets.cmake
+        NAMESPACE safety_core::
+        DESTINATION share/${PROJECT_NAME}/cmake)
+    ament_export_targets(safety_core_targets HAS_LIBRARY_TARGET)
+    ament_export_include_directories(include)
+    ament_package()
+endif()

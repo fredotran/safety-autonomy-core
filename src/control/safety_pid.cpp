@@ -99,6 +99,13 @@ namespace safety_core::control
 
         const double error = setpoint - measurement;
         integral_ += error * dt;
+
+        // Anti-windup: clamp integral to prevent accumulation during saturation
+        if (gains_.max_integral > 0.0)
+        {
+            integral_ = std::clamp(integral_, -gains_.max_integral, gains_.max_integral);
+        }
+
         double derivative = 0.0;
         if (!first_update_ && dt > 0.0)
         {
@@ -107,7 +114,14 @@ namespace safety_core::control
 
         double output = (gains_.kp * error) + (gains_.ki * integral_) + (gains_.kd * derivative);
         output        = clamp_speed(output);
-        output        = clamp_accel(output, dt);
+
+        // Back-calculation anti-windup: undo integration that would cause saturation
+        const double pre_accel_output = output;
+        output                        = clamp_accel(output, dt);
+        if (std::abs(pre_accel_output - output) > 1e-9 && gains_.ki != 0.0)
+        {
+            integral_ -= (pre_accel_output - output) / gains_.ki;
+        }
 
         prev_error_   = error;
         last_output_  = output;
@@ -169,6 +183,31 @@ namespace safety_core::control
             limited = last_output_ - max_delta;
         }
         return clamp_speed(limited);
+    }
+
+    double SafetyPidController::compute(double setpoint, double measurement, double ff_velocity,
+                                        double ff_acceleration) noexcept
+    {
+        const double pid_output = compute(setpoint, measurement);
+        if (!std::isfinite(ff_velocity) || !std::isfinite(ff_acceleration))
+        {
+            return pid_output;
+        }
+
+        double dt = kDefaultDtSeconds;
+        if (config_ != nullptr)
+        {
+            const double cfg_dt = std::chrono::duration<double>(config_->timing.control_period).count();
+            if (cfg_dt > 0.0)
+            {
+                dt = cfg_dt;
+            }
+        }
+
+        double output = pid_output + ff_velocity + (ff_acceleration * dt);
+        output        = clamp_speed(output);
+        last_output_  = output;
+        return output;
     }
 
     void SafetyPidController::publish_event(const char* topic, std::string_view payload) const noexcept

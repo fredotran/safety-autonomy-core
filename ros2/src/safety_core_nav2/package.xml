@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>safety_core_nav2</name>
+  <version>0.1.0</version>
+  <description>Nav2 plugins that integrate safety_core multi-zone safety into Nav2 behavior trees and collision monitoring.</description>
+
+  <maintainer email="safety-core@example.com">Safety Autonomy Team</maintainer>
+  <license>Proprietary</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>behaviortree_cpp_v3</depend>
+  <depend>nav2_behavior_tree</depend>
+  <depend>safety_core_msgs</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+    <nav2_behavior_tree plugin="${prefix}/safety_core_nav2_bt_plugins.xml"/>
+  </export>
+</package>

@@ -1,0 +1,36 @@
+# Parameters for the safety_core wrapper nodes.
+# These mirror the safety_core::config::SystemConfig used in the C++ library
+# and the AGV demo example, so behavior is reproducible across environments.
+
+safety_envelope_node:
+  ros__parameters:
+    # Motion envelope (matches examples/agv_safety_demo.cpp warehouse profile)
+    envelope.max_speed_mps: 1.5
+    envelope.max_accel_mps2: 0.75
+    envelope.max_comfort_decel_mps2: 1.0
+    envelope.control_latency_s: 0.04
+    envelope.safety_buffer_m: 0.30
+
+    # Robot footprint (used by safety_core::safety::evaluate_stop_distance overload)
+    footprint.length_m: 0.80
+    footprint.width_m: 0.60
+    footprint.front_overhang_m: 0.10
+
+    # Lateral corridor (added to footprint half-width for forward-cone scan filtering)
+    corridor_half_width_m: 0.40
+    scan_min_valid_range_m: 0.05
+    base_frame: "base_link"
+
+safety_supervisor_node:
+  ros__parameters:
+    localization_timeout_s: 0.5
+    auto_recover_from_obstacle: true
+
+safety_drive_bridge_node:
+  ros__parameters:
+    max_linear_mps: 1.5
+    max_angular_radps: 1.5
+    max_decel_mps2: 1.0
+    max_jerk_mps3: 2.0
+    cmd_freshness_s: 0.25
+    control_period_s: 0.05

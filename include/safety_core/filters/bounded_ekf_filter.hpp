@@ -2,6 +2,8 @@
 
 #include "safety_core/config/system_config.hpp"
 
+#include <cstdint>
+
 namespace safety_core::filters
 {
 
@@ -15,6 +17,7 @@ namespace safety_core::filters
         double max_abs_velocity{100.0};
         double min_variance{1e-9};
         double max_variance{1e6};
+        double innovation_gate_sigma{5.0}; // Mahalanobis gate (0 = disabled)
     };
 
     class BoundedEkfFilter
@@ -37,6 +40,9 @@ namespace safety_core::filters
 
         bool update(double position_measurement, double assumed_accel_mps2 = 0.0) noexcept;
 
+        // Timestamped update: computes dt from consecutive timestamps
+        bool update(double position_measurement, double assumed_accel_mps2, std::uint64_t timestamp_ns) noexcept;
+
         [[nodiscard]] double position() const noexcept
         {
             return x_;
@@ -49,13 +55,18 @@ namespace safety_core::filters
         {
             return healthy_;
         }
+        [[nodiscard]] std::uint64_t rejected_count() const noexcept
+        {
+            return rejected_count_;
+        }
 
       private:
         [[nodiscard]] double dt_seconds() const noexcept;
-        void predict(double assumed_accel_mps2) noexcept;
+        void predict(double assumed_accel_mps2, double dt) noexcept;
         void clamp_covariance() noexcept;
         [[nodiscard]] double clamp_position(double value) const noexcept;
         [[nodiscard]] double clamp_velocity(double value) const noexcept;
+        [[nodiscard]] bool innovation_gate(double innovation, double s) const noexcept;
 
         const config::SystemConfig* config_{nullptr};
         BoundedEkfParams params_{};
@@ -69,6 +80,8 @@ namespace safety_core::filters
         double p11_{1.0};
 
         bool healthy_{true};
+        std::uint64_t last_timestamp_ns_{0U};
+        std::uint64_t rejected_count_{0U};
     };
 
 } // namespace safety_core::filters

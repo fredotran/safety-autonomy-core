@@ -17,7 +17,9 @@ namespace safety_core::filters
         p10_ = 0.0;
         p11_ = 1.0;
         clamp_covariance();
-        healthy_ = true;
+        healthy_           = true;
+        last_timestamp_ns_ = 0U;
+        rejected_count_    = 0U;
     }
 
     bool BoundedEkfFilter::update(double position_measurement, double assumed_accel_mps2) noexcept
@@ -28,7 +30,8 @@ namespace safety_core::filters
             return false;
         }
 
-        predict(assumed_accel_mps2);
+        const double dt = dt_seconds();
+        predict(assumed_accel_mps2, dt);
 
         const double r = std::max(params_.measurement_noise, params_.min_variance);
         const double s = p00_ + r;
@@ -39,8 +42,82 @@ namespace safety_core::filters
         }
 
         const double innovation = position_measurement - x_;
-        const double k0         = p00_ / s;
-        const double k1         = p10_ / s;
+
+        // Innovation gating: reject outliers via Mahalanobis distance
+        if (!innovation_gate(innovation, s))
+        {
+            ++rejected_count_;
+            return healthy_;
+        }
+
+        const double k0 = p00_ / s;
+        const double k1 = p10_ / s;
+
+        const double old_p00 = p00_;
+        const double old_p01 = p01_;
+        const double old_p10 = p10_;
+        const double old_p11 = p11_;
+
+        x_ += k0 * innovation;
+        v_ += k1 * innovation;
+
+        p00_ = (1.0 - k0) * old_p00;
+        p01_ = (1.0 - k0) * old_p01;
+        p10_ = old_p10 - (k1 * old_p00);
+        p11_ = old_p11 - (k1 * old_p01);
+
+        x_ = clamp_position(x_);
+        v_ = clamp_velocity(v_);
+        clamp_covariance();
+
+        healthy_ = std::isfinite(x_) && std::isfinite(v_);
+        return healthy_;
+    }
+
+    bool BoundedEkfFilter::update(double position_measurement, double assumed_accel_mps2,
+                                  std::uint64_t timestamp_ns) noexcept
+    {
+        if (!std::isfinite(position_measurement) || !std::isfinite(assumed_accel_mps2))
+        {
+            healthy_ = false;
+            return false;
+        }
+
+        // Compute dt from timestamps
+        double dt = dt_seconds();
+        if (last_timestamp_ns_ > 0U && timestamp_ns > last_timestamp_ns_)
+        {
+            dt = static_cast<double>(timestamp_ns - last_timestamp_ns_) * 1e-9;
+        }
+        last_timestamp_ns_ = timestamp_ns;
+
+        // Reject stale measurements (> 10x expected period)
+        const double expected_dt = dt_seconds();
+        if (dt > (expected_dt * 10.0))
+        {
+            return healthy_;
+        }
+
+        predict(assumed_accel_mps2, dt);
+
+        const double r = std::max(params_.measurement_noise, params_.min_variance);
+        const double s = p00_ + r;
+        if (!std::isfinite(s) || (s <= params_.min_variance))
+        {
+            healthy_ = false;
+            return false;
+        }
+
+        const double innovation = position_measurement - x_;
+
+        if (!innovation_gate(innovation, s))
+        {
+            ++rejected_count_;
+            return healthy_;
+        }
+
+        const double k0 = p00_ / s;
+        const double k1 = p10_ / s;
 
         const double old_p00 = p00_;
         const double old_p01 = p01_;
@@ -72,10 +149,8 @@ namespace safety_core::filters
         return 0.1;
     }
 
-    void BoundedEkfFilter::predict(double assumed_accel_mps2) noexcept
+    void BoundedEkfFilter::predict(double assumed_accel_mps2, double dt) noexcept
     {
-        const double dt = dt_seconds();
-
         x_ += (v_ * dt) + (0.5 * assumed_accel_mps2 * dt * dt);
         v_ += assumed_accel_mps2 * dt;
 
@@ -95,6 +170,18 @@ namespace safety_core::filters
         x_ = clamp_position(x_);
         v_ = clamp_velocity(v_);
         clamp_covariance();
+    }
+
+    bool BoundedEkfFilter::innovation_gate(double innovation, double s) const noexcept
+    {
+        if (params_.innovation_gate_sigma <= 0.0)
+        {
+            return true; // gating disabled
+        }
+        // Mahalanobis distance for 1D: innovation^2 / S
+        const double mahal_sq  = (innovation * innovation) / s;
+        const double threshold = params_.innovation_gate_sigma * params_.innovation_gate_sigma;
+        return mahal_sq <= threshold;
     }
 
     void BoundedEkfFilter::clamp_covariance() noexcept

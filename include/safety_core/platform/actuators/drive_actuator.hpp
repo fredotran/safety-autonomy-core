@@ -18,6 +18,20 @@ namespace safety_core::platform::actuators
         virtual ~DriveActuator()                               = default;
         virtual void command(const DriveCommand& cmd) noexcept = 0;
         virtual DriveCommand last_command() const noexcept     = 0;
+
+        [[nodiscard]] virtual bool is_command_fresh(std::uint64_t now_ns, std::uint64_t max_age_ns) const noexcept
+        {
+            const auto cmd = last_command();
+            if (cmd.timestamp_ns == 0U)
+            {
+                return false;
+            }
+            if (now_ns < cmd.timestamp_ns)
+            {
+                return false;
+            }
+            return (now_ns - cmd.timestamp_ns) <= max_age_ns;
+        }
     };
 
     class BufferedDriveActuator final : public DriveActuator
@@ -25,15 +39,22 @@ namespace safety_core::platform::actuators
       public:
         void command(const DriveCommand& cmd) noexcept override
         {
-            last_ = cmd;
+            last_          = cmd;
+            command_count_ = command_count_ + 1U;
         }
         DriveCommand last_command() const noexcept override
         {
             return last_;
         }
 
+        [[nodiscard]] std::uint64_t command_count() const noexcept
+        {
+            return command_count_;
+        }
+
       private:
         DriveCommand last_{};
+        std::uint64_t command_count_{0U};
     };
 
 } // namespace safety_core::platform::actuators
