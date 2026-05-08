@@ -85,6 +85,20 @@ ROS 2 Jazzy + Gazebo Harmonic + Nav2 integration for the [`safety_autonomy_core`
 
 ## Build
 
+### Quick setup script
+
+```bash
+cd safety-autonomy-core/ros2
+./setup_demo.sh
+```
+
+This script will:
+- Source the ROS 2 environment
+- Build the workspace
+- Prompt you to select a launch option (full demo, safety stack only, or simulation only)
+
+### Manual build
+
 ```bash
 cd safety-autonomy-core/ros2
 source /opt/ros/jazzy/setup.bash
@@ -103,6 +117,8 @@ If Nav2 is installed, drop `--packages-skip safety_core_nav2` to also build the 
 > **Note**: Sanitizers must be disabled when building under colcon because the safety_core library propagates `-fsanitize=address,undefined` as PUBLIC link options, which conflicts with rclcpp's pre-built libraries.
 
 ## Run
+
+> **Tip**: Use the `setup_demo.sh` script for a guided build and launch experience (see Build section above).
 
 ### Full demo (Gazebo + safety_core + Nav2 + SLAM + RViz)
 
@@ -234,6 +250,7 @@ The boundary contract: ROS callbacks copy data into safety_core types, run noexc
 ```
 ros2/
 ├── README.md                           ← this file
+├── setup_demo.sh                       ← Quick build + launch script
 └── src/
     ├── safety_autonomy_core (symlink)
     ├── safety_core_msgs/
