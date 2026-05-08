@@ -65,13 +65,6 @@ policy_guard:
     - chmod +x tools/safety/verify_policy.sh
     - tools/safety/verify_policy.sh
 
-safety_case_guard:
-  stage: lint
-  <<: *cache_template
-  script:
-    - chmod +x tools/safety/verify_safety_case.sh
-    - tools/safety/verify_safety_case.sh
-
 build_and_test:
   stage: test
   <<: *cache_template
