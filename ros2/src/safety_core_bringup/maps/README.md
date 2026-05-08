@@ -32,3 +32,12 @@ To generate a map for warehouse navigation:
 ## Current Status
 
 No map files are currently available. Use SLAM mode to generate a map first.
+
+## Note
+
+The warehouse environment with AMCL is an advanced feature that requires:
+- A pre-generated map file (warehouse_map.yaml and warehouse_map.pgm)
+- Proper map_server configuration
+- AMCL particle filter tuning for your specific environment
+
+For basic demo testing, use the `outdoor` or `indoor` environments which do not require pre-generated maps.
