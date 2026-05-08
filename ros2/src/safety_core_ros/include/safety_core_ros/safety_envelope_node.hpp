@@ -73,11 +73,11 @@ namespace safety_core_ros
         // Operational parameters
         struct Params
         {
-            double corridor_half_width_m  {0.5};
-            double scan_min_valid_range_m {0.05};
-            double scan_ignore_min_range_m{0.5};  // Ignore obstacles closer than this (workers on robot)
-            double startup_grace_period_s {2.0};  // Grace period to allow sensor stabilization
-            std::string base_frame         {"base_link"};
+            double corridor_half_width_m{0.5};
+            double scan_min_valid_range_m{0.05};
+            double scan_ignore_min_range_m{0.5}; // Ignore obstacles closer than this (workers on robot)
+            double startup_grace_period_s{2.0};  // Grace period to allow sensor stabilization
+            std::string base_frame{"base_link"};
         } params_;
 
         // State

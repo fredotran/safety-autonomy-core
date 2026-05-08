@@ -86,7 +86,7 @@ namespace safety_core_ros
 
     void SafetySupervisorNode::on_envelope(const safety_core_msgs::msg::EnvelopeStatus::ConstSharedPtr msg)
     {
-        latest_zone_  = static_cast<SafetyZone>(msg->zone.zone);
+        latest_zone_            = static_cast<SafetyZone>(msg->zone.zone);
         const Mode current_mode = machine_->mode();
 
         // Always check for auto-transition from Idle to Moving when in Clear zone
@@ -201,13 +201,13 @@ namespace safety_core_ros
         if (result.ok())
         {
             safe_stop_requested_ = false;
-            response->success  = true;
-            response->message = "Fault cleared successfully";
+            response->success    = true;
+            response->message    = "Fault cleared successfully";
             RCLCPP_INFO(get_logger(), "Fault cleared via service call");
         }
         else
         {
-            response->success  = false;
+            response->success = false;
             response->message = result.error_message();
             RCLCPP_WARN(get_logger(), "Failed to clear fault: %s", result.error_message());
         }
