@@ -193,7 +193,7 @@ build_cmake() {
     log_info "Configuring with CMake..."
     /usr/bin/cmake -S . -B "$build_dir" "${cmake_args[@]}"
 
-    log_info "Building with CMake..."
+    log_info "Building with make..."
     local build_args=()
     if [[ -n "$PARALLEL_JOBS" ]]; then
         build_args+=(-j "$PARALLEL_JOBS")
@@ -202,14 +202,14 @@ build_cmake() {
         build_args+=(VERBOSE=1)
     fi
 
-    /usr/bin/cmake --build "$build_dir" "${build_args[@]}"
+    make -C "$build_dir" "${build_args[@]}"
 
     if [[ "$RUN_TESTS" == true ]]; then
         log_info "Running tests with CTest..."
         /usr/bin/ctest --test-dir "$build_dir" --output-on-failure
     fi
 
-    log_success "CMake build completed successfully"
+    log_success "Build completed successfully"
 }
 
 # Build with ROS 2 colcon
