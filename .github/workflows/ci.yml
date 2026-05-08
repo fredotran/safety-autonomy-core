@@ -6,10 +6,12 @@ on:
       - main
       - "ec/**"
       - "devin/**"
+      - "feature/**"
   pull_request:
     branches:
       - main
       - "ec/**"
+      - "feature/**"
   workflow_dispatch:
 
 concurrency:
