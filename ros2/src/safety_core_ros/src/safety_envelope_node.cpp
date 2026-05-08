@@ -51,24 +51,23 @@ namespace safety_core_ros
     void SafetyEnvelopeNode::load_config_from_params()
     {
         // Load envelope configuration
-        config_.envelope.max_speed_mps  = ParamLoader::load_double(this, "envelope.max_speed_mps", 1.5);
+        config_.envelope.max_speed_mps = ParamLoader::load_double(this, "envelope.max_speed_mps", 1.5);
         config_.envelope.max_accel_mps2 = ParamLoader::load_double(this, "envelope.max_accel_mps2", 0.75);
-        config_.envelope.max_comfort_decel_mps2 =
-            ParamLoader::load_double(this, "envelope.max_comfort_decel_mps2", 1.0);
+        config_.envelope.max_comfort_decel_mps2 = ParamLoader::load_double(this, "envelope.max_comfort_decel_mps2", 1.0);
         config_.envelope.control_latency_s = ParamLoader::load_double(this, "envelope.control_latency_s", 0.04);
-        config_.envelope.safety_buffer_m   = ParamLoader::load_double(this, "envelope.safety_buffer_m", 0.3);
+        config_.envelope.safety_buffer_m = ParamLoader::load_double(this, "envelope.safety_buffer_m", 0.3);
 
         // Load footprint configuration
-        footprint_.length_m         = ParamLoader::load_double(this, "footprint.length_m", 0.8);
-        footprint_.width_m          = ParamLoader::load_double(this, "footprint.width_m", 0.6);
+        footprint_.length_m = ParamLoader::load_double(this, "footprint.length_m", 0.8);
+        footprint_.width_m = ParamLoader::load_double(this, "footprint.width_m", 0.6);
         footprint_.front_overhang_m = ParamLoader::load_double(this, "footprint.front_overhang_m", 0.1);
 
         // Load operational parameters
-        params_.corridor_half_width_m   = ParamLoader::load_double(this, "corridor_half_width_m", 0.5);
-        params_.scan_min_valid_range_m  = ParamLoader::load_double(this, "scan_min_valid_range_m", 0.05);
+        params_.corridor_half_width_m = ParamLoader::load_double(this, "corridor_half_width_m", 0.5);
+        params_.scan_min_valid_range_m = ParamLoader::load_double(this, "scan_min_valid_range_m", 0.05);
         params_.scan_ignore_min_range_m = ParamLoader::load_double(this, "scan_ignore_min_range_m", 0.5);
-        params_.startup_grace_period_s   = ParamLoader::load_double(this, "startup_grace_period_s", 2.0);
-        params_.base_frame              = ParamLoader::load_string(this, "base_frame", "base_link");
+        params_.startup_grace_period_s = ParamLoader::load_double(this, "startup_grace_period_s", 2.0);
+        params_.base_frame = ParamLoader::load_string(this, "base_frame", "base_link");
     }
 
     void SafetyEnvelopeNode::on_odom(const nav_msgs::msg::Odometry::ConstSharedPtr msg)
