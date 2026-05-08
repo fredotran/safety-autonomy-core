@@ -5,6 +5,40 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2](https://github.com/fredotran/safety-autonomy-core/compare/v0.1.1...v0.1.2) (2026-05-08)
+
+
+### Features
+
+* Add comprehensive Devin rules with auto-loaded robotics skills ([4d5585c](https://github.com/fredotran/safety-autonomy-core/commit/4d5585cce11e25788d5adfc3759e347094348565))
+* add Devin rules with auto-loaded skills for robotics development ([18311b4](https://github.com/fredotran/safety-autonomy-core/commit/18311b4ff8dfa2cdb8eed54e4281d2a7f7273a6c))
+* Add Docker deployment support for ROS2 demo ([#11](https://github.com/fredotran/safety-autonomy-core/issues/11)) ([c7cc78c](https://github.com/fredotran/safety-autonomy-core/commit/c7cc78c7fa390b79e7852deddb1b431daabccc2c))
+
+
+### Bug Fixes
+
+* Add copyright headers to C++ source files for CI compliance ([bc9c72a](https://github.com/fredotran/safety-autonomy-core/commit/bc9c72ad8f9b999daa868121a5d2037a42cee181))
+* Add Eigen3 dependency and remove broken non_regression_tests ([1a78c9d](https://github.com/fredotran/safety-autonomy-core/commit/1a78c9df99b9ca2cbc64f969aa8861ae89c56ff0))
+* add feature/** branches to CI workflow triggers ([5bde81f](https://github.com/fredotran/safety-autonomy-core/commit/5bde81f8b5b07b3679678fceadf77db80dd1115e))
+* Format non_regression_tests.cpp with clang-format ([3c0949d](https://github.com/fredotran/safety-autonomy-core/commit/3c0949d131a9d68db028a4e75384ce9cc8ed22d9))
+* Install Eigen3 in CI and fix lint/attest issues ([17d8c58](https://github.com/fredotran/safety-autonomy-core/commit/17d8c5866f1972f2edfc8d41be13f865842cdbfa))
+* Make copyright check non-blocking and revert to SPDX format ([979f753](https://github.com/fredotran/safety-autonomy-core/commit/979f75340f74f4d17f7d4c7b651b693f97b18abc))
+* Move ament_copyright to non-blocking lint job ([e46c566](https://github.com/fredotran/safety-autonomy-core/commit/e46c566b54799c3990d439ef74d46cb8c4a1d23f))
+* Remove --rosdistro from ament_lint_cmake and make clang_tidy non-blocking ([ed2e2f0](https://github.com/fredotran/safety-autonomy-core/commit/ed2e2f0dc9bcb1c301d678ac1fc8af6e77f5ae49))
+* Remove ament_copyright check entirely ([aec98a0](https://github.com/fredotran/safety-autonomy-core/commit/aec98a0c426e55bff8189a3b03951ad7f2b7bd4c))
+* Remove GPU requirements for Docker demo compatibility ([c084aec](https://github.com/fredotran/safety-autonomy-core/commit/c084aec35710bb8a84e0a9d22ab1152faf5086d9))
+* Remove non-existent maps directory from CMakeLists.txt install ([61ba4a6](https://github.com/fredotran/safety-autonomy-core/commit/61ba4a6c901ca1314c3756bc744512f2637652d1))
+* Remove trailing whitespace from ROS2 CMakeLists.txt ([3b4bf4c](https://github.com/fredotran/safety-autonomy-core/commit/3b4bf4c1cab1b70e9c496dfa977239acba48ceb8))
+* resolve Python linting issues and remove continue-on-error from CI jobs ([2735b77](https://github.com/fredotran/safety-autonomy-core/commit/2735b7771a76df88c9424c7e4071dc386ba5a406))
+* Restore .devin/ to .gitignore as originally requested ([a2dd079](https://github.com/fredotran/safety-autonomy-core/commit/a2dd079b9675422b4999c710e303648371486b9c))
+* Restore .devin/ to .gitignore as originally requested ([cac2d71](https://github.com/fredotran/safety-autonomy-core/commit/cac2d71117d2cc53a57feac2c7f1911ab3d7c7c7))
+
+
+### Documentation
+
+* Add git-master skill to AGENTS.md ([7167fb3](https://github.com/fredotran/safety-autonomy-core/commit/7167fb3a5b7b92689861b4e8400915525233558e))
+* improve CI workflow comments for ROS 2 build jobs ([5fddadd](https://github.com/fredotran/safety-autonomy-core/commit/5fddaddaff62e8f5573813ce5c59bd97c1f2dc8f))
+
 ## [0.1.1](https://github.com/fredotran/safety-autonomy-core/compare/v0.1.0...v0.1.1) (2026-05-08)
 
 
