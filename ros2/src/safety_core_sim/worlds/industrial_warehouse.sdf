@@ -236,43 +236,196 @@
     </model>
 
     <!-- ===========================================================
-         FORKLIFT-SHAPED OBSTACLE (placed in aisle to trigger zone)
+         FORKLIFT-SHAPED OBSTACLE (detailed multi-link model)
+         Placed in aisle to trigger safety zones
     =========================================================== -->
     <model name="forklift_obstacle">
       <static>true</static>
-      <pose>9 0 0.6 0 0 1.5708</pose>
-      <link name="link">
-        <collision name="c"><geometry><box><size>2.0 1.0 1.2</size></box></geometry></collision>
+      <pose>9 0 0.0 0 0 1.5708</pose>
+      
+      <!-- Main body -->
+      <link name="body">
+        <pose>0 0 0.6 0 0 0</pose>
+        <collision name="c">
+          <geometry><box><size>2.0 1.0 1.2</size></box></geometry>
+        </collision>
         <visual name="v">
           <geometry><box><size>2.0 1.0 1.2</size></box></geometry>
           <material><ambient>0.95 0.55 0.05 1</ambient><diffuse>1.0 0.65 0.10 1</diffuse></material>
         </visual>
       </link>
+      
+      <!-- Forks -->
+      <link name="forks">
+        <pose>1.2 0 0.2 0 0 0</pose>
+        <collision name="c">
+          <geometry><box><size>0.8 0.1 0.05</size></box></geometry>
+        </collision>
+        <visual name="v">
+          <geometry><box><size>0.8 0.1 0.05</size></box></geometry>
+          <material><ambient>0.4 0.4 0.4 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <!-- Mast -->
+      <link name="mast">
+        <pose>0.8 0 1.0 0 0 0</pose>
+        <collision name="c">
+          <geometry><box><size>0.1 0.3 1.5</size></box></geometry>
+        </collision>
+        <visual name="v">
+          <geometry><box><size>0.1 0.3 1.5</size></box></geometry>
+          <material><ambient>0.3 0.3 0.3 1</ambient><diffuse>0.4 0.4 0.4 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <!-- Cabin/Overhead guard -->
+      <link name="cabin">
+        <pose>-0.5 0 1.4 0 0 0</pose>
+        <collision name="c">
+          <geometry><box><size>0.8 0.9 0.6</size></box></geometry>
+        </collision>
+        <visual name="v">
+          <geometry><box><size>0.8 0.9 0.6</size></box></geometry>
+          <material><ambient>0.8 0.7 0.5 1</ambient><diffuse>0.9 0.8 0.6 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <!-- Wheels (visual only) -->
+      <link name="front_left_wheel">
+        <pose>0.8 0.45 0.15 0 0 0</pose>
+        <visual name="v">
+          <geometry><cylinder><radius>0.15</radius><length>0.1</length></cylinder></geometry>
+          <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <link name="front_right_wheel">
+        <pose>0.8 -0.45 0.15 0 0 0</pose>
+        <visual name="v">
+          <geometry><cylinder><radius>0.15</radius><length>0.1</length></cylinder></geometry>
+          <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <link name="rear_left_wheel">
+        <pose>-0.8 0.45 0.15 0 0 0</pose>
+        <visual name="v">
+          <geometry><cylinder><radius>0.15</radius><length>0.1</length></cylinder></geometry>
+          <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <link name="rear_right_wheel">
+        <pose>-0.8 -0.45 0.15 0 0 0</pose>
+        <visual name="v">
+          <geometry><cylinder><radius>0.15</radius><length>0.1</length></cylinder></geometry>
+          <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse></material>
+        </visual>
+      </link>
     </model>
 
     <!-- ===========================================================
-         WORKER MODEL (simple box representing a worker)
-         Static obstacle to avoid Fuel asset loading issues
+         WORKER MODEL (realistic human-like figure)
+         Multi-link model with head, torso, and legs for better visualization
     =========================================================== -->
     <model name="warehouse_worker">
-      <pose>-9 0 0.9 0 0 0</pose>
+      <pose>-9 0 0.0 0 0 0</pose>
       <static>true</static>
-      <link name="link">
-        <collision name="c"><geometry><box><size>0.5 0.5 1.8</size></box></geometry></collision>
+      
+      <!-- Torso -->
+      <link name="torso">
+        <pose>0 0 1.0 0 0 0</pose>
+        <collision name="c">
+          <geometry><box><size>0.4 0.3 0.8</size></box></geometry>
+        </collision>
         <visual name="v">
-          <geometry><box><size>0.5 0.5 1.8</size></box></geometry>
-          <material><ambient>0.4 0.6 0.8 1</ambient><diffuse>0.5 0.7 0.9 1</diffuse></material>
+          <geometry><box><size>0.4 0.3 0.8</size></box></geometry>
+          <material><ambient>0.2 0.4 0.7 1</ambient><diffuse>0.3 0.5 0.8 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <!-- Head -->
+      <link name="head">
+        <pose>0 0 1.55 0 0 0</pose>
+        <collision name="c">
+          <geometry><sphere><radius>0.15</radius></sphere></geometry>
+        </collision>
+        <visual name="v">
+          <geometry><sphere><radius>0.15</radius></sphere></geometry>
+          <material><ambient>0.8 0.7 0.6 1</ambient><diffuse>0.9 0.8 0.7 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <!-- Left Leg -->
+      <link name="left_leg">
+        <pose>-0.1 0 0.4 0 0 0</pose>
+        <collision name="c">
+          <geometry><box><size>0.15 0.15 0.8</size></box></geometry>
+        </collision>
+        <visual name="v">
+          <geometry><box><size>0.15 0.15 0.8</size></box></geometry>
+          <material><ambient>0.2 0.2 0.3 1</ambient><diffuse>0.3 0.3 0.4 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <!-- Right Leg -->
+      <link name="right_leg">
+        <pose>0.1 0 0.4 0 0 0</pose>
+        <collision name="c">
+          <geometry><box><size>0.15 0.15 0.8</size></box></geometry>
+        </collision>
+        <visual name="v">
+          <geometry><box><size>0.15 0.15 0.8</size></box></geometry>
+          <material><ambient>0.2 0.2 0.3 1</ambient><diffuse>0.3 0.3 0.4 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <!-- Left Arm -->
+      <link name="left_arm">
+        <pose>-0.3 0 1.2 0 0 0</pose>
+        <collision name="c">
+          <geometry><box><size>0.12 0.12 0.5</size></box></geometry>
+        </collision>
+        <visual name="v">
+          <geometry><box><size>0.12 0.12 0.5</size></box></geometry>
+          <material><ambient>0.8 0.7 0.6 1</ambient><diffuse>0.9 0.8 0.7 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <!-- Right Arm -->
+      <link name="right_arm">
+        <pose>0.3 0 1.2 0 0 0</pose>
+        <collision name="c">
+          <geometry><box><size>0.12 0.12 0.5</size></box></geometry>
+        </collision>
+        <visual name="v">
+          <geometry><box><size>0.12 0.12 0.5</size></box></geometry>
+          <material><ambient>0.8 0.7 0.6 1</ambient><diffuse>0.9 0.8 0.7 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <!-- Hard hat (safety equipment) -->
+      <link name="hard_hat">
+        <pose>0 0 1.72 0 0 0</pose>
+        <collision name="c">
+          <geometry><cylinder><radius>0.18</radius><length>0.12</length></cylinder></geometry>
+        </collision>
+        <visual name="v">
+          <geometry><cylinder><radius>0.18</radius><length>0.12</length></cylinder></geometry>
+          <material><ambient>1.0 0.8 0.1 1</ambient><diffuse>1.0 0.9 0.2 1</diffuse></material>
         </visual>
       </link>
     </model>
 
     <!-- ===========================================================
          MOVING CONVEYOR BELT (dynamic obstacle)
-         Moves back and forth along the warehouse aisle
+         NOTE: Animation system requires gz-sim-animation-system plugin
+         Currently disabled - conveyor is static
     =========================================================== -->
     <model name="conveyor_belt">
       <pose>0 2 0.5 0 0 0</pose>
-      <static>false</static>
+      <static>true</static>
       <link name="link">
         <inertial><mass>50</mass></inertial>
         <collision name="c"><geometry><box><size>3 0.5 0.2</size></box></geometry></collision>
@@ -281,84 +434,101 @@
           <material><ambient>0.3 0.3 0.3 1</ambient><diffuse>0.4 0.4 0.4 1</diffuse></material>
         </visual>
       </link>
-      <!-- Animation for back-and-forth movement -->
-      <plugin filename="gz-sim-animation-system" name="animation">
-        <animation name="conveyor_move">
-          <script>
-            <loop>true</loop>
-            <delay><float>0.0</float></delay>
-            <translation>
-              <xyz>0 3 0</xyz>
-              <duration>5.0</duration>
-            </translation>
-            <translation>
-              <xyz>0 -3 0</xyz>
-              <duration>5.0</duration>
-            </translation>
-          </script>
-        </animation>
-      </plugin>
+      <!-- Animation system plugin not available in current Gazebo version -->
     </model>
 
     <!-- ===========================================================
-         MOVING FORKLIFT (dynamic obstacle)
-         Moves in a pattern through the warehouse
+         MOVING FORKLIFT (dynamic obstacle with detailed model)
+         NOTE: Animation system requires gz-sim-animation-system plugin
+         Currently disabled - forklift is static
     =========================================================== -->
     <model name="moving_forklift">
-      <pose>-8 5 0.6 0 0 0</pose>
-      <static>false</static>
-      <link name="link">
+      <pose>-8 5 0.0 0 0 0</pose>
+      <static>true</static>
+      
+      <!-- Main body -->
+      <link name="body">
+        <pose>0 0 0.6 0 0 0</pose>
         <inertial><mass>200</mass></inertial>
-        <collision name="c"><geometry><box><size>2.0 1.0 1.2</size></box></geometry></collision>
+        <collision name="c">
+          <geometry><box><size>2.0 1.0 1.2</size></box></geometry>
+        </collision>
         <visual name="v">
           <geometry><box><size>2.0 1.0 1.2</size></box></geometry>
           <material><ambient>0.95 0.55 0.05 1</ambient><diffuse>1.0 0.65 0.10 1</diffuse></material>
         </visual>
       </link>
-      <!-- Animation for forklift movement pattern -->
-      <plugin filename="gz-sim-animation-system" name="animation">
-        <animation name="forklift_patrol">
-          <script>
-            <loop>true</loop>
-            <delay><float>0.0</float></delay>
-            <!-- Move along one aisle -->
-            <translation>
-              <xyz>16 0 0</xyz>
-              <duration>8.0</duration>
-            </translation>
-            <!-- Rotate and move back -->
-            <pose>
-              <xyz>0 0 0</xyz>
-              <rpy>0 0 3.14159</rpy>
-              <duration>1.0</duration>
-            </pose>
-            <translation>
-              <xyz>-16 0 0</xyz>
-              <duration>8.0</duration>
-            </translation>
-            <!-- Rotate and move to other aisle -->
-            <pose>
-              <xyz>0 0 0</xyz>
-              <rpy>0 0 1.5708</rpy>
-              <duration>1.0</duration>
-            </pose>
-            <translation>
-              <xyz>0 -10 0</xyz>
-              <duration>6.0</duration>
-            </translation>
-            <!-- Return to start -->
-            <translation>
-              <xyz>0 10 0</xyz>
-              <duration>6.0</duration>
-            </translation>
-            <pose>
-              <xyz>0 0 0</xyz>
-              <rpy>0 0 -1.5708</rpy>
-              <duration>1.0</duration>
-            </pose>
-          </script>
-        </animation>
-      </plugin>
+      
+      <!-- Forks -->
+      <link name="forks">
+        <pose>1.2 0 0.2 0 0 0</pose>
+        <collision name="c">
+          <geometry><box><size>0.8 0.1 0.05</size></box></geometry>
+        </collision>
+        <visual name="v">
+          <geometry><box><size>0.8 0.1 0.05</size></box></geometry>
+          <material><ambient>0.4 0.4 0.4 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <!-- Mast -->
+      <link name="mast">
+        <pose>0.8 0 1.0 0 0 0</pose>
+        <collision name="c">
+          <geometry><box><size>0.1 0.3 1.5</size></box></geometry>
+        </collision>
+        <visual name="v">
+          <geometry><box><size>0.1 0.3 1.5</size></box></geometry>
+          <material><ambient>0.3 0.3 0.3 1</ambient><diffuse>0.4 0.4 0.4 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <!-- Cabin/Overhead guard -->
+      <link name="cabin">
+        <pose>-0.5 0 1.4 0 0 0</pose>
+        <collision name="c">
+          <geometry><box><size>0.8 0.9 0.6</size></box></geometry>
+        </collision>
+        <visual name="v">
+          <geometry><box><size>0.8 0.9 0.6</size></box></geometry>
+          <material><ambient>0.8 0.7 0.5 1</ambient><diffuse>0.9 0.8 0.6 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <!-- Wheels (visual only) -->
+      <link name="front_left_wheel">
+        <pose>0.8 0.45 0.15 0 0 0</pose>
+        <visual name="v">
+          <geometry><cylinder><radius>0.15</radius><length>0.1</length></cylinder></geometry>
+          <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <link name="front_right_wheel">
+        <pose>0.8 -0.45 0.15 0 0 0</pose>
+        <visual name="v">
+          <geometry><cylinder><radius>0.15</radius><length>0.1</length></cylinder></geometry>
+          <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <link name="rear_left_wheel">
+        <pose>-0.8 0.45 0.15 0 0 0</pose>
+        <visual name="v">
+          <geometry><cylinder><radius>0.15</radius><length>0.1</length></cylinder></geometry>
+          <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <link name="rear_right_wheel">
+        <pose>-0.8 -0.45 0.15 0 0 0</pose>
+        <visual name="v">
+          <geometry><cylinder><radius>0.15</radius><length>0.1</length></cylinder></geometry>
+          <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse></material>
+        </visual>
+      </link>
+      
+      <!-- Animation system plugin not available in current Gazebo version -->
     </model>
 
     <!-- ===========================================================

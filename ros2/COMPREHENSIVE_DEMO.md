@@ -116,6 +116,20 @@ cd /home/itsfredostark/Code/safety-autonomy-core
 
 Select option 1 (Full demo) to launch the comprehensive demo with Gazebo, safety stack, and RViz.
 
+### Launch Options
+
+The setup script now provides 4 launch options:
+
+1. **Full demo** (Gazebo + Safety Stack + Nav2 + RViz) - **Wheel odometry-based navigation**
+   - Robot uses diff-drive wheel odometry for localization
+   - RViz fixed frame is `base_link` (robot-centric view)
+   - Nav2 provides path planning and control
+   - No SLAM or AMCL (pure odometry)
+   - To enable SLAM: `ros2 launch safety_core_bringup agv_warehouse.launch.py slam:=true`
+2. **Safety stack + Simulation** (Gazebo + Safety Nodes + RViz) - Recommended for testing
+3. **Safety stack only** (no simulation, for physical robot)
+4. **Simulation only** (Gazebo only)
+
 ### Manual Launch
 
 ```bash
@@ -123,8 +137,11 @@ Select option 1 (Full demo) to launch the comprehensive demo with Gazebo, safety
 source /opt/ros/jazzy/setup.bash
 source ros2/install/setup.bash
 
-# Launch the comprehensive demo
-ros2 launch safety_core_bringup comprehensive_demo.launch.py
+# Launch different configurations
+ros2 launch safety_core_bringup agv_warehouse.launch.py      # Full demo
+ros2 launch safety_core_bringup safety_sim.launch.py         # Safety + Simulation
+ros2 launch safety_core_bringup safety_only.launch.py        # Safety only
+ros2 launch safety_core_sim sim_only.launch.py               # Simulation only
 ```
 
 ### Launch Options
@@ -282,7 +299,8 @@ The Gazebo window shows:
 - Industrial warehouse with shelves, pallets, forklift
 - AGV robot moving through the environment
 - Realistic physics and sensor simulation
-- **NEW: Moving obstacles** (conveyor belt and forklift) for dynamic scenarios
+- **Detailed warehouse models** (realistic worker, forklifts, pallet racks)
+- **Static obstacles** (conveyor belt, forklift - animation plugin not available in current Gazebo version)
 
 ## Customizing the Demo
 
@@ -343,10 +361,88 @@ self.rotate(angle, speed)             # Rotate
 ## Troubleshooting
 
 ### Robot Not Moving
-1. Check safety state: `ros2 topic echo /safety/state`
-2. Check if fault is latched
-3. Verify envelope node is running: `ros2 node list`
-4. Check for obstacles in Emergency zone
+
+If the robot is not moving in the simulation:
+
+1. **Run the movement test script:**
+   ```bash
+   python3 ros2/src/safety_core_bringup/scripts/test_robot_movement.py
+   ```
+   This will test basic movement and help diagnose the issue.
+
+2. **Check safety state:**
+   ```bash
+   ros2 topic echo /safety/state
+   ```
+   Look for:
+   - `fault_latched: true` - A fault is preventing movement
+   - `mode: 7` (SafeStop) - Emergency stop is engaged
+
+3. **Check if demo script is running:**
+   - The robot needs commands from a demo script or manual control
+   - Run one of the demo scripts (quick_demo.py, comprehensive_demo.py, etc.)
+
+4. **Verify safety nodes are running:**
+   ```bash
+   ros2 node list
+   ```
+   Should show: safety_envelope_node, safety_supervisor_node, safety_drive_bridge_node
+
+5. **Check topic connections:**
+   ```bash
+   ros2 topic list
+   ros2 topic info /cmd_vel_nav
+   ros2 topic info /cmd_vel
+   ```
+
+6. **Verify simulation is running:**
+   - Gazebo window should be open
+   - Robot model should be visible in the warehouse
+
+### RViz Shows Nothing
+
+1. **Run the diagnostic tool:**
+   ```bash
+   python3 ros2/src/safety_core_bringup/scripts/check_rviz_topics.py
+   ```
+   This will check all required topics and provide specific guidance.
+
+2. **Check fixed frame:**
+   - In RViz, set "Fixed Frame" to `odom` (not `map`)
+   - The safety-only config uses `odom` as the fixed frame
+
+3. **Verify topics are published:**
+   ```bash
+   ros2 topic list
+   ```
+   Should show: /robot_description, /tf, /scan, /odom, /clock
+
+4. **Check robot description:**
+   ```bash
+   ros2 topic echo /robot_description --once
+   ```
+   Should publish the URDF
+
+5. **Check TF tree:**
+   ```bash
+   ros2 topic echo /tf
+   ```
+   Should show base_footprint, base_link, wheel links, etc.
+
+6. **Verify robot_state_publisher is running:**
+   ```bash
+   ros2 node list | grep robot_state_publisher
+   ```
+
+7. **Use the correct RViz config:**
+   - Full demo uses: `agv_warehouse.rviz` (with Nav2 topics)
+   - Safety stack + sim uses: `safety_simple.rviz` (minimal, reliable)
+   - Safety-only uses: `safety_simple.rviz` (minimal, reliable)
+
+8. **RViz startup delay:**
+   - RViz now starts with a 2-3 second delay to ensure topics are published
+   - If RViz starts too early, it won't receive the robot_description
+   - Wait for all nodes to start before opening RViz manually
 
 ### Demo Script Not Starting
 1. Ensure simulation is running
@@ -424,9 +520,9 @@ The demo has been significantly enhanced with the following new capabilities:
 - **Sensor Failure Simulation** for realistic testing
 
 ### Enhanced Simulation Environment
-- **Moving obstacles** (conveyor belt and forklift)
-- Dynamic environment for more realistic testing
-- Improved obstacle scenarios
+- **Detailed warehouse models** (realistic worker with hard hat, detailed forklifts)
+- Static obstacles (conveyor belt, forklift - animation plugin not available in current Gazebo version)
+- Improved visual quality and obstacle scenarios
 
 ### Realistic Testing
 - **Sensor failure simulation** with multiple failure modes

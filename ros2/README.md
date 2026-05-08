@@ -10,19 +10,25 @@ ROS 2 Jazzy + Gazebo Harmonic + Nav2 integration for the [`safety_autonomy_core`
 | `safety_core_ros`        | C++ nodes   | Wrapper nodes integrating safety_core into rclcpp                                      |
 | `safety_core_nav2`       | C++ plugin  | Nav2 behavior-tree plugin (`IsSafe` condition node)                                    |
 | `safety_core_sim`        | resources   | AGV URDF (xacro), industrial warehouse SDF, `ros_gz_bridge` config, sim launch         |
-| `safety_core_bringup`    | resources   | Top-level launch files, Nav2 params, SLAM Toolbox params, RViz config                  |
+| `safety_core_bringup`    | resources   | Top-level launch files, Nav2 params, SLAM Toolbox params, RViz config, EKF localization  |
 | `safety_autonomy_core`   | symlink     | The C++ library at the repo root, surfaced as an ament package                         |
 
 ## Architecture
 
 ```text
 ┌────────────────────────── Gazebo Harmonic ──────────────────────────┐
-│ industrial_warehouse.sdf + AGV (diff drive, 2D LiDAR, IMU)          │
+│ industrial_warehouse.sdf + AGV (diff drive, 2D LiDAR, IMU, GPS)     │
 └─────────────────────────────────────────────────────────────────────┘
-        │  /scan, /imu, /odom, /clock          ▲  /cmd_vel
-        ▼                                       │
+        │  /scan, /imu, /odom, /gps, /clock      ▲  /cmd_vel
+        ▼                                         │
 ┌─────────────────────── ros_gz_bridge ──────────────────────────────┐
 │ Bidirectional bridge (config: ros_gz_bridge.yaml)                  │
+└────────────────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌─────────────────── EKF Localization (optional) ────────────────────┐
+│  Multi-sensor fusion: odom + IMU + GPS → /odometry/filtered        │
+│  Extended Kalman Filter for drift-corrected localization            │
 └────────────────────────────────────────────────────────────────────┘
         │
         ▼
@@ -81,6 +87,10 @@ ROS 2 Jazzy + Gazebo Harmonic + Nav2 integration for the [`safety_autonomy_core`
     ros-jazzy-slam-toolbox \
     ros-jazzy-behaviortree-cpp-v3
   ```
+- **Optional, for EKF multi-sensor fusion localization**:
+  ```bash
+  sudo apt install ros-jazzy-robot-localization
+  ```
 - The C++ library at the repo root (built automatically by colcon).
 
 ## Build
@@ -135,14 +145,23 @@ Optional launch arguments:
 |-----------------|---------|----------------------------------------------|
 | `use_sim_time`  | `true`  | Use Gazebo's `/clock`                        |
 | `rviz`          | `true`  | Launch RViz with the demo config             |
-| `slam`          | `true`  | Launch SLAM Toolbox (online async mapping)   |
+| `slam`          | `false` | Launch SLAM Toolbox (online async mapping)   |
 | `nav2`          | `true`  | Launch Nav2 stack (only if installed)        |
+| `ekf`           | `false` | Enable EKF multi-sensor fusion localization  |
 
 Example with no Nav2:
 
 ```bash
 ros2 launch safety_core_bringup agv_warehouse.launch.py nav2:=false
 ```
+
+Example with EKF localization enabled:
+
+```bash
+ros2 launch safety_core_bringup agv_warehouse.launch.py ekf:=true
+```
+
+> **Note:** See [LOCALIZATION.md](LOCALIZATION.md) for detailed documentation on the multi-sensor fusion localization system.
 
 You can drive manually (without Nav2) by publishing to `/cmd_vel_nav`:
 
@@ -173,6 +192,8 @@ ros2 launch safety_core_bringup safety_only.launch.py
 | `/scan`              | `sensor_msgs/LaserScan`       | Gazebo (gpu_lidar)      | 360 samples, 15 Hz, 10 m max range            |
 | `/odom`              | `nav_msgs/Odometry`           | Gazebo (DiffDrive)      | 50 Hz wheel odometry                          |
 | `/imu`               | `sensor_msgs/Imu`             | Gazebo (Imu sensor)     | 100 Hz                                        |
+| `/gps`               | `sensor_msgs/NavSatFix`       | Gazebo (GPS sensor)     | 10 Hz (optional, for EKF fusion)              |
+| `/odometry/filtered` | `nav_msgs/Odometry`           | EKF (robot_localization)| 50 Hz fused odometry (when ekf:=true)         |
 | `/cmd_vel_nav`       | `geometry_msgs/Twist`         | Nav2 collision_monitor  | Gated by safety_drive_bridge before `/cmd_vel`|
 
 ### Outbound (published by safety stack)
@@ -273,7 +294,8 @@ ros2/
     │   ├── config/ros_gz_bridge.yaml
     │   └── launch/sim_only.launch.py
     └── safety_core_bringup/
-        ├── launch/{agv_warehouse,safety_only}.launch.py
-        ├── config/{safety_params,nav2_params,slam_toolbox}.yaml
+        ├── launch/{agv_warehouse,safety_only,localization}.launch.py
+        ├── config/{safety_params,nav2_params,slam_toolbox,ekf_config}.yaml
+        ├── scripts/test_localization.py
         └── rviz/agv_warehouse.rviz
 ```
