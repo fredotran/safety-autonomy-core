@@ -10,6 +10,12 @@
 namespace safety_core::filters
 {
 
+    namespace
+    {
+        // Allow 10x expected period for sensor delays and stale measurements
+        constexpr double kStaleMeasurementMultiplier = 10.0;
+    } // namespace
+
     void BoundedEkfFilter::reset(double position, double velocity) noexcept
     {
         x_ = clamp_position(position);
@@ -38,7 +44,8 @@ namespace safety_core::filters
 
         const double r = std::max(params_.measurement_noise, params_.min_variance);
         const double s = p00_ + r;
-        if (!std::isfinite(s) || (s <= params_.min_variance))
+        // Improved validation: check both operands and result
+        if (!std::isfinite(s) || !std::isfinite(params_.min_variance) || s <= params_.min_variance)
         {
             healthy_ = false;
             return false;
@@ -96,7 +103,7 @@ namespace safety_core::filters
 
         // Reject stale measurements (> 10x expected period)
         const double expected_dt = dt_seconds();
-        if (dt > (expected_dt * 10.0))
+        if (dt > (expected_dt * kStaleMeasurementMultiplier))
         {
             return healthy_;
         }
@@ -105,7 +112,8 @@ namespace safety_core::filters
 
         const double r = std::max(params_.measurement_noise, params_.min_variance);
         const double s = p00_ + r;
-        if (!std::isfinite(s) || (s <= params_.min_variance))
+        // Improved validation: check both operands and result
+        if (!std::isfinite(s) || !std::isfinite(params_.min_variance) || s <= params_.min_variance)
         {
             healthy_ = false;
             return false;

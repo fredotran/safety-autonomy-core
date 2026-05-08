@@ -5,6 +5,7 @@
 
 #include "safety_core/config/system_config.hpp"
 
+#include <cmath>
 #include <cstdint>
 
 namespace safety_core::filters
@@ -33,6 +34,24 @@ namespace safety_core::filters
 
         void set_params(const BoundedEkfParams& params) noexcept
         {
+            // Validate all floating-point parameters to prevent undefined behavior
+            if (!std::isfinite(params.process_noise_position) || !std::isfinite(params.process_noise_velocity) ||
+                !std::isfinite(params.measurement_noise) || !std::isfinite(params.max_abs_position) ||
+                !std::isfinite(params.max_abs_velocity) || !std::isfinite(params.min_variance) ||
+                !std::isfinite(params.max_variance) || !std::isfinite(params.innovation_gate_sigma))
+            {
+                // Keep default parameters if validation fails
+                return;
+            }
+
+            // Validate parameter ranges
+            if (params.min_variance < 0.0 || params.max_variance < params.min_variance ||
+                params.max_abs_position < 0.0 || params.max_abs_velocity < 0.0 || params.innovation_gate_sigma < 0.0)
+            {
+                // Keep default parameters if range validation fails
+                return;
+            }
+
             params_ = params;
             clamp_covariance();
             x_ = clamp_position(x_);

@@ -61,7 +61,12 @@ namespace safety_core::exec
             {
                 return Result::Fault("configured max tasks exceeds executor capacity");
             }
-            max_tasks_       = static_cast<std::size_t>(cfg.max_tasks);
+            max_tasks_ = static_cast<std::size_t>(cfg.max_tasks);
+            // Safety: ensure max_tasks_ never exceeds template parameter
+            if (max_tasks_ > MaxTasks)
+            {
+                max_tasks_ = MaxTasks;
+            }
             default_period_  = cfg.timing.control_period;
             watchdog_period_ = cfg.timing.watchdog_period;
             return Result::Ok();
@@ -79,12 +84,23 @@ namespace safety_core::exec
                 return Result::InvalidState("task period must be non-zero");
             }
             std::size_t used_count = 0U;
+            // Safety: explicit bounds validation
+            if (max_tasks_ > MaxTasks)
+            {
+                return Result::Fault("internal error: max_tasks exceeds capacity");
+            }
             for (auto& slot : tasks_)
             {
                 if (!slot.used)
                 {
                     const time::TimePoint now_tp = now();
-                    if ((use_period.count() > 0) && (now_tp > (time::TimePoint::max() - use_period)))
+                    // Improved overflow check: validate period first, then check addition safety
+                    if (use_period.count() <= 0)
+                    {
+                        publish_event(diag::topic::kExecutorTaskError.data(), "reason=invalid_period");
+                        return Result::Fault("task period must be positive");
+                    }
+                    if (now_tp > time::TimePoint::max() - use_period)
                     {
                         publish_event(diag::topic::kExecutorTaskError.data(), "reason=release_time_overflow");
                         return Result::Fault("task release time overflow");
@@ -121,7 +137,13 @@ namespace safety_core::exec
                     while (now_tp >= slot.next_release)
                     {
                         const auto release = slot.next_release;
-                        if ((slot.period.count() > 0) && (release > (time::TimePoint::max() - slot.period)))
+                        // Improved overflow check with period validation first
+                        if (slot.period.count() <= 0)
+                        {
+                            publish_event(diag::topic::kExecutorTaskError.data(), "reason=invalid_period_runtime");
+                            return Result::Fault("task period must be positive");
+                        }
+                        if (release > time::TimePoint::max() - slot.period)
                         {
                             publish_event(diag::topic::kExecutorTaskError.data(), "reason=deadline_overflow");
                             return Result::Fault("task deadline overflow");
@@ -138,7 +160,8 @@ namespace safety_core::exec
 
                         const auto deadline = release + slot.period;
                         const Result r      = slot.fn(release, slot.context);
-                        if ((slot.period.count() > 0) && (slot.next_release > (time::TimePoint::max() - slot.period)))
+                        // Improved overflow check for next_release (period already validated above)
+                        if (slot.next_release > time::TimePoint::max() - slot.period)
                         {
                             publish_event(diag::topic::kExecutorTaskError.data(), "reason=next_release_overflow");
                             return Result::Fault("task release progression overflow");

@@ -88,6 +88,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Complementary Filter Cutoff Frequency**: Optional `cutoff_frequency_hz` parameter auto-derives alpha from `1 / (1 + 2*pi*fc*dt)`, replacing manual alpha tuning.
 - **AGV Safety Demo**: `examples/agv_safety_demo.cpp` demonstrating the full pipeline -- sensor fusion, PID control, multi-zone envelope, state transitions, and emergency stop.
 - **Production Improvements Tests**: 15 new test cases covering all above features.
+- **MISRA-like Static Analysis**: Enhanced CI with cppcheck and extended clang-tidy checks for MISRA C++ compliance baseline establishment.
+- **Commercial MISRA Tools Documentation**: Comprehensive guide covering Coverity, QAC, Helix QAC, and PCLint with cost estimates and implementation roadmap.
+- **Safety-Critical Code Improvements**:
+  - Atomic mode transitions using compare-and-swap to prevent race conditions
+  - Enhanced integer overflow checks in time arithmetic with period validation
+  - Null pointer caching in safety supervisor to prevent TOCTOU vulnerabilities
+  - Floating-point parameter validation in bounded_ekf_filter
+  - Comprehensive configuration validation with safety limits
+  - Explicit bounds checking in task_executor array operations
+  - Magic number replacement with named constants
+
+### Changed
+- **CI Pipeline**: Consolidated static analysis into single `clang_tidy` job with cppcheck integration, removed redundant `misra_like_analysis` job.
+- **State Machine**: Implemented atomic CAS-based mode transitions for thread-safe concurrent access.
 
 ## [0.1.0] - 2026-03-13
 
