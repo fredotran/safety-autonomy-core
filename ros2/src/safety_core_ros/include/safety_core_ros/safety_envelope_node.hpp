@@ -75,11 +75,14 @@ namespace safety_core_ros
         {
             double corridor_half_width_m{0.5};
             double scan_min_valid_range_m{0.05};
+            double scan_ignore_min_range_m{0.5};  // Ignore obstacles closer than this (workers on robot)
+            double startup_grace_period_s{2.0};  // Grace period to allow sensor stabilization
             std::string base_frame{"base_link"};
         } params_;
 
         // State
         std::atomic<double> latest_speed_mps_{0.0};
+        rclcpp::Time startup_time_;
 
         // ROS interfaces
         rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
