@@ -47,9 +47,6 @@ jobs:
   clang_tidy:
     name: clang_tidy (static analysis)
     runs-on: ubuntu-24.04
-    # Pre-existing readability/bugprone findings in the core C++ library; tracked as known
-    # debt and intentionally non-blocking until a dedicated cleanup pass lands.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - name: Install build deps
@@ -200,10 +197,6 @@ jobs:
     runs-on: ubuntu-24.04
     container:
       image: ros:jazzy-ros-base
-    # Pre-existing flake8/pep257 findings in legacy demo scripts (comprehensive_demo.launch.py,
-    # before_after_comparison.py, etc.) make the strict ament_flake8 / ament_pep257 jobs noisy
-    # until a dedicated cleanup pass lands. ament_lint_cmake / ament_copyright are still run.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - name: Install ros-gz + ament linters
