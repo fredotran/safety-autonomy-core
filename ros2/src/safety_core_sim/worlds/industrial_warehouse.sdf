@@ -1,0 +1,281 @@
+<?xml version="1.0" ?>
+<sdf version="1.10">
+  <world name="industrial_warehouse">
+
+    <physics name="default_physics" default="0" type="ode">
+      <max_step_size>0.005</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+      <real_time_update_rate>200</real_time_update_rate>
+    </physics>
+
+    <plugin filename="gz-sim-physics-system"        name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system"  name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system"
+            name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu"/>
+    <plugin filename="gz-sim-contact-system" name="gz::sim::systems::Contact"/>
+
+    <gravity>0 0 -9.81</gravity>
+    <magnetic_field>5.5645e-6 22.8758e-6 -42.3884e-6</magnetic_field>
+    <atmosphere type="adiabatic"/>
+
+    <scene>
+      <ambient>0.5 0.5 0.5 1</ambient>
+      <background>0.7 0.7 0.7 1</background>
+      <shadows>true</shadows>
+    </scene>
+
+    <light name="ceiling_light_1" type="point">
+      <pose>5 -3 4 0 0 0</pose>
+      <intensity>0.8</intensity>
+      <diffuse>1 1 1 1</diffuse>
+      <specular>0.3 0.3 0.3 1</specular>
+      <attenuation><range>20</range><constant>0.5</constant><linear>0.01</linear><quadratic>0.001</quadratic></attenuation>
+      <cast_shadows>false</cast_shadows>
+    </light>
+
+    <light name="ceiling_light_2" type="point">
+      <pose>5 3 4 0 0 0</pose>
+      <intensity>0.8</intensity>
+      <diffuse>1 1 1 1</diffuse>
+      <attenuation><range>20</range><constant>0.5</constant><linear>0.01</linear><quadratic>0.001</quadratic></attenuation>
+      <cast_shadows>false</cast_shadows>
+    </light>
+
+    <light name="ceiling_light_3" type="point">
+      <pose>-5 0 4 0 0 0</pose>
+      <intensity>0.8</intensity>
+      <diffuse>1 1 1 1</diffuse>
+      <attenuation><range>20</range><constant>0.5</constant><linear>0.01</linear><quadratic>0.001</quadratic></attenuation>
+      <cast_shadows>false</cast_shadows>
+    </light>
+
+    <light name="sun" type="directional">
+      <pose>0 0 10 0 0 0</pose>
+      <cast_shadows>false</cast_shadows>
+      <diffuse>0.4 0.4 0.4 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+
+    <!-- ===========================================================
+         FLOOR (concrete)
+    =========================================================== -->
+    <model name="floor">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry><plane><normal>0 0 1</normal><size>30 20</size></plane></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><plane><normal>0 0 1</normal><size>30 20</size></plane></geometry>
+          <material>
+            <ambient>0.55 0.55 0.55 1</ambient>
+            <diffuse>0.65 0.65 0.65 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ===========================================================
+         OUTER WALLS (rectangular warehouse 24m x 14m)
+    =========================================================== -->
+    <model name="wall_north">
+      <static>true</static>
+      <pose>0 7 1.5 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>24 0.2 3</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>24 0.2 3</size></box></geometry>
+          <material><ambient>0.85 0.85 0.85 1</ambient><diffuse>0.85 0.85 0.85 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_south">
+      <static>true</static>
+      <pose>0 -7 1.5 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>24 0.2 3</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>24 0.2 3</size></box></geometry>
+          <material><ambient>0.85 0.85 0.85 1</ambient><diffuse>0.85 0.85 0.85 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_east">
+      <static>true</static>
+      <pose>12 0 1.5 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>0.2 14 3</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>0.2 14 3</size></box></geometry>
+          <material><ambient>0.85 0.85 0.85 1</ambient><diffuse>0.85 0.85 0.85 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_west">
+      <static>true</static>
+      <pose>-12 0 1.5 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>0.2 14 3</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>0.2 14 3</size></box></geometry>
+          <material><ambient>0.85 0.85 0.85 1</ambient><diffuse>0.85 0.85 0.85 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ===========================================================
+         PALLET RACKS (industrial shelving) - two rows along the
+         long axis with a center aisle
+    =========================================================== -->
+    <model name="rack_north_1">
+      <static>true</static>
+      <pose>-7 4 1.0 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>4 1 2</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>4 1 2</size></box></geometry>
+          <material><ambient>0.3 0.3 0.4 1</ambient><diffuse>0.4 0.4 0.5 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="rack_north_2">
+      <static>true</static>
+      <pose>-1 4 1.0 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>4 1 2</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>4 1 2</size></box></geometry>
+          <material><ambient>0.3 0.3 0.4 1</ambient><diffuse>0.4 0.4 0.5 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="rack_north_3">
+      <static>true</static>
+      <pose>5 4 1.0 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>4 1 2</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>4 1 2</size></box></geometry>
+          <material><ambient>0.3 0.3 0.4 1</ambient><diffuse>0.4 0.4 0.5 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="rack_south_1">
+      <static>true</static>
+      <pose>-7 -4 1.0 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>4 1 2</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>4 1 2</size></box></geometry>
+          <material><ambient>0.3 0.3 0.4 1</ambient><diffuse>0.4 0.4 0.5 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="rack_south_2">
+      <static>true</static>
+      <pose>-1 -4 1.0 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>4 1 2</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>4 1 2</size></box></geometry>
+          <material><ambient>0.3 0.3 0.4 1</ambient><diffuse>0.4 0.4 0.5 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="rack_south_3">
+      <static>true</static>
+      <pose>5 -4 1.0 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>4 1 2</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>4 1 2</size></box></geometry>
+          <material><ambient>0.3 0.3 0.4 1</ambient><diffuse>0.4 0.4 0.5 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ===========================================================
+         PALLETS (low static obstacles in the aisle)
+    =========================================================== -->
+    <model name="pallet_1">
+      <static>true</static>
+      <pose>3 0.2 0.075 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>1.2 0.8 0.15</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>1.2 0.8 0.15</size></box></geometry>
+          <material><ambient>0.55 0.35 0.15 1</ambient><diffuse>0.65 0.45 0.20 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="pallet_2">
+      <static>true</static>
+      <pose>-5 -0.3 0.075 0 0 0.4</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>1.2 0.8 0.15</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>1.2 0.8 0.15</size></box></geometry>
+          <material><ambient>0.55 0.35 0.15 1</ambient><diffuse>0.65 0.45 0.20 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ===========================================================
+         FORKLIFT-SHAPED OBSTACLE (placed in aisle to trigger zone)
+    =========================================================== -->
+    <model name="forklift_obstacle">
+      <static>true</static>
+      <pose>9 0 0.6 0 0 1.5708</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>2.0 1.0 1.2</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>2.0 1.0 1.2</size></box></geometry>
+          <material><ambient>0.95 0.55 0.05 1</ambient><diffuse>1.0 0.65 0.10 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ===========================================================
+         WORKER ACTOR (animated pedestrian crossing the aisle)
+         Uses Gazebo's actor system; falls back gracefully if the
+         skin asset is absent (visualized as a simple animated cube).
+    =========================================================== -->
+    <actor name="warehouse_worker">
+      <pose>-9 -1.0 0 0 0 0</pose>
+      <skin>
+        <filename>https://fuel.gazebosim.org/1.0/openrobotics/models/actor/tip/files/meshes/walk.dae</filename>
+        <scale>1.0</scale>
+      </skin>
+      <animation name="walking">
+        <filename>https://fuel.gazebosim.org/1.0/openrobotics/models/actor/tip/files/meshes/walk.dae</filename>
+        <interpolate_x>true</interpolate_x>
+      </animation>
+      <script>
+        <loop>true</loop>
+        <delay_start>0</delay_start>
+        <auto_start>true</auto_start>
+        <trajectory id="0" type="walking">
+          <waypoint><time>0</time><pose>-9 -1.0 0 0 0 0</pose></waypoint>
+          <waypoint><time>4</time><pose>-9  1.0 0 0 0 1.5708</pose></waypoint>
+          <waypoint><time>8</time><pose>-9 -1.0 0 0 0 -1.5708</pose></waypoint>
+        </trajectory>
+      </script>
+    </actor>
+
+  </world>
+</sdf>

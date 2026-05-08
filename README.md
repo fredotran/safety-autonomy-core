@@ -120,8 +120,31 @@ Downstream ROS 2 packages link with:
 
 ```cmake
 find_package(safety_autonomy_core REQUIRED)
-target_link_libraries(my_node PRIVATE safety_core::safety_core)
+target_link_libraries(my_node PRIVATE safety_autonomy_core::safety_core)
 ```
+
+### ROS 2 wrapper + AGV warehouse simulation
+
+A complete ROS 2 Jazzy + Gazebo Harmonic + Nav2 wrapper with a self-contained industrial warehouse simulation lives in [`ros2/`](ros2/README.md). It includes:
+
+- Wrapper nodes (`safety_envelope_node`, `safety_supervisor_node`, `safety_drive_bridge_node`)
+- Custom messages (`SafetyState`, `EnvelopeStatus`, `DiagnosticEvent`, etc.)
+- A Nav2 BT plugin (`IsSafe` condition node)
+- AGV URDF + warehouse SDF + `ros_gz_bridge` config
+- Top-level launch files, Nav2 params, SLAM Toolbox config, RViz visualization
+
+```bash
+cd ros2
+source /opt/ros/jazzy/setup.bash
+colcon build --packages-skip safety_core_nav2 \
+    --cmake-args -DSAFETY_CORE_ENABLE_AMENT=ON \
+                 -DSAFETY_CORE_ENABLE_SANITIZERS=OFF \
+                 -DSAFETY_CORE_ENABLE_WERROR=OFF
+source install/setup.bash
+ros2 launch safety_core_bringup agv_warehouse.launch.py
+```
+
+See [`ros2/README.md`](ros2/README.md) for full architecture, topic map, parameter list, and run instructions.
 
 ## Architecture Overview
 

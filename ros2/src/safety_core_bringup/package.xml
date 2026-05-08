@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>safety_core_bringup</name>
+  <version>0.1.0</version>
+  <description>Top-level launch files, parameter sets, RViz configs, and maps for the safety_core AGV warehouse demo.</description>
+
+  <maintainer email="safety-core@example.com">Safety Autonomy Team</maintainer>
+  <license>Proprietary</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <exec_depend>safety_core_sim</exec_depend>
+  <exec_depend>safety_core_ros</exec_depend>
+  <exec_depend>safety_core_nav2</exec_depend>
+  <exec_depend>safety_core_msgs</exec_depend>
+  <exec_depend>nav2_bringup</exec_depend>
+  <exec_depend>nav2_lifecycle_manager</exec_depend>
+  <exec_depend>nav2_collision_monitor</exec_depend>
+  <exec_depend>slam_toolbox</exec_depend>
+  <exec_depend>rviz2</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>tf2_tools</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

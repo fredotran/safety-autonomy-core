@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **ROS 2 wrapper workspace** (`ros2/`): full ROS 2 Jazzy integration with five new packages.
+  - `safety_core_msgs`: ROS 2 message definitions (`SafetyState`, `SafetyZone`, `EnvelopeStatus`, `DiagnosticEvent`, `MonitorEvent`).
+  - `safety_core_ros`: wrapper nodes -- `safety_envelope_node` (lidar → zone classification), `safety_supervisor_node` (state machine + supervisor), `safety_drive_bridge_node` (Nav2 → /cmd_vel gating with jerk-limited stop and freshness watchdog).
+  - `safety_core_nav2`: Nav2 behavior-tree plugin (`IsSafe` condition node) for gating motion behind safety state.
+  - `safety_core_sim`: Gazebo Harmonic AGV (URDF xacro: diff drive + 360° lidar + IMU), self-contained industrial warehouse SDF (shelves, pallets, forklift, animated worker), `ros_gz_bridge` config, sim-only launch.
+  - `safety_core_bringup`: top-level launch (Gazebo + Nav2 + SLAM Toolbox + RViz), Nav2 params (MPPI controller, collision_monitor zones), SLAM Toolbox params, RViz config.
+- **rclcpp adapters** for safety_core abstractions: `RosClock`, `RosDiagnosticTransport`, `RosHealthMonitor`.
 - **PID Anti-Windup**: Integral clamping with configurable `max_integral` limit and back-calculation anti-windup when output saturates.
 - **PID Feedforward**: New `compute(setpoint, measurement, ff_velocity, ff_acceleration)` overload for trajectory tracking with velocity/acceleration feedforward terms.
 - **Drive Command Freshness Watchdog**: `is_command_fresh(now_ns, max_age_ns)` on `DriveActuator` interface for detecting stale commands; `command_count()` on `BufferedDriveActuator`.

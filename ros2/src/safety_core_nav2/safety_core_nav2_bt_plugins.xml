@@ -1,0 +1,11 @@
+<class_libraries>
+  <library path="is_safe_condition_bt_node">
+    <class type="safety_core_nav2::IsSafeCondition" base_class_type="BT::ConditionNode">
+      <description>
+        Returns SUCCESS while the safety_core supervisor reports a non-fault state and the safety
+        envelope is in CLEAR (and optionally WARNING/PROTECTIVE) zones. Used to gate Nav2 motion
+        attempts behind the safety envelope.
+      </description>
+    </class>
+  </library>
+</class_libraries>
