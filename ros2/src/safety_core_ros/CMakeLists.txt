@@ -44,6 +44,7 @@ find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 find_package(safety_core_msgs REQUIRED)
 find_package(safety_autonomy_core REQUIRED)
 
@@ -106,7 +107,7 @@ target_link_libraries(safety_supervisor_node
   ${SAFETY_CORE_TARGET})
 ament_target_dependencies(safety_supervisor_node
   rclcpp rclcpp_lifecycle std_msgs nav_msgs sensor_msgs
-  diagnostic_msgs safety_core_msgs)
+  diagnostic_msgs std_srvs safety_core_msgs)
 
 # ----------------------------------------------------------------------------
 # Node 3: safety_drive_bridge_node
