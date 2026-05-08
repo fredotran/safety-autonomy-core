@@ -62,7 +62,7 @@ namespace safety_core_ros
             }
             else
             {
-                RCLCPP_WARN(get_logger(), "Failed to clear fault: %s", clear_result.message);
+                RCLCPP_WARN(get_logger(), "Failed to clear fault: %s", clear_result.message.data());
             }
         }
 
@@ -210,7 +210,7 @@ namespace safety_core_ros
         {
             response->success = false;
             response->message = result.message;
-            RCLCPP_WARN(get_logger(), "Failed to clear fault: %s", result.message);
+            RCLCPP_WARN(get_logger(), "Failed to clear fault: %s", result.message.data());
         }
     }
 
