@@ -9,6 +9,7 @@ using namespace std::chrono_literals;
 using safety_core::safety::SafetyZone;
 using safety_core::sm::Mode;
 using std::placeholders::_1;
+using std::placeholders::_2;
 
 namespace safety_core_ros
 {
@@ -54,7 +55,7 @@ namespace safety_core_ros
         // Clear any latched fault from previous runs (for simulation/testing)
         if (machine_->fault_latched())
         {
-            const Result clear_result = machine_->clear_fault();
+            const safety_core::Result clear_result = machine_->clear_fault();
             if (clear_result.ok())
             {
                 RCLCPP_INFO(get_logger(), "Cleared latched fault from previous run");
@@ -197,7 +198,7 @@ namespace safety_core_ros
                                               std::shared_ptr<std_srvs::srv::Trigger::Response> response)
     {
         (void)request; // Unused
-        const Result result = machine_->clear_fault();
+        const safety_core::Result result = machine_->clear_fault();
         if (result.ok())
         {
             safe_stop_requested_ = false;
