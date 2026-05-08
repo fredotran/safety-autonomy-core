@@ -16,6 +16,8 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
+**Note**: The pre-commit hook automatically runs `clang-format` on C++ files before committing. If `clang-format` is not installed on your host system, the hook will automatically use the Docker container (if available) to format files. To install `clang-format` locally: `sudo apt install clang-format`.
+
 ## 3) One-command quality gate
 Use the repository quality gate script before opening a merge request:
 
