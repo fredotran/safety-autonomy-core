@@ -203,7 +203,7 @@ jobs:
         run: docker compose build
       - name: Verify ROS 2 build
         run: |
-          docker compose run --rm development bash -c "
+          docker compose run --rm safety-autonomy-demo bash -c "
             source /opt/ros/jazzy/setup.bash &&
             source /workspace/ros2_ws/install/setup.bash &&
             colcon list &&
