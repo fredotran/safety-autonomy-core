@@ -47,32 +47,11 @@ jobs:
           clang-format --dry-run --Werror $(find include src tests ros2/src -name '*.hpp' -o -name '*.cpp')
 
   clang_tidy:
-    name: clang_tidy (static analysis)
+    name: clang_tidy (static analysis + cppcheck)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     # Pre-existing readability/bugprone findings in the core C++ library; tracked as known
     # debt and intentionally non-blocking until a dedicated cleanup pass lands.
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install build deps
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            build-essential cmake ninja-build clang clang-tidy libeigen3-dev
-      - name: Configure
-        run: |
-          cmake -S . -B ${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug -DSAFETY_CORE_ENABLE_SANITIZERS=OFF
-      - name: Build safety_core
-        run: cmake --build ${BUILD_DIR} --target safety_core
-      - name: clang-tidy
-        run: clang-tidy -p ${BUILD_DIR} $(find src include -name '*.cpp') || true
-
-  misra_like_analysis:
-    name: misra_like_analysis (MISRA-like static analysis)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    # Non-blocking to establish baseline and avoid blocking CI while learning MISRA compliance
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
@@ -92,17 +71,13 @@ jobs:
                    --inline-suppr \
                    --std=c++20 \
                    --suppress=missingIncludeSystem \
-                   --suppress=uninitvar \
                    --suppress=unusedFunction \
                    --suppressions-list=.cppcheck-suppressions \
                    -I include \
                    -I /usr/include/eigen3 \
                    src/ include/ || true
-      - name: Run clang-tidy with MISRA-like checks
-        run: |
-          clang-tidy -p ${BUILD_DIR} \
-                    --config-file=.clang-tidy-misra \
-                    $(find src include -name '*.cpp') || true
+      - name: clang-tidy
+        run: clang-tidy -p ${BUILD_DIR} $(find src include -name '*.cpp') || true
 
   hook_smoke:
     name: hook_smoke (pre-commit hook)
