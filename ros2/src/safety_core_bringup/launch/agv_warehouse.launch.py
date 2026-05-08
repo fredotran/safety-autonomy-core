@@ -55,6 +55,7 @@ def generate_launch_description():
     use_ekf = LaunchConfiguration("ekf")
     use_gps = LaunchConfiguration("gps")
     nav2_controller = LaunchConfiguration("nav2_controller")
+    use_teleop = LaunchConfiguration("teleop")
 
     safety_params = os.path.join(pkg_bringup, "config", "safety_params.yaml")
     # Odometry-only Nav2 config (no AMCL / no map_server) for the default wheel-odometry mode.
@@ -82,6 +83,11 @@ def generate_launch_description():
         "nav2_controller",
         default_value="dwb",
         description="Nav2 controller type: 'mppi' (MPPI) or 'dwb' (DWB - simpler, recommended for diff-drive)",
+    )
+    declare_use_teleop = DeclareLaunchArgument(
+        "teleop",
+        default_value="false",
+        description="Enable teleoperation node for manual control",
     )
 
     # 1. Simulation (Gazebo + AGV + ros_gz_bridge + robot_state_publisher).
@@ -123,12 +129,26 @@ def generate_launch_description():
         ],
     )
 
+    teleop = Node(
+        package="safety_core_ros",
+        executable="teleop_node",
+        name="teleop_node",
+        output="screen",
+        parameters=[
+            {"use_sim_time": use_sim_time},
+            {"linear_speed": 0.3},
+            {"angular_speed": 0.3},
+        ],
+        condition=IfCondition(use_teleop),
+    )
+
     safety_stack = GroupAction(
         actions=[
             LogInfo(msg="Starting safety_core wrapper stack..."),
             safety_envelope,
             safety_supervisor,
             safety_drive_bridge,
+            teleop,
         ]
     )
 
@@ -243,6 +263,7 @@ def generate_launch_description():
             declare_ekf,
             declare_gps,
             declare_nav2_controller,
+            declare_use_teleop,
             sim,
             safety_stack,
             ekf_stack,

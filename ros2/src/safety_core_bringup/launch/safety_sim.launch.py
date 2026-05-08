@@ -32,6 +32,7 @@ def generate_launch_description():
 
     use_sim_time = LaunchConfiguration("use_sim_time")
     use_rviz = LaunchConfiguration("rviz")
+    use_teleop = LaunchConfiguration("teleop")
 
     safety_params = os.path.join(pkg_bringup, "config", "safety_params.yaml")
     rviz_config = os.path.join(pkg_bringup, "rviz", "safety_simple.rviz")
@@ -39,6 +40,7 @@ def generate_launch_description():
 
     declare_use_sim_time = DeclareLaunchArgument("use_sim_time", default_value="true")
     declare_rviz = DeclareLaunchArgument("rviz", default_value="true")
+    declare_use_teleop = DeclareLaunchArgument("teleop", default_value="false")
 
     sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(sim_launch),
@@ -73,12 +75,26 @@ def generate_launch_description():
         ],
     )
 
+    teleop = Node(
+        package="safety_core_ros",
+        executable="teleop_node",
+        name="teleop_node",
+        output="screen",
+        parameters=[
+            {"use_sim_time": use_sim_time},
+            {"linear_speed": 0.3},
+            {"angular_speed": 0.3},
+        ],
+        condition=IfCondition(use_teleop),
+    )
+
     safety_stack = GroupAction(
         actions=[
             LogInfo(msg="Starting safety_core wrapper stack (no Nav2)..."),
             safety_envelope,
             safety_supervisor,
             safety_drive_bridge,
+            teleop,
         ]
     )
 
@@ -95,6 +111,7 @@ def generate_launch_description():
         [
             declare_use_sim_time,
             declare_rviz,
+            declare_use_teleop,
             sim,
             safety_stack,
             TimerAction(period=3.0, actions=[rviz]),

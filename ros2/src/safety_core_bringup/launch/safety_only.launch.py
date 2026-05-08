@@ -24,13 +24,16 @@ def generate_launch_description():
 
     use_sim_time = LaunchConfiguration("use_sim_time")
     use_rviz = LaunchConfiguration("rviz")
+    use_teleop = LaunchConfiguration("teleop")
     declare_use_sim_time = DeclareLaunchArgument("use_sim_time", default_value="false")
     declare_rviz = DeclareLaunchArgument("rviz", default_value="true")
+    declare_use_teleop = DeclareLaunchArgument("teleop", default_value="false")
 
     return LaunchDescription(
         [
             declare_use_sim_time,
             declare_rviz,
+            declare_use_teleop,
             Node(
                 package="safety_core_ros",
                 executable="safety_envelope_node",
@@ -55,6 +58,18 @@ def generate_launch_description():
                     ("cmd_vel_nav", "/cmd_vel_nav"),
                     ("cmd_vel", "/cmd_vel"),
                 ],
+            ),
+            Node(
+                package="safety_core_ros",
+                executable="teleop_node",
+                name="teleop_node",
+                output="screen",
+                parameters=[
+                    {"use_sim_time": use_sim_time},
+                    {"linear_speed": 0.3},
+                    {"angular_speed": 0.3},
+                ],
+                condition=IfCondition(use_teleop),
             ),
             TimerAction(period=2.0, actions=[  # Delay RViz by 2 seconds
                 Node(

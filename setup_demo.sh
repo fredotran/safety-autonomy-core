@@ -102,17 +102,17 @@ if [ "$USE_DOCKER" = true ]; then
         1)
             echo -e "${GREEN}Launching full demo in Docker...${NC}"
             $DOCKER_COMPOSE run --rm safety-autonomy-demo \
-                bash -c "source install/setup.bash && ros2 launch safety_core_bringup agv_warehouse.launch.py"
+                bash -c "source install/setup.bash && ros2 launch safety_core_bringup agv_warehouse.launch.py teleop:=true"
             ;;
         2)
             echo -e "${GREEN}Launching safety stack with simulation in Docker...${NC}"
             $DOCKER_COMPOSE run --rm safety-autonomy-demo \
-                bash -c "source install/setup.bash && ros2 launch safety_core_bringup safety_sim.launch.py"
+                bash -c "source install/setup.bash && ros2 launch safety_core_bringup safety_sim.launch.py teleop:=true"
             ;;
         3)
             echo -e "${GREEN}Launching safety stack only in Docker...${NC}"
             $DOCKER_COMPOSE run --rm safety-autonomy-demo \
-                bash -c "source install/setup.bash && ros2 launch safety_core_bringup safety_only.launch.py"
+                bash -c "source install/setup.bash && ros2 launch safety_core_bringup safety_only.launch.py teleop:=true"
             ;;
         4)
             echo -e "${GREEN}Launching simulation only in Docker...${NC}"
@@ -131,7 +131,7 @@ if [ "$USE_DOCKER" = true ]; then
         *)
             echo -e "${RED}Invalid option. Defaulting to safety stack with simulation...${NC}"
             $DOCKER_COMPOSE run --rm safety-autonomy-demo \
-                bash -c "source install/setup.bash && ros2 launch safety_core_bringup safety_sim.launch.py"
+                bash -c "source install/setup.bash && ros2 launch safety_core_bringup safety_sim.launch.py teleop:=true"
             ;;
     esac
     
@@ -195,19 +195,19 @@ read -p "Select option [1-5]: " choice
 case $choice in
     1)
         echo -e "${GREEN}Launching full demo...${NC}"
-        ros2 launch safety_core_bringup agv_warehouse.launch.py
+        ros2 launch safety_core_bringup agv_warehouse.launch.py teleop:=true
         ;;
     2)
         echo -e "${GREEN}Launching safety stack with simulation...${NC}"
-        ros2 launch safety_core_bringup safety_sim.launch.py
+        ros2 launch safety_core_bringup safety_sim.launch.py teleop:=true
         ;;
     3)
         echo -e "${GREEN}Launching safety stack only...${NC}"
-        ros2 launch safety_core_bringup safety_only.launch.py
+        ros2 launch safety_core_bringup safety_only.launch.py teleop:=true
         ;;
     4)
         echo -e "${GREEN}Launching simulation only...${NC}"
-        ros2 launch safety_core_bringup sim_only.launch.py
+        ros2 launch safety_core_sim sim_only.launch.py
         ;;
     5)
         echo -e "${GREEN}Launching diagnostic mode...${NC}"
@@ -215,6 +215,6 @@ case $choice in
         ;;
     *)
         echo -e "${RED}Invalid option. Defaulting to safety stack with simulation...${NC}"
-        ros2 launch safety_core_bringup safety_sim.launch.py
+        ros2 launch safety_core_bringup safety_sim.launch.py teleop:=true
         ;;
 esac
