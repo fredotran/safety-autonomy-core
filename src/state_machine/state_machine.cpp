@@ -42,8 +42,23 @@ namespace safety_core::sm
             return Result::InvalidState("transition not allowed");
         }
 
-        const Mode prev = mode_.load(std::memory_order_acquire);
-        mode_.store(target, std::memory_order_release);
+        // Atomic transition using compare-and-swap to prevent race conditions
+        Mode prev = mode_.load(std::memory_order_acquire);
+        while (!mode_.compare_exchange_weak(prev, target, std::memory_order_acq_rel, std::memory_order_acquire))
+        {
+            // CAS failed: prev now contains the current mode
+            // Re-validate that transition is still allowed from the updated current state
+            if (!allowed(target))
+            {
+                return Result::InvalidState("transition not allowed");
+            }
+            // If transition to same mode, allow it (idempotent)
+            if (prev == target)
+            {
+                return Result::Ok();
+            }
+        }
+
         notify_transition(prev, target);
         return Result::Ok();
     }
@@ -67,9 +82,14 @@ namespace safety_core::sm
         latched_fault_.store(false, std::memory_order_release);
         fault_code_ = 0U;
 
-        // Transition to Idle mode after clearing fault
-        const Mode prev = mode_.load(std::memory_order_acquire);
-        mode_.store(Mode::Idle, std::memory_order_release);
+        // Atomic transition to Idle mode after clearing fault
+        Mode prev = mode_.load(std::memory_order_acquire);
+        while (!mode_.compare_exchange_weak(prev, Mode::Idle, std::memory_order_acq_rel, std::memory_order_acquire))
+        {
+            // CAS failed: prev now contains the current mode
+            // Allow transition even if state changed (fault clearing takes precedence)
+        }
+
         notify_transition(prev, Mode::Idle);
 
         return Result::Ok();
@@ -88,11 +108,23 @@ namespace safety_core::sm
     Result ModeStateMachine::recover_localization() noexcept
     {
         // Recovery goes to Degraded to avoid immediate full-performance until validated.
-        if (mode_.load(std::memory_order_acquire) != Mode::LocalizationLost)
+        Mode current = mode_.load(std::memory_order_acquire);
+        if (current != Mode::LocalizationLost)
         {
             return Result::InvalidState("not in LocalizationLost");
         }
-        mode_.store(Mode::Degraded, std::memory_order_release);
+
+        // Atomic transition to Degraded mode
+        Mode prev = current;
+        while (!mode_.compare_exchange_weak(prev, Mode::Degraded, std::memory_order_acq_rel, std::memory_order_acquire))
+        {
+            // CAS failed: state changed, check if still valid
+            if (prev != Mode::LocalizationLost)
+            {
+                return Result::InvalidState("state changed during recovery");
+            }
+        }
+
         return Result::Ok();
     }
 

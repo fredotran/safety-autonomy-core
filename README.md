@@ -487,6 +487,29 @@ MISRA/AUTOSAR-inspired rules for safety-critical code:
 - Deterministic math (no `-ffast-math`)
 - Bounded queues, timed waits, no unbounded locks
 
+### MISRA Compliance
+
+The project implements MISRA-like coding standards for safety-critical robotics systems. Current status:
+
+**Static Analysis:**
+- **cppcheck**: MISRA-like rules with 161 active checkers (non-blocking baseline)
+- **clang-tidy**: Extended checks for bugprone, cppcoreguidelines, performance, and readability
+- **CI Job**: `clang_tidy` runs both tools for comprehensive analysis
+
+**Documentation:**
+- **Commercial Tools Guide**: Comprehensive documentation for Coverity, QAC, Helix QAC, and PCLint
+- **Implementation Roadmap**: 5-phase path from baseline to full certification
+- **Cost Estimates**: $77,000 - $350,000+ for first-year certification
+
+**Current Coverage:**
+- ~60-70% of common MISRA C++ 2023 rules via open-source tools
+- Thread-safe atomic operations in state machine
+- Enhanced integer overflow and bounds checking
+- Floating-point validation in safety-critical modules
+
+**Certification Path:**
+Full ISO 26262/ISO 13849 certification requires commercial MISRA tools and significant investment. See [`markdown/docs/safety_case/misra_compliance_tools.md`](markdown/docs/safety_case/misra_compliance_tools.md) for detailed guidance.
+
 ## Safety Case Artifacts
 
 Located in `markdown/docs/safety_case/`:
