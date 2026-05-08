@@ -22,6 +22,7 @@ concurrency:
 
 permissions:
   contents: read
+  id-token: write
   checks: write
 
 env:
@@ -185,6 +186,11 @@ jobs:
           done
       - name: ctest
         run: ctest --test-dir ${BUILD_DIR} --output-on-failure
+      - name: Attest Build Provenance
+        uses: actions/attest-build-provenance@v4.1.0
+        with:
+          subject-path: ${{ env.BUILD_DIR }}/safety_core.a
+        push-to-gh-contexts: true
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -227,6 +233,11 @@ jobs:
             --print-summary \
             --fail-under-line ${COVERAGE_MIN_LINE} \
             --fail-under-branch ${COVERAGE_MIN_BRANCH}
+      - name: Attest Build Provenance
+        uses: actions/attest-build-provenance@v4.1.0
+        with:
+          subject-path: build-coverage/coverage.info
+          push-to-gh-contexts: true
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v4
@@ -285,6 +296,11 @@ jobs:
             --build-tool-args --cache-dir=$(pwd)/.ccache_cache
           source install/setup.bash
           echo "ROS 2 build successful"
+      - name: Attest Build Provenance
+        uses: actions/attest-build-provenance@v4.1.0
+        with:
+          subject-path: ros2/install/
+          push-to-gh-contexts: true
 
   ros2_lint_strict:
     name: ros2_lint_strict (ament_lint_cmake + ament_copyright)
