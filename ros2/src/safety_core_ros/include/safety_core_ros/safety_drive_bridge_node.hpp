@@ -2,7 +2,6 @@
 
 #include "safety_core/motion/trajectory.hpp"
 #include "safety_core/platform/actuators/drive_actuator.hpp"
-#include "safety_core_ros/math_utils.hpp"
 #include "safety_core_ros/param_loader.hpp"
 #include "safety_core_ros/qos_config.hpp"
 #include "safety_core_ros/time_utils.hpp"

@@ -7,7 +7,6 @@
 #include "safety_core_ros/qos_config.hpp"
 
 #include <atomic>
-#include <geometry_msgs/msg/twist.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <safety_core_msgs/msg/envelope_status.hpp>

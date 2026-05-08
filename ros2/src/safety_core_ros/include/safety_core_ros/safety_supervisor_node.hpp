@@ -3,7 +3,6 @@
 #include "safety_core/safety/safety_envelope.hpp"
 #include "safety_core/safety/safety_supervisor.hpp"
 #include "safety_core/state_machine/state_machine.hpp"
-#include "safety_core_ros/math_utils.hpp"
 #include "safety_core_ros/param_loader.hpp"
 #include "safety_core_ros/qos_config.hpp"
 #include "safety_core_ros/ros_clock.hpp"

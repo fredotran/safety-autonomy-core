@@ -4,7 +4,6 @@
 
 #include <algorithm>
 #include <chrono>
-#include <cmath>
 
 using std::placeholders::_1;
 
