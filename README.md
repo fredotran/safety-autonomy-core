@@ -60,6 +60,10 @@ safety-autonomy-core/
 │   └── agv_safety_demo.cpp    #   Full AGV safety pipeline demonstration
 ├── tools/                     # Developer tooling
 │   └── dev/run_quality_gate.sh
+├── markdown/                  # Documentation and safety case artifacts
+│   └── docs/                  #   Documentation
+│       ├── diagnostics/       #   Integration guides
+│       └── safety_case/       #   ISO 26262 / ISO 13849 evidence scaffolding
 ├── ros2/                      # ROS 2 wrapper + AGV simulation
 │   └── src/                   #   ROS 2 packages (safety_core_msgs, safety_core_ros, etc.)
 ├── setup_demo.sh              # ROS 2 demo build + launch script
@@ -269,6 +273,7 @@ Controls:
 | Lint | `clang_tidy` | Static analysis |
 | Lint | `hook_smoke` | Pre-commit hook validation |
 | Policy | `policy_guard` | Banned API checks (exceptions, dynamic alloc, abort) |
+| Policy | `safety_case_guard` | Safety artifact presence verification |
 | Build | `build_and_test` | CMake build + ctest (sanitizers enabled) |
 | Coverage | `coverage` | gcovr gate (line: 80%, branch: 55%) |
 | Security | SAST + Secret Detection | GitLab templates |
@@ -284,6 +289,23 @@ MISRA/AUTOSAR-inspired rules for safety-critical code:
 - Saturation/NaN/Inf guards at all boundaries
 - Deterministic math (no `-ffast-math`)
 - Bounded queues, timed waits, no unbounded locks
+
+## Safety Case Artifacts
+
+Located in `markdown/docs/safety_case/`:
+
+- Traceability matrix (hazard-to-control-to-test)
+- Assumptions and residual risk registers
+- ISO 3691-4 clause conformance matrix
+- ISO 26262 / ISO 13849 crosswalk
+- Functional safety plan
+- V&V strategy
+- Tool confidence register
+- Change impact assessment template
+- Release safety evidence checklist
+- Integration safety manual
+
+> **Note:** This repository provides process and evidence scaffolding for ISO 26262 / ISO 13849 readiness. Formal compliance requires project-specific system integration evidence, independent assessment, and organizational process records.
 
 ## Contributing
 
