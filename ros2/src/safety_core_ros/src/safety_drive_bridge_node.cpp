@@ -22,8 +22,13 @@ namespace safety_core_ros
         cmd_freshness_s_   = get_parameter("cmd_freshness_s").as_double();
         control_period_s_  = get_parameter("control_period_s").as_double();
 
+        // Optimized QoS settings
         rclcpp::QoS reliable_qos(10);
-        rclcpp::QoS sensor_qos = rclcpp::SensorDataQoS();
+        reliable_qos.durability_volatile(); // Volatile durability for faster publishing
+
+        rclcpp::SensorDataQoS sensor_qos;
+        sensor_qos.keep_last(5);  // Reduced history depth for lower latency
+        sensor_qos.best_effort(); // Use best-effort for sensor data (faster)
 
         cmd_vel_nav_sub_ = create_subscription<geometry_msgs::msg::Twist>(
             "cmd_vel_nav", reliable_qos, std::bind(&SafetyDriveBridgeNode::on_cmd_vel_nav, this, _1));
@@ -131,21 +136,26 @@ namespace safety_core_ros
         geometry_msgs::msg::Twist cmd;
         cmd.linear.x  = 0.0;
         cmd.angular.z = 0.0;
-        cmd_vel_pub_->publish(cmd);
+        cmd_vel_pub_->publish(std::move(cmd));
         last_published_linear_ = 0.0;
     }
 
     void SafetyDriveBridgeNode::control_tick()
     {
+        // Load atomic variables once to avoid repeated loads
+        const bool fault_latched    = fault_latched_.load(std::memory_order_relaxed);
+        const bool safe_stop_active = safe_stop_active_.load(std::memory_order_relaxed);
+        const double speed_limit    = recommended_speed_limit_mps_.load(std::memory_order_relaxed);
+
         // 1. Hard fault latched: always stop.
-        if (fault_latched_.load(std::memory_order_relaxed))
+        if (fault_latched)
         {
             publish_zero_twist();
             return;
         }
 
         // 2. Safe-stop active: follow jerk-limited deceleration profile.
-        if (safe_stop_active_.load(std::memory_order_relaxed))
+        if (safe_stop_active)
         {
             if (stop_profile_active_ && stop_profile_index_ < stop_profile_count_)
             {
@@ -153,7 +163,7 @@ namespace safety_core_ros
                 cmd.linear.x           = stop_profile_[stop_profile_index_].speed_mps;
                 cmd.angular.z          = 0.0;
                 last_published_linear_ = cmd.linear.x;
-                cmd_vel_pub_->publish(cmd);
+                cmd_vel_pub_->publish(std::move(cmd));
                 ++stop_profile_index_;
             }
             else
@@ -169,8 +179,10 @@ namespace safety_core_ros
             publish_zero_twist();
             return;
         }
-        const std::uint64_t age_ns     = now_ns() - latest_nav_cmd_time_ns_;
-        const std::uint64_t max_age_ns = static_cast<std::uint64_t>(cmd_freshness_s_ * 1e9);
+
+        const std::uint64_t current_time_ns = now_ns();
+        const std::uint64_t age_ns          = current_time_ns - latest_nav_cmd_time_ns_;
+        const std::uint64_t max_age_ns      = static_cast<std::uint64_t>(cmd_freshness_s_ * 1e9);
         if (age_ns > max_age_ns)
         {
             RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000,
@@ -184,14 +196,13 @@ namespace safety_core_ros
         const double v_request = latest_nav_cmd_->linear.x;
         const double w_request = latest_nav_cmd_->angular.z;
 
-        const double v_limit_envelope = recommended_speed_limit_mps_.load(std::memory_order_relaxed);
-        const double v_limit          = std::min(max_linear_mps_, v_limit_envelope);
+        const double v_limit = std::min(max_linear_mps_, speed_limit);
 
         geometry_msgs::msg::Twist cmd;
         cmd.linear.x  = std::clamp(v_request, -v_limit, v_limit);
         cmd.angular.z = std::clamp(w_request, -max_angular_radps_, max_angular_radps_);
 
-        cmd_vel_pub_->publish(cmd);
+        cmd_vel_pub_->publish(std::move(cmd));
         last_published_linear_ = cmd.linear.x;
     }
 

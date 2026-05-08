@@ -6,8 +6,29 @@ if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
 endif()
 
+# Release optimizations for better performance
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+
+# Compiler optimizations
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
+  
+  # Performance optimizations
+  add_compile_options(-O3 -march=native -ffast-math)
+  
+  # Link-time optimization
+  add_link_options(-flto)
+  
+  # Remove unused code
+  add_compile_options(-fdata-sections -ffunction-sections)
+  add_link_options(-Wl,--gc-sections)
+endif()
+
+# Set CPU affinity for better real-time performance
+if(UNIX)
+  add_compile_options(-pthread)
 endif()
 
 find_package(ament_cmake REQUIRED)

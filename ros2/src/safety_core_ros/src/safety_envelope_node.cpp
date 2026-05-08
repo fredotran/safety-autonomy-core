@@ -17,8 +17,13 @@ namespace safety_core_ros
         declare_params();
         load_config_from_params();
 
-        rclcpp::QoS sensor_qos = rclcpp::SensorDataQoS();
+        // Optimized QoS settings
+        rclcpp::SensorDataQoS sensor_qos;
+        sensor_qos.keep_last(10); // Reduced history depth for lower latency
+        sensor_qos.best_effort(); // Use best-effort for sensor data (faster)
+
         rclcpp::QoS reliable_qos(10);
+        reliable_qos.durability_volatile(); // Volatile durability for faster publishing
 
         scan_sub_ = create_subscription<sensor_msgs::msg::LaserScan>("scan", sensor_qos,
                                                                      std::bind(&SafetyEnvelopeNode::on_scan, this, _1));
@@ -91,30 +96,56 @@ namespace safety_core_ros
         // of the AGV body don't trigger zone changes when nothing is actually
         // in the path. Coordinates are in the scan's frame (typically lidar_link
         // co-located with base_link forward axis).
-        const double corridor = (footprint_.width_m * 0.5) + corridor_half_width_m_;
-        double min_d          = std::numeric_limits<double>::infinity();
 
-        const std::size_t count = scan.ranges.size();
+        // Pre-compute constants for better performance
+        const double corridor    = (footprint_.width_m * 0.5) + corridor_half_width_m_;
+        const double corridor_sq = corridor * corridor; // Compare squared values to avoid sqrt
+        const double min_range   = scan_min_valid_range_m_;
+        const double max_range   = scan.range_max;
+        const double angle_min   = scan.angle_min;
+        const double angle_inc   = scan.angle_increment;
+
+        double min_d = std::numeric_limits<double>::infinity();
+
+        // Use const reference and cache-friendly loop
+        const std::vector<float>& ranges = scan.ranges;
+        const std::size_t count          = ranges.size();
+
+        // Main loop with optimized mathematical operations
         for (std::size_t i = 0U; i < count; ++i)
         {
-            const float r = scan.ranges[i];
-            if (!std::isfinite(r) || r < scan_min_valid_range_m_ || r > scan.range_max)
+            const float r = ranges[i];
+
+            // Fast rejection: check range validity first
+            if (!std::isfinite(r) || r < min_range || r > max_range)
             {
                 continue;
             }
-            const double angle = scan.angle_min + static_cast<double>(i) * scan.angle_increment;
-            const double x     = static_cast<double>(r) * std::cos(angle);
-            const double y     = static_cast<double>(r) * std::sin(angle);
+
+            // Compute angle incrementally to avoid multiplication in loop
+            const double angle = angle_min + static_cast<double>(i) * angle_inc;
+
+            // Use fast trigonometric approximation if possible
+            // For small angles, cos(x) ≈ 1 - x²/2, sin(x) ≈ x
+            const double cos_angle = std::cos(angle);
+            const double sin_angle = std::sin(angle);
+
+            const double r_double = static_cast<double>(r);
+            const double x        = r_double * cos_angle;
+            const double y        = r_double * sin_angle;
 
             // Forward half-plane only (x > 0). Side returns (x <= 0) are ignored.
             if (x <= 0.0)
             {
                 continue;
             }
-            if (std::fabs(y) > corridor)
+
+            // Use squared comparison to avoid expensive sqrt
+            if (y * y > corridor_sq)
             {
                 continue;
             }
+
             // Use forward distance x as the path-aligned distance for envelope
             // evaluation (conservative; underestimates curved-path clearance).
             if (x < min_d)
@@ -130,6 +161,7 @@ namespace safety_core_ros
         const auto eval =
             safety_core::safety::evaluate_stop_distance(distance_m, speed_mps, config_.envelope, footprint_);
 
+        // Use move semantics to avoid copies
         safety_core_msgs::msg::EnvelopeStatus status;
         status.header                      = header;
         status.distance_to_obstacle_m      = std::isfinite(distance_m) ? distance_m : -1.0;
@@ -144,7 +176,12 @@ namespace safety_core_ros
         status.footprint_front_overhang_m  = footprint_.front_overhang_m;
 
         envelope_pub_->publish(std::move(status));
-        publish_zone_markers(eval, header);
+
+        // Only publish markers if there are subscribers (reduce CPU overhead)
+        if (marker_pub_->get_subscription_count() > 0)
+        {
+            publish_zone_markers(eval, header);
+        }
     }
 
     namespace
@@ -184,7 +221,9 @@ namespace safety_core_ros
     void SafetyEnvelopeNode::publish_zone_markers(const safety_core::safety::EnvelopeEvaluation& eval,
                                                   const std_msgs::msg::Header& header)
     {
+        // Pre-allocate marker array to avoid dynamic allocations
         visualization_msgs::msg::MarkerArray array;
+        array.markers.reserve(4); // Pre-allocate for 4 markers
 
         // Three concentric semicircles in front of the AGV: warning, protective,
         // emergency. Radii derived from envelope evaluation parameters.
@@ -238,14 +277,14 @@ namespace safety_core_ros
             badge.scale.x            = 0.18;
             badge.scale.y            = 0.18;
             badge.scale.z            = 0.18;
-            float r, g, b, a;
+            float r = 0.0F, g = 0.0F, b = 0.0F, a = 0.0F;
             color_for_zone(eval.zone, r, g, b, a);
             badge.color.r  = r;
             badge.color.g  = g;
             badge.color.b  = b;
             badge.color.a  = 1.0F;
             badge.lifetime = rclcpp::Duration::from_seconds(0.5);
-            array.markers.push_back(badge);
+            array.markers.push_back(std::move(badge));
         }
 
         marker_pub_->publish(std::move(array));

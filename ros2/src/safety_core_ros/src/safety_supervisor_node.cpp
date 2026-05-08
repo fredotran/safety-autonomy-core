@@ -18,7 +18,13 @@ namespace safety_core_ros
         const double localization_timeout_s = get_parameter("localization_timeout_s").as_double();
         localization_timeout_ns_            = static_cast<std::uint64_t>(localization_timeout_s * 1e9);
 
+        // Optimized QoS settings
         rclcpp::QoS reliable_qos(10);
+        reliable_qos.durability_volatile(); // Volatile durability for faster publishing
+
+        rclcpp::SensorDataQoS sensor_qos;
+        sensor_qos.keep_last(5);  // Reduced history depth for lower latency
+        sensor_qos.best_effort(); // Use best-effort for sensor data (faster)
 
         // Order matters: build adapters first, then publishers (used by transport),
         // then state machine / supervisor (which use clock + transport).
@@ -42,8 +48,7 @@ namespace safety_core_ros
         state_pub_     = create_publisher<safety_core_msgs::msg::SafetyState>("safety/state", reliable_qos);
         safe_stop_pub_ = create_publisher<std_msgs::msg::Bool>("safety/safe_stop", reliable_qos);
 
-        rclcpp::QoS sensor_qos = rclcpp::SensorDataQoS();
-        envelope_sub_          = create_subscription<safety_core_msgs::msg::EnvelopeStatus>(
+        envelope_sub_ = create_subscription<safety_core_msgs::msg::EnvelopeStatus>(
             "safety/envelope_status", sensor_qos, std::bind(&SafetySupervisorNode::on_envelope, this, _1));
         odom_sub_ = create_subscription<nav_msgs::msg::Odometry>("odom", sensor_qos,
                                                                  std::bind(&SafetySupervisorNode::on_odom, this, _1));
@@ -110,44 +115,49 @@ namespace safety_core_ros
 
     void SafetySupervisorNode::timer_tick()
     {
+        // Cache current time and mode to avoid repeated calls
+        const std::uint64_t current_time_ns = now_ns();
+        const Mode current_mode             = machine_->mode();
+
         // Localization staleness check.
         if (last_odom_time_ns_.has_value())
         {
-            const std::uint64_t age_ns = now_ns() - last_odom_time_ns_.value_or(now_ns());
+            const std::uint64_t age_ns = current_time_ns - last_odom_time_ns_.value();
             (void)supervisor_->observe_localization_age(age_ns, localization_timeout_ns_);
 
-            if (age_ns > localization_timeout_ns_ && machine_->mode() != Mode::LocalizationLost &&
-                machine_->mode() != Mode::SafeStop)
+            // Only check for localization lost if not already in SafeStop or LocalizationLost
+            if (age_ns > localization_timeout_ns_ && current_mode != Mode::LocalizationLost &&
+                current_mode != Mode::SafeStop)
             {
                 (void)machine_->report_localization_lost();
             }
         }
 
-        (void)supervisor_->observe_clock_sample(now_ns());
+        (void)supervisor_->observe_clock_sample(current_time_ns);
 
-        publish_state();
+        publish_state(current_mode);
     }
 
-    safety_core_msgs::msg::SafetyState SafetySupervisorNode::build_state_msg() const
+    safety_core_msgs::msg::SafetyState SafetySupervisorNode::build_state_msg(Mode current_mode) const
     {
         safety_core_msgs::msg::SafetyState msg;
         msg.header.stamp        = get_clock()->now();
         msg.header.frame_id     = "base_link";
-        msg.mode                = static_cast<std::uint8_t>(machine_->mode());
+        msg.mode                = static_cast<std::uint8_t>(current_mode);
         msg.fault_latched       = machine_->fault_latched();
         msg.fault_code          = 0U; // Library does not currently expose code; leave 0.
         msg.zone.zone           = static_cast<std::uint8_t>(latest_zone_);
-        msg.safe_stop_requested = safe_stop_requested_ || (machine_->mode() == Mode::SafeStop);
+        msg.safe_stop_requested = safe_stop_requested_ || (current_mode == Mode::SafeStop);
         return msg;
     }
 
-    void SafetySupervisorNode::publish_state()
+    void SafetySupervisorNode::publish_state(Mode current_mode)
     {
-        state_pub_->publish(build_state_msg());
+        state_pub_->publish(build_state_msg(current_mode));
 
         std_msgs::msg::Bool stop;
-        stop.data = safe_stop_requested_ || (machine_->mode() == Mode::SafeStop);
-        safe_stop_pub_->publish(stop);
+        stop.data = safe_stop_requested_ || (current_mode == Mode::SafeStop);
+        safe_stop_pub_->publish(std::move(stop));
     }
 
 } // namespace safety_core_ros

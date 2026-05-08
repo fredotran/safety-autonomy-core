@@ -34,8 +34,8 @@ namespace safety_core_ros
         void on_odom(const nav_msgs::msg::Odometry::ConstSharedPtr msg);
         void timer_tick();
 
-        void publish_state();
-        safety_core_msgs::msg::SafetyState build_state_msg() const;
+        void publish_state(safety_core::sm::Mode current_mode);
+        safety_core_msgs::msg::SafetyState build_state_msg(safety_core::sm::Mode current_mode) const;
 
         [[nodiscard]] std::uint64_t now_ns() const noexcept;
 
