@@ -69,4 +69,9 @@ namespace safety_core::motion
                                          TrajectoryPoint* out_points, std::size_t capacity,
                                          std::size_t& out_count) noexcept;
 
+    // Jerk-limited emergency stop: ramps deceleration up/down to limit mechanical shock
+    bool generate_jerk_limited_stop_profile(double initial_speed_mps, double max_decel_mps2, double max_jerk_mps3,
+                                            double dt_s, TrajectoryPoint* out_points, std::size_t capacity,
+                                            std::size_t& out_count) noexcept;
+
 } // namespace safety_core::motion

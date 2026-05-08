@@ -120,4 +120,82 @@ namespace safety_core::motion
         return true;
     }
 
+    bool generate_jerk_limited_stop_profile(double initial_speed_mps, double max_decel_mps2, double max_jerk_mps3,
+                                            double dt_s, TrajectoryPoint* out_points, std::size_t capacity,
+                                            std::size_t& out_count) noexcept
+    {
+        out_count = 0U;
+        if ((out_points == nullptr) || (capacity == 0U) || !std::isfinite(initial_speed_mps) ||
+            !std::isfinite(max_decel_mps2) || !std::isfinite(max_jerk_mps3) || !std::isfinite(dt_s) || (dt_s <= 0.0) ||
+            (max_decel_mps2 <= 0.0) || (max_jerk_mps3 <= 0.0))
+        {
+            return false;
+        }
+
+        double t    = 0.0;
+        double v    = std::max(0.0, initial_speed_mps);
+        double a    = 0.0;
+        double x    = 0.0;
+        double jerk = 0.0;
+
+        while ((v > 0.0) && (out_count < capacity))
+        {
+            // Phase 1: Ramp up deceleration (jerk = -max_jerk)
+            // Phase 2: Constant deceleration (jerk = 0)
+            // Phase 3: Ramp down deceleration (jerk = +max_jerk) as speed approaches zero
+            if (a > -max_decel_mps2)
+            {
+                // Ramp up deceleration
+                jerk = -max_jerk_mps3;
+                a += jerk * dt_s;
+                if (a < -max_decel_mps2)
+                {
+                    a    = -max_decel_mps2;
+                    jerk = 0.0;
+                }
+            }
+            else
+            {
+                // At max deceleration — check if we need to ramp down
+                // Time to stop at current decel: t_stop = v / |a|
+                // Time to ramp decel to zero: t_ramp = |a| / jerk
+                const double t_stop = (std::abs(a) > 1e-9) ? (v / std::abs(a)) : 0.0;
+                const double t_ramp = std::abs(a) / max_jerk_mps3;
+                if (t_stop <= t_ramp)
+                {
+                    jerk = max_jerk_mps3;
+                    a += jerk * dt_s;
+                    if (a > 0.0)
+                    {
+                        a    = 0.0;
+                        jerk = 0.0;
+                    }
+                }
+                else
+                {
+                    jerk = 0.0;
+                }
+            }
+
+            out_points[out_count] = TrajectoryPoint{t, v, a, jerk, x};
+            ++out_count;
+
+            const double next_v = std::max(0.0, v + (a * dt_s));
+            const double step_d = ((v + next_v) * 0.5) * dt_s;
+
+            t += dt_s;
+            x += step_d;
+            v = next_v;
+        }
+
+        if (out_count >= capacity)
+        {
+            return false;
+        }
+
+        out_points[out_count] = TrajectoryPoint{t, 0.0, 0.0, 0.0, x};
+        ++out_count;
+        return true;
+    }
+
 } // namespace safety_core::motion

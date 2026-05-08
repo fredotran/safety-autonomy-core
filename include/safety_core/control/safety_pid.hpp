@@ -20,6 +20,7 @@ namespace safety_core::control
         double kp{0.0};
         double ki{0.0};
         double kd{0.0};
+        double max_integral{100.0}; // Anti-windup: clamps integral accumulator
     };
 
     class SafetyPidController
@@ -34,6 +35,7 @@ namespace safety_core::control
         void reset() noexcept;
         void mark_localization_update(time::TimePoint stamp = time::now()) noexcept;
         double compute(double setpoint, double measurement) noexcept;
+        double compute(double setpoint, double measurement, double ff_velocity, double ff_acceleration = 0.0) noexcept;
 
       private:
         [[nodiscard]] time::TimePoint now() const noexcept;

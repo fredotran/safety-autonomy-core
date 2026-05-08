@@ -2,6 +2,7 @@
 
 #include "safety_core/result.hpp"
 
+#include <atomic>
 #include <cstdint>
 #include <string_view>
 
@@ -51,11 +52,11 @@ namespace safety_core::sm
 
         [[nodiscard]] Mode mode() const noexcept
         {
-            return mode_;
+            return mode_.load(std::memory_order_acquire);
         }
         [[nodiscard]] bool fault_latched() const noexcept
         {
-            return latched_fault_;
+            return latched_fault_.load(std::memory_order_acquire);
         }
 
         Result transition_to(Mode target) noexcept;
@@ -73,8 +74,8 @@ namespace safety_core::sm
         void notify_fault(std::uint16_t fault_code) const noexcept;
         void publish_event(std::string_view topic, std::string_view payload) const noexcept;
 
-        Mode mode_{Mode::Init};
-        bool latched_fault_{false};
+        std::atomic<Mode> mode_{Mode::Init};
+        std::atomic<bool> latched_fault_{false};
         std::uint16_t fault_code_{0U};
         diag::HealthMonitor* monitor_{nullptr};
         diag::DiagnosticTransport* diag_transport_{nullptr};

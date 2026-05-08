@@ -207,6 +207,20 @@ target_link_libraries(safety_supervisor_tests PRIVATE safety_core)
 
 add_test(NAME safety_supervisor_tests COMMAND safety_supervisor_tests)
 
+add_executable(production_improvements_tests
+    tests/production_improvements_tests.cpp
+)
+
+target_link_libraries(production_improvements_tests PRIVATE safety_core)
+
+add_test(NAME production_improvements_tests COMMAND production_improvements_tests)
+
+add_executable(agv_safety_demo
+    examples/agv_safety_demo.cpp
+)
+
+target_link_libraries(agv_safety_demo PRIVATE safety_core)
+
 # Commentary: Package smoke test is defined inline to guarantee install/export + find_package validity.
 set(SAFETY_CORE_PACKAGE_SMOKE_ROOT "${CMAKE_BINARY_DIR}/package_smoke")
 set(SAFETY_CORE_PACKAGE_SMOKE_INSTALL_DIR "${SAFETY_CORE_PACKAGE_SMOKE_ROOT}/install")

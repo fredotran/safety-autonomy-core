@@ -2,6 +2,8 @@
 
 #include "safety_core/config/system_config.hpp"
 
+#include <cstdint>
+
 namespace safety_core::filters
 {
 
@@ -26,11 +28,16 @@ namespace safety_core::filters
         }
         void reset(double position = 0.0, double velocity = 0.0) noexcept
         {
-            position_ = position;
-            velocity_ = velocity;
+            position_          = position;
+            velocity_          = velocity;
+            last_timestamp_ns_ = 0U;
         }
 
         double update(double measurement) noexcept;
+
+        // Timestamped update: computes dt from consecutive timestamps
+        double update(double measurement, std::uint64_t timestamp_ns) noexcept;
+
         [[nodiscard]] double position() const noexcept
         {
             return position_;
@@ -47,6 +54,7 @@ namespace safety_core::filters
         AlphaBetaParams params_{};
         double position_{0.0};
         double velocity_{0.0};
+        std::uint64_t last_timestamp_ns_{0U};
     };
 
 } // namespace safety_core::filters
