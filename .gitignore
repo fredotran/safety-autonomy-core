@@ -7,3 +7,7 @@ build-coverage/
 *.gcda
 *.gcno
 .cache/clangd/index/
+
+# CI caching
+apt-cache/
+ccache/

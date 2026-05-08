@@ -65,6 +65,9 @@ safety-autonomy-core/
 ├── ros2/                      # ROS 2 wrapper + AGV simulation
 │   └── src/                   #   ROS 2 packages (safety_core_msgs, safety_core_ros, etc.)
 ├── setup_demo.sh              # ROS 2 demo build + launch script
+├── CHANGELOG.md               # Version history
+├── CONTRIBUTING.md            # Contribution guidelines
+├── LICENSE                    # Commercial license terms
 ├── CMakeLists.txt             # Build system
 ├── CMakePresets.json          # Dev/safety/coverage presets
 ├── .clang-format              # Code style

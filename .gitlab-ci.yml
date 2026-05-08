@@ -2,9 +2,11 @@ stages:
   - format
   - lint
   - test
+  - ros2
   - secret-detection
 
-image: ubuntu:24.04
+default:
+  image: ubuntu:24.04
 
 variables:
   BUILD_DIR: build
@@ -12,20 +14,32 @@ variables:
   SECRET_DETECTION_ENABLED: "true"
   COVERAGE_MIN_LINE: "80"
   COVERAGE_MIN_BRANCH: "55"
+  ROS_DISTRO: "jazzy"
+  ROS_WORKSPACE: "ros2"
+
+.cache_template: &cache_template
+  cache:
+    key: ${CI_JOB_NAME}
+    paths:
+      - ccache/
+      - apt-cache/
 
 before_script:
-  - apt-get update -y
-  - apt-get install -y --no-install-recommends build-essential cmake ninja-build clang clang-tidy clang-format git ca-certificates gcovr
+  - mkdir -p apt-cache
+  - apt-get update -qq
+  - apt-get -o dir::cache::archives="apt-cache" install -y --no-install-recommends build-essential cmake ninja-build clang clang-tidy clang-format git ca-certificates gcovr ccache
 
 format_check:
   stage: format
+  <<: *cache_template
   script:
     - echo "Running clang-format check"
     - clang-format --version
-    - clang-format --dry-run --Werror $(find include src tests -name '*.hpp' -o -name '*.cpp')
+    - clang-format --dry-run --Werror $(find include src tests ros2/src -name '*.hpp' -o -name '*.cpp')
 
 clang_tidy:
   stage: lint
+  <<: *cache_template
   script:
     - cmake -S . -B ${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug -DSAFETY_CORE_ENABLE_SANITIZERS=OFF
     - cmake --build ${BUILD_DIR} --target safety_core
@@ -33,6 +47,7 @@ clang_tidy:
 
 hook_smoke:
   stage: lint
+  <<: *cache_template
   script:
     - cmake -S . -B ${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug -DSAFETY_CORE_ENABLE_SANITIZERS=OFF
     - cmake --build ${BUILD_DIR} --target safety_core
@@ -45,18 +60,21 @@ hook_smoke:
 
 policy_guard:
   stage: lint
+  <<: *cache_template
   script:
     - chmod +x tools/safety/verify_policy.sh
     - tools/safety/verify_policy.sh
 
 safety_case_guard:
   stage: lint
+  <<: *cache_template
   script:
     - chmod +x tools/safety/verify_safety_case.sh
     - tools/safety/verify_safety_case.sh
 
 build_and_test:
   stage: test
+  <<: *cache_template
   script:
     - cmake -S . -B ${BUILD_DIR} ${CMAKE_FLAGS}
     - cmake --build ${BUILD_DIR}
@@ -74,6 +92,7 @@ build_and_test:
 
 coverage:
   stage: test
+  <<: *cache_template
   variables:
     CC: gcc
     CXX: g++
@@ -85,6 +104,74 @@ coverage:
 
 sast:
   stage: test
+
+# ROS 2 Jobs
+.ros2_base_template: &ros2_base_template
+  stage: ros2
+  <<: *cache_template
+  before_script:
+    - mkdir -p apt-cache
+    - apt-get update -qq
+    - apt-get -o dir::cache::archives="apt-cache" install -y --no-install-recommends software-properties-common
+    - add-apt-repository universe
+    - apt-get update -qq
+    - apt-get -o dir::cache::archives="apt-cache" install -y --no-install-recommends
+        build-essential
+        cmake
+        git
+        ca-certificates
+        curl
+        gnupg
+        lsb-release
+    - curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
+    - echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" > /etc/apt/sources.list.d/ros2.list
+    - apt-get update -qq
+    - apt-get -o dir::cache::archives="apt-cache" install -y --no-install-recommends
+        ros-${ROS_DISTRO}-ros-base
+        ros-${ROS_DISTRO}-colcon-common-extensions
+        ros-${ROS_DISTRO}-ros-gz
+        python3-colcon-common-extensions
+    - source /opt/ros/${ROS_DISTRO}/setup.bash
+
+ros2_build:
+  <<: *ros2_base_template
+  script:
+    - cd ${ROS_WORKSPACE}
+    - colcon build
+        --packages-skip safety_core_nav2
+        --cmake-args -DSAFETY_CORE_ENABLE_AMENT=ON
+                     -DSAFETY_CORE_ENABLE_SANITIZERS=OFF
+                     -DSAFETY_CORE_ENABLE_WERROR=OFF
+    - source install/setup.bash
+    - echo "ROS 2 build successful"
+
+ros2_lint:
+  <<: *ros2_base_template
+  script:
+    - cd ${ROS_WORKSPACE}
+    - colcon build --packages-select safety_core_msgs safety_core_ros
+        --cmake-args -DSAFETY_CORE_ENABLE_AMENT=ON
+                     -DSAFETY_CORE_ENABLE_SANITIZERS=OFF
+                     -DSAFETY_CORE_ENABLE_WERROR=OFF
+    - source install/setup.bash
+    - ament_lint_cmake --rosdistro ${ROS_DISTRO} src/safety_core_msgs
+    - ament_lint_cmake --rosdistro ${ROS_DISTRO} src/safety_core_ros
+    - ament_copyright --rosdistro ${ROS_DISTRO} src/safety_core_msgs src/safety_core_ros
+    - ament_flake8 --rosdistro ${ROS_DISTRO} src/safety_core_bringup
+    - ament_pep257 --rosdistro ${ROS_DISTRO} src/safety_core_bringup
+
+ros2_test:
+  <<: *ros2_base_template
+  script:
+    - cd ${ROS_WORKSPACE}
+    - colcon build
+        --packages-skip safety_core_nav2
+        --cmake-args -DSAFETY_CORE_ENABLE_AMENT=ON
+                     -DSAFETY_CORE_ENABLE_SANITIZERS=OFF
+                     -DSAFETY_CORE_ENABLE_WERROR=OFF
+    - source install/setup.bash
+    - colcon test --packages-select safety_core_ros --event-handlers console_direct+
+    - colcon test-result --all
 
 secret_detection:
   stage: secret-detection
