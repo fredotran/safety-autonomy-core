@@ -32,6 +32,9 @@ namespace safety_core_ros
         marker_pub_ =
             create_publisher<visualization_msgs::msg::MarkerArray>("safety/zone_markers", QosConfig::state_qos());
 
+        // Initialize startup time for grace period
+        startup_time_ = get_clock()->now();
+
         RCLCPP_INFO(get_logger(),
                     "safety_envelope_node up | footprint=%.2fx%.2fm overhang=%.2fm | "
                     "max_speed=%.2f decel=%.2f buffer=%.2f",
@@ -61,9 +64,11 @@ namespace safety_core_ros
         footprint_.front_overhang_m = ParamLoader::load_double(this, "footprint.front_overhang_m", 0.1);
 
         // Load operational parameters
-        params_.corridor_half_width_m  = ParamLoader::load_double(this, "corridor_half_width_m", 0.5);
-        params_.scan_min_valid_range_m = ParamLoader::load_double(this, "scan_min_valid_range_m", 0.05);
-        params_.base_frame             = ParamLoader::load_string(this, "base_frame", "base_link");
+        params_.corridor_half_width_m   = ParamLoader::load_double(this, "corridor_half_width_m", 0.5);
+        params_.scan_min_valid_range_m  = ParamLoader::load_double(this, "scan_min_valid_range_m", 0.05);
+        params_.scan_ignore_min_range_m = ParamLoader::load_double(this, "scan_ignore_min_range_m", 0.5);
+        params_.startup_grace_period_s  = ParamLoader::load_double(this, "startup_grace_period_s", 2.0);
+        params_.base_frame              = ParamLoader::load_string(this, "base_frame", "base_link");
     }
 
     void SafetyEnvelopeNode::on_odom(const nav_msgs::msg::Odometry::ConstSharedPtr msg)
@@ -120,6 +125,12 @@ namespace safety_core_ros
                 continue;
             }
 
+            // Ignore obstacles closer than scan_ignore_min_range_m (workers on robot)
+            if (x < params_.scan_ignore_min_range_m)
+            {
+                continue;
+            }
+
             // Update minimum distance
             min_d = MathUtils::min(x, min_d);
         }
@@ -143,19 +154,57 @@ namespace safety_core_ros
 
     void SafetyEnvelopeNode::publish_envelope(double distance_m, double speed_mps, const std_msgs::msg::Header& header)
     {
+        // Check if we're still in the startup grace period
+        const rclcpp::Time now     = get_clock()->now();
+        const double elapsed_s     = (now - startup_time_).seconds();
+        const bool in_grace_period = elapsed_s < params_.startup_grace_period_s;
+
+        // Handle invalid scan data (no valid obstacles detected)
+        if (!MathUtils::is_finite(distance_m) || distance_m < 0.0)
+        {
+            // During grace period, assume clear zone to allow startup
+            // After grace period, assume warning zone for safety
+            safety_core_msgs::msg::EnvelopeStatus status;
+            status.header                 = header;
+            status.distance_to_obstacle_m = -1.0; // Invalid/unknown
+            status.current_speed_mps      = speed_mps;
+            status.within_envelope        = in_grace_period;
+            status.zone.zone = in_grace_period ? static_cast<std::uint8_t>(safety_core::safety::SafetyZone::Clear)
+                                               : static_cast<std::uint8_t>(safety_core::safety::SafetyZone::Warning);
+            status.stopping_distance_m         = config_.envelope.safety_buffer_m;
+            status.required_clearance_m        = config_.envelope.safety_buffer_m;
+            status.recommended_speed_limit_mps = in_grace_period
+                                                     ? config_.envelope.max_speed_mps
+                                                     : std::min(speed_mps, config_.envelope.max_speed_mps * 0.5);
+            status.footprint_length_m          = footprint_.length_m;
+            status.footprint_width_m           = footprint_.width_m;
+            status.footprint_front_overhang_m  = footprint_.front_overhang_m;
+
+            envelope_pub_->publish(std::move(status));
+            return;
+        }
+
         const auto eval =
             safety_core::safety::evaluate_stop_distance(distance_m, speed_mps, config_.envelope, footprint_);
+
+        // During grace period, override emergency zone to warning zone
+        safety_core::safety::EnvelopeEvaluation modified_eval = eval;
+        if (in_grace_period && eval.zone == safety_core::safety::SafetyZone::Emergency)
+        {
+            modified_eval.zone                        = safety_core::safety::SafetyZone::Warning;
+            modified_eval.recommended_speed_limit_mps = std::min(speed_mps, config_.envelope.max_speed_mps * 0.5);
+        }
 
         // Use move semantics to avoid copies
         safety_core_msgs::msg::EnvelopeStatus status;
         status.header                      = header;
         status.distance_to_obstacle_m      = MathUtils::is_finite(distance_m) ? distance_m : -1.0;
         status.current_speed_mps           = speed_mps;
-        status.within_envelope             = eval.within_envelope;
-        status.zone.zone                   = static_cast<std::uint8_t>(eval.zone);
-        status.stopping_distance_m         = eval.stopping_distance;
-        status.required_clearance_m        = eval.required_clearance;
-        status.recommended_speed_limit_mps = eval.recommended_speed_limit_mps;
+        status.within_envelope             = modified_eval.within_envelope;
+        status.zone.zone                   = static_cast<std::uint8_t>(modified_eval.zone);
+        status.stopping_distance_m         = modified_eval.stopping_distance;
+        status.required_clearance_m        = modified_eval.required_clearance;
+        status.recommended_speed_limit_mps = modified_eval.recommended_speed_limit_mps;
         status.footprint_length_m          = footprint_.length_m;
         status.footprint_width_m           = footprint_.width_m;
         status.footprint_front_overhang_m  = footprint_.front_overhang_m;
@@ -165,7 +214,7 @@ namespace safety_core_ros
         // Only publish markers if there are subscribers (reduce CPU overhead)
         if (marker_pub_->get_subscription_count() > 0)
         {
-            publish_zone_markers(eval, header);
+            publish_zone_markers(modified_eval, header);
         }
     }
 

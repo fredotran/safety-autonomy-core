@@ -21,6 +21,7 @@
 #include <safety_core_msgs/msg/envelope_status.hpp>
 #include <safety_core_msgs/msg/safety_state.hpp>
 #include <std_msgs/msg/bool.hpp>
+#include <std_srvs/srv/trigger.hpp>
 
 namespace safety_core_ros
 {
@@ -48,6 +49,8 @@ namespace safety_core_ros
         // Callbacks
         void on_envelope(const safety_core_msgs::msg::EnvelopeStatus::ConstSharedPtr msg);
         void on_odom(const nav_msgs::msg::Odometry::ConstSharedPtr msg);
+        void on_clear_fault(const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+                            std::shared_ptr<std_srvs::srv::Trigger::Response> response);
         void timer_tick();
 
         // State management
@@ -87,6 +90,7 @@ namespace safety_core_ros
         rclcpp::Publisher<safety_core_msgs::msg::SafetyState>::SharedPtr state_pub_;
         rclcpp::Publisher<safety_core_msgs::msg::DiagnosticEvent>::SharedPtr diag_pub_;
         rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr safe_stop_pub_;
+        rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr clear_fault_srv_;
         rclcpp::TimerBase::SharedPtr timer_;
     };
 

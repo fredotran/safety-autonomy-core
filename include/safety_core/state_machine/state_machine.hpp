@@ -64,6 +64,7 @@ namespace safety_core::sm
 
         Result transition_to(Mode target) noexcept;
         Result latch_fault(std::uint16_t fault_code) noexcept;
+        Result clear_fault() noexcept;
         Result request_obstacle_hold() noexcept;
         Result report_localization_lost() noexcept;
         Result recover_localization() noexcept;
