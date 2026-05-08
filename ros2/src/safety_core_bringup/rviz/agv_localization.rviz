@@ -1,0 +1,148 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Selection
+    Name: Selection
+  - Class: rviz_common/Tool Properties
+    Name: Tool Properties
+  - Class: rviz_common/Views
+    Name: Views
+  - Class: nav2_rviz_plugins/Navigation 2
+    Name: Navigation 2
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Cell Size: 1
+      Color: 160; 160; 164
+      Plane: XY
+      Plane Cell Count: 30
+    - Class: rviz_default_plugins/RobotModel
+      Name: AGV
+      Description Source: Topic
+      Description Topic:
+        Value: /robot_description
+        Depth: 1
+        Reliability Policy: Reliable
+        Durability Policy: Transient Local
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Frame Timeout: 15
+      Show Names: true
+      Update Interval: 0.1
+    - Class: rviz_default_plugins/LaserScan
+      Name: LaserScan
+      Topic:
+        Value: /scan
+        Reliability Policy: Best Effort
+      Color: 255; 255; 0
+      Size (m): 0.04
+      Style: Points
+    - Class: rviz_default_plugins/Odometry
+      Name: Wheel Odometry
+      Topic:
+        Value: /odom
+        Reliability Policy: Best Effort
+      Color: 25; 255; 0
+      Keep: 100
+    - Class: rviz_default_plugins/Odometry
+      Name: EKF Filtered (odom)
+      Topic:
+        Value: /odometry/filtered
+        Reliability Policy: Best Effort
+      Color: 0; 170; 255
+      Keep: 100
+    - Class: rviz_default_plugins/Odometry
+      Name: EKF Filtered (map)
+      Topic:
+        Value: /odometry/filtered_map
+        Reliability Policy: Best Effort
+      Color: 255; 0; 255
+      Keep: 100
+    - Class: rviz_default_plugins/Map
+      Name: Map (SLAM/AMCL)
+      Topic:
+        Value: /map
+        Reliability Policy: Reliable
+      Alpha: 0.7
+    - Class: rviz_default_plugins/PoseArray
+      Name: AMCL Particles
+      Topic:
+        Value: /particlecloud
+        Reliability Policy: Reliable
+      Color: 255; 0; 0
+      Length: 0.3
+    - Class: rviz_default_plugins/MarkerArray
+      Name: Safety Zones
+      Topic:
+        Value: /safety/zone_markers
+        Reliability Policy: Reliable
+    - Class: rviz_default_plugins/Path
+      Name: Global Plan
+      Topic:
+        Value: /plan
+        Reliability Policy: Reliable
+      Color: 25; 255; 0
+    - Class: rviz_default_plugins/Path
+      Name: Local Plan
+      Topic:
+        Value: /local_plan
+        Reliability Policy: Best Effort
+      Color: 255; 0; 255
+    - Class: rviz_default_plugins/Polygon
+      Name: Footprint
+      Topic:
+        Value: /local_costmap/published_footprint
+        Reliability Policy: Reliable
+      Color: 0; 170; 255
+    - Class: rviz_default_plugins/Polygon
+      Name: Collision Zone Stop
+      Topic:
+        Value: /collision_monitor/polygon_stop
+        Reliability Policy: Reliable
+      Color: 255; 0; 0
+    - Class: rviz_default_plugins/Polygon
+      Name: Collision Zone Slow
+      Topic:
+        Value: /collision_monitor/polygon_slow
+        Reliability Policy: Reliable
+      Color: 255; 200; 0
+    - Class: rviz_default_plugins/Map
+      Name: Local Costmap
+      Topic:
+        Value: /local_costmap/costmap
+        Reliability Policy: Reliable
+      Color Scheme: costmap
+      Alpha: 0.4
+    - Class: rviz_default_plugins/Map
+      Name: Global Costmap
+      Topic:
+        Value: /global_costmap/costmap
+        Reliability Policy: Reliable
+      Color Scheme: costmap
+      Alpha: 0.4
+  Global Options:
+    Background Color: 48; 48; 48
+    Fixed Frame: map
+    Frame Rate: 30
+  Tools:
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: nav2_rviz_plugins/GoalTool
+  Value: true
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 18
+      Focal Point:
+        X: 0
+        Y: 0
+        Z: 0
+      Yaw: 0.7853
+      Pitch: 1.0471
+      Name: Current View
+      Target Frame: <Fixed Frame>
+Window Geometry:
+  Width: 1600
+  Height: 900
