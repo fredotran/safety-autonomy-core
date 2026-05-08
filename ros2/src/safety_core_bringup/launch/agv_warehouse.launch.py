@@ -56,6 +56,7 @@ def generate_launch_description():
     use_gps = LaunchConfiguration("gps")
     nav2_controller = LaunchConfiguration("nav2_controller")
     use_teleop = LaunchConfiguration("teleop")
+    environment = LaunchConfiguration("environment")
 
     safety_params = os.path.join(pkg_bringup, "config", "safety_params.yaml")
     # Odometry-only Nav2 config (no AMCL / no map_server) for the default wheel-odometry mode.
@@ -63,8 +64,13 @@ def generate_launch_description():
     nav2_params_simple = os.path.join(pkg_bringup, "config", "nav2_params_simple.yaml")
     slam_params = os.path.join(pkg_bringup, "config", "slam_toolbox.yaml")
     ekf_config = os.path.join(pkg_bringup, "config", "ekf_config.yaml")
-    # Robot-centric (Fixed Frame: odom) RViz config tuned for the wheel-odometry demo.
-    rviz_config = os.path.join(pkg_bringup, "rviz", "agv_nav2_robot_frame.rviz")
+    amcl_config = os.path.join(pkg_bringup, "config", "amcl_config.yaml")
+    # RViz configs: robot-centric for outdoor, map-centric for indoor/warehouse
+    rviz_config_robot = os.path.join(pkg_bringup, "rviz", "agv_nav2_robot_frame.rviz")
+    rviz_config_localization = os.path.join(pkg_bringup, "rviz", "agv_localization.rviz")
+    rviz_config = PythonExpression([
+        "'", rviz_config_localization, "' if '", environment, "' == 'indoor' or '", environment, "' == 'warehouse' else '", rviz_config_robot, "'"
+    ])
     sim_launch = os.path.join(pkg_sim, "launch", "sim_only.launch.py")
 
     declare_use_sim_time = DeclareLaunchArgument("use_sim_time", default_value="true")
@@ -72,8 +78,8 @@ def generate_launch_description():
     # SLAM disabled by default — the demo runs in pure wheel-odometry mode.
     declare_slam = DeclareLaunchArgument("slam", default_value="false")
     declare_nav2 = DeclareLaunchArgument("nav2", default_value="true")
-    # EKF localization disabled by default; opt in with ekf:=true.
-    declare_ekf = DeclareLaunchArgument("ekf", default_value="false")
+    # EKF localization enabled by default for better odometry in outdoor/mixed environments.
+    declare_ekf = DeclareLaunchArgument("ekf", default_value="true")
     declare_gps = DeclareLaunchArgument(
         "gps",
         default_value="true",
@@ -89,6 +95,26 @@ def generate_launch_description():
         default_value="false",
         description="Enable teleoperation node for manual control",
     )
+    declare_environment = DeclareLaunchArgument(
+        "environment",
+        default_value="outdoor",
+        description="Environment type: 'outdoor' (EKF+GPS+Nav2), 'indoor' (EKF+SLAM+Nav2), 'warehouse' (EKF+Nav2, map-based)",
+        choices=["outdoor", "indoor", "warehouse"],
+    )
+
+    # Environment-specific configuration
+    # Outdoor: EKF + GPS + Nav2 (default)
+    # Indoor: EKF + SLAM + Nav2  
+    # Warehouse: EKF + Nav2 with map-based navigation
+    use_ekf_env = PythonExpression([
+        "'true' if '", environment, "' == 'outdoor' or '", environment, "' == 'warehouse' else 'false'"
+    ])
+    use_gps_env = PythonExpression([
+        "'true' if '", environment, "' == 'outdoor' else 'false'"
+    ])
+    use_slam_env = PythonExpression([
+        "'true' if '", environment, "' == 'indoor' else 'false'"
+    ])
 
     # 1. Simulation (Gazebo + AGV + ros_gz_bridge + robot_state_publisher).
     sim = IncludeLaunchDescription(
@@ -162,7 +188,10 @@ def generate_launch_description():
         name="ekf_filter_node",
         output="screen",
         parameters=[ekf_config, {"use_sim_time": use_sim_time}],
-        condition=IfCondition(use_ekf),
+        remappings=[
+            ("odometry/filtered", "/odometry/filtered"),
+        ],
+        condition=IfCondition(use_ekf_env),
     )
     use_ekf_and_gps = PythonExpression(["'", use_ekf, "' == 'true' and '", use_gps, "' == 'true'"])
     navsat_transform = Node(
@@ -186,7 +215,9 @@ def generate_launch_description():
         name="ekf_filter_node_map",
         output="screen",
         parameters=[ekf_config, {"use_sim_time": use_sim_time}],
-        remappings=[("odometry/filtered", "/odometry/filtered_map")],
+        remappings=[
+            ("odometry/filtered", "/odometry/filtered_map"),
+        ],
         condition=IfCondition(use_ekf_and_gps),
     )
 
@@ -199,14 +230,62 @@ def generate_launch_description():
         ]
     )
 
-    # 4. SLAM Toolbox (optional - disabled by default for wheel odometry mode).
+    # 4. SLAM Toolbox (optional - for indoor environments)
     slam = Node(
         package="slam_toolbox",
         executable="async_slam_toolbox_node",
         name="slam_toolbox",
         output="screen",
         parameters=[slam_params, {"use_sim_time": use_sim_time}],
-        condition=IfCondition(use_slam),
+        condition=IfCondition(use_slam_env),
+    )
+
+    # 5. AMCL + Map Server (optional - for warehouse environments with pre-existing map)
+    # Note: Map file must exist - use SLAM to generate a map first
+    use_amcl_env = PythonExpression([
+        "'true' if '", environment, "' == 'warehouse' else 'false'"
+    ])
+    map_file = LaunchConfiguration("map_file")
+    declare_map_file = DeclareLaunchArgument(
+        "map_file",
+        default_value=os.path.join(pkg_bringup, "maps", "warehouse_map.yaml"),
+        description="Path to map file for AMCL (warehouse environment)"
+    )
+
+    map_server = Node(
+        package="nav2_map_server",
+        executable="map_server",
+        name="map_server",
+        output="screen",
+        parameters=[{"yaml_filename": map_file, "use_sim_time": use_sim_time}],
+        condition=IfCondition(use_amcl_env),
+    )
+
+    lifecycle_manager_map = Node(
+        package="nav2_lifecycle_manager",
+        executable="lifecycle_manager",
+        name="lifecycle_manager_map",
+        output="screen",
+        parameters=[{"use_sim_time": use_sim_time, "autostart": True, "node_names": ["map_server"]}],
+        condition=IfCondition(use_amcl_env),
+    )
+
+    amcl = Node(
+        package="nav2_amcl",
+        executable="amcl",
+        name="amcl",
+        output="screen",
+        parameters=[amcl_config, {"use_sim_time": use_sim_time}],
+        condition=IfCondition(use_amcl_env),
+    )
+
+    lifecycle_manager_localization = Node(
+        package="nav2_lifecycle_manager",
+        executable="lifecycle_manager",
+        name="lifecycle_manager_localization",
+        output="screen",
+        parameters=[{"use_sim_time": use_sim_time, "autostart": True, "node_names": ["amcl"]}],
+        condition=IfCondition(use_amcl_env),
     )
 
     # 4. Nav2 stack (delayed startup, configured for odometry-based localization).
@@ -229,7 +308,7 @@ def generate_launch_description():
                 "autostart": "true",
                 "use_composition": "False",
             }.items(),
-            condition=IfCondition(use_nav2),
+            condition=IfCondition(PythonExpression(["'", environment, "' != 'warehouse'"])),
         )
         nav2_actions.append(TimerAction(period=5.0, actions=[nav2_launch]))
     except Exception as exc:  # PackageNotFoundError or import error
@@ -264,10 +343,16 @@ def generate_launch_description():
             declare_gps,
             declare_nav2_controller,
             declare_use_teleop,
+            declare_environment,
+            declare_map_file,
             sim,
             safety_stack,
             ekf_stack,
             slam,
+            map_server,
+            lifecycle_manager_map,
+            amcl,
+            lifecycle_manager_localization,
             *nav2_actions,
             TimerAction(period=3.0, actions=[rviz]),  # Delay RViz by 3 seconds
         ]
