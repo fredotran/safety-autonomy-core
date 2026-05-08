@@ -183,8 +183,8 @@ jobs:
         shell: bash
         # --base-paths picks up the root safety_autonomy_core ament package + ros2/src/* together.
         # safety_core_nav2 needs nav2_behavior_tree which isn't in ros:jazzy-ros-base; skipping it
-        # also forces us to skip safety_core_bringup (which exec_depends on safety_core_nav2 via
-        # the unified launch files). The remaining packages still cover the C++ build surface.
+        # safety_core_bringup exec_depends on safety_core_nav2 via unified launch files; skipping it too
+        # The remaining packages still cover the C++ build surface.
         run: |
           source /opt/ros/${ROS_DISTRO}/setup.bash
           colcon build --packages-skip safety_core_nav2 safety_core_bringup \
@@ -253,6 +253,9 @@ jobs:
             python3-colcon-common-extensions
       - name: colcon build + test
         shell: bash
+        # Skip safety_core_nav2 (needs nav2_behavior_tree not in ros:jazzy-ros-base)
+        # Skip safety_core_bringup (exec_depends on safety_core_nav2)
+        # Test only safety_core_ros which contains the C++ wrapper nodes
         run: |
           source /opt/ros/${ROS_DISTRO}/setup.bash
           colcon build --packages-skip safety_core_nav2 safety_core_bringup \
