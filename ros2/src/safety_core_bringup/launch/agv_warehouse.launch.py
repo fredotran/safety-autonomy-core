@@ -56,7 +56,6 @@ def generate_launch_description():
     use_gps = LaunchConfiguration("gps")
     nav2_controller = LaunchConfiguration("nav2_controller")
     use_teleop = LaunchConfiguration("teleop")
-    environment = LaunchConfiguration("environment")
 
     safety_params = os.path.join(pkg_bringup, "config", "safety_params.yaml")
     # Odometry-only Nav2 config (no AMCL / no map_server) for the default wheel-odometry mode.
@@ -95,27 +94,6 @@ def generate_launch_description():
         default_value="false",
         description="Enable teleoperation node for manual control",
     )
-    declare_environment = DeclareLaunchArgument(
-        "environment",
-        default_value="outdoor",
-        description="Environment type: 'outdoor' (EKF+GPS+Nav2), 'indoor' (EKF+SLAM+Nav2), 'warehouse' (EKF+Nav2, map-based)",
-        choices=["outdoor", "indoor", "warehouse"],
-    )
-
-    # Environment-specific configuration
-    # Outdoor: EKF + GPS + Nav2 (default)
-    # Indoor: EKF + SLAM + Nav2  
-    # Warehouse: EKF + Nav2 with map-based navigation
-    # Note: EKF disabled by default due to config parsing issue in container
-    use_ekf_env = PythonExpression([
-        "'false'  # EKF disabled due to config parsing issue, can be enabled manually with ekf:=true"
-    ])
-    use_gps_env = PythonExpression([
-        "'true' if '", environment, "' == 'outdoor' else 'false'"
-    ])
-    use_slam_env = PythonExpression([
-        "'true' if '", environment, "' == 'indoor' else 'false'"
-    ])
 
     # 1. Simulation (Gazebo + AGV + ros_gz_bridge + robot_state_publisher).
     sim = IncludeLaunchDescription(
@@ -344,8 +322,6 @@ def generate_launch_description():
             declare_gps,
             declare_nav2_controller,
             declare_use_teleop,
-            declare_environment,
-            declare_map_file,
             sim,
             safety_stack,
             ekf_stack,
