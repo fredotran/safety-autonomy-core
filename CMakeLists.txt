@@ -215,6 +215,14 @@ target_link_libraries(production_improvements_tests PRIVATE safety_core)
 
 add_test(NAME production_improvements_tests COMMAND production_improvements_tests)
 
+add_executable(non_regression_tests
+    tests/non_regression_tests.cpp
+)
+
+target_link_libraries(non_regression_tests PRIVATE safety_core)
+
+add_test(NAME non_regression_tests COMMAND non_regression_tests)
+
 add_executable(agv_safety_demo
     examples/agv_safety_demo.cpp
 )
