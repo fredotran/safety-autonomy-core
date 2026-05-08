@@ -5,6 +5,27 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2](https://github.com/fredotran/safety-autonomy-core/compare/v0.1.1...v0.1.2) (2026-05-08)
+
+
+### Features
+
+* Add comprehensive Devin rules with auto-loaded robotics skills ([4d5585c](https://github.com/fredotran/safety-autonomy-core/commit/4d5585cce11e25788d5adfc3759e347094348565))
+* add Devin rules with auto-loaded skills for robotics development ([18311b4](https://github.com/fredotran/safety-autonomy-core/commit/18311b4ff8dfa2cdb8eed54e4281d2a7f7273a6c))
+
+
+### Bug Fixes
+
+* Add copyright headers to C++ source files for CI compliance ([bc9c72a](https://github.com/fredotran/safety-autonomy-core/commit/bc9c72ad8f9b999daa868121a5d2037a42cee181))
+* add feature/** branches to CI workflow triggers ([5bde81f](https://github.com/fredotran/safety-autonomy-core/commit/5bde81f8b5b07b3679678fceadf77db80dd1115e))
+* Remove non-existent maps directory from CMakeLists.txt install ([61ba4a6](https://github.com/fredotran/safety-autonomy-core/commit/61ba4a6c901ca1314c3756bc744512f2637652d1))
+* resolve Python linting issues and remove continue-on-error from CI jobs ([2735b77](https://github.com/fredotran/safety-autonomy-core/commit/2735b7771a76df88c9424c7e4071dc386ba5a406))
+
+
+### Documentation
+
+* improve CI workflow comments for ROS 2 build jobs ([5fddadd](https://github.com/fredotran/safety-autonomy-core/commit/5fddaddaff62e8f5573813ce5c59bd97c1f2dc8f))
+
 ## [0.1.1](https://github.com/fredotran/safety-autonomy-core/compare/v0.1.0...v0.1.1) (2026-05-08)
 
 
