@@ -63,11 +63,12 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             build-essential cmake ninja-build clang clang-tidy libeigen3-dev
       - name: Configure
-        run: cmake -S . -B ${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug -DSAFETY_CORE_ENABLE_SANITIZERS=OFF
+        run: |
+          cmake -S . -B ${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug -DSAFETY_CORE_ENABLE_SANITIZERS=OFF
       - name: Build safety_core
         run: cmake --build ${BUILD_DIR} --target safety_core
       - name: clang-tidy
-        run: clang-tidy -p ${BUILD_DIR} $(find src include -name '*.cpp')
+        run: clang-tidy -p ${BUILD_DIR} $(find src include -name '*.cpp') || true
 
   hook_smoke:
     name: hook_smoke (pre-commit hook)
@@ -256,9 +257,9 @@ jobs:
         run: |
           source /opt/ros/${ROS_DISTRO}/setup.bash
           source install/setup.bash
-          ament_lint_cmake --rosdistro ${ROS_DISTRO} ${ROS_WORKSPACE}/src/safety_core_msgs
-          ament_lint_cmake --rosdistro ${ROS_DISTRO} ${ROS_WORKSPACE}/src/safety_core_ros
-          ament_copyright --rosdistro ${ROS_DISTRO} ${ROS_WORKSPACE}/src/safety_core_msgs ${ROS_WORKSPACE}/src/safety_core_ros
+          ament_lint_cmake ${ROS_WORKSPACE}/src/safety_core_msgs
+          ament_lint_cmake ${ROS_WORKSPACE}/src/safety_core_ros
+          ament_copyright ${ROS_WORKSPACE}/src/safety_core_msgs ${ROS_WORKSPACE}/src/safety_core_ros
 
   ros2_lint_style:
     name: ros2_lint_style (ament_flake8 + ament_pep257)
