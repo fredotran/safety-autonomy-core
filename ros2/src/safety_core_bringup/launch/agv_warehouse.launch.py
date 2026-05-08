@@ -77,7 +77,7 @@ def generate_launch_description():
     # SLAM disabled by default — the demo runs in pure wheel-odometry mode.
     declare_slam = DeclareLaunchArgument("slam", default_value="false")
     declare_nav2 = DeclareLaunchArgument("nav2", default_value="true")
-    # EKF localization disabled by default due to YAML parsing issues in container
+    # EKF localization enabled by default for better odometry in outdoor/mixed environments.
     declare_ekf = DeclareLaunchArgument("ekf", default_value="false")
     declare_gps = DeclareLaunchArgument(
         "gps",
