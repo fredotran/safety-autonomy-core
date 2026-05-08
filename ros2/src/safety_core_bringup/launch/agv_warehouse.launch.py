@@ -54,10 +54,12 @@ def generate_launch_description():
     use_nav2 = LaunchConfiguration("nav2")
     use_ekf = LaunchConfiguration("ekf")
     use_gps = LaunchConfiguration("gps")
+    nav2_controller = LaunchConfiguration("nav2_controller")
 
     safety_params = os.path.join(pkg_bringup, "config", "safety_params.yaml")
     # Odometry-only Nav2 config (no AMCL / no map_server) for the default wheel-odometry mode.
-    nav2_params = os.path.join(pkg_bringup, "config", "nav2_params_odometry.yaml")
+    nav2_params_odometry = os.path.join(pkg_bringup, "config", "nav2_params_odometry.yaml")
+    nav2_params_simple = os.path.join(pkg_bringup, "config", "nav2_params_simple.yaml")
     slam_params = os.path.join(pkg_bringup, "config", "slam_toolbox.yaml")
     ekf_config = os.path.join(pkg_bringup, "config", "ekf_config.yaml")
     # Robot-centric (Fixed Frame: odom) RViz config tuned for the wheel-odometry demo.
@@ -75,6 +77,11 @@ def generate_launch_description():
         "gps",
         default_value="true",
         description="When ekf:=true, also enable navsat_transform_node + map-frame EKF.",
+    )
+    declare_nav2_controller = DeclareLaunchArgument(
+        "nav2_controller",
+        default_value="dwb",
+        description="Nav2 controller type: 'mppi' (MPPI) or 'dwb' (DWB - simpler, recommended for diff-drive)",
     )
 
     # 1. Simulation (Gazebo + AGV + ros_gz_bridge + robot_state_publisher).
@@ -188,13 +195,17 @@ def generate_launch_description():
     nav2_actions: list = []
     try:
         nav2_bringup_pkg = get_package_share_directory("nav2_bringup")
+        # Select Nav2 config based on controller type
+        nav2_params_selected = PythonExpression([
+            "'", nav2_params_simple, "' if '", nav2_controller, "' == 'dwb' else '", nav2_params_odometry, "'"
+        ])
         nav2_launch = IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(nav2_bringup_pkg, "launch", "navigation_launch.py")
             ),
             launch_arguments={
                 "use_sim_time": use_sim_time,
-                "params_file": nav2_params,
+                "params_file": nav2_params_selected,
                 "autostart": "true",
                 "use_composition": "False",
             }.items(),
@@ -231,6 +242,7 @@ def generate_launch_description():
             declare_nav2,
             declare_ekf,
             declare_gps,
+            declare_nav2_controller,
             sim,
             safety_stack,
             ekf_stack,
