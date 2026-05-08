@@ -73,3 +73,8 @@ If a package fails to build in the container:
 2. Verify CMakeLists.txt is correct
 3. Check for Python import errors
 4. Ensure all required files are copied to the container
+5. **Check if safety_autonomy_core needs rebuild** - If you see errors about missing methods in safety_core library, rebuild safety_autonomy_core first:
+   ```bash
+   docker exec safety-autonomy-demo bash -c "cd /workspace/ros2_ws && source /opt/ros/jazzy/setup.bash && colcon build --packages-select safety_autonomy_core"
+   ```
+   Then rebuild the package that depends on it.
