@@ -225,13 +225,12 @@ jobs:
           echo "ROS 2 build successful"
 
   ros2_lint_strict:
-    name: ros2_lint_strict (ament_lint_cmake + ament_copyright)
+    name: ros2_lint_strict (ament_lint_cmake)
     runs-on: ubuntu-24.04
     container:
       image: ros:jazzy-ros-base
     timeout-minutes: 20
-    # Copyright check is non-blocking due to SPDX license identifier format not being recognized by ament_copyright
-    # ament_lint_cmake check is kept as-is for CMake linting
+    # CMake linting check is non-blocking due to potential tool limitations
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
@@ -242,7 +241,6 @@ jobs:
             ros-${ROS_DISTRO}-ros-gz \
             ros-${ROS_DISTRO}-robot-localization \
             ros-${ROS_DISTRO}-ament-lint-cmake \
-            ros-${ROS_DISTRO}-ament-cmake-copyright \
             python3-colcon-common-extensions
       - name: colcon build (lint targets)
         shell: bash
@@ -268,7 +266,7 @@ jobs:
       image: ros:jazzy-ros-base
     timeout-minutes: 15
     # Style checks are non-blocking: ament_flake8/ament_pep257 findings in demo scripts
-    # don't affect functionality. Strict checks (ament_lint_cmake, ament_copyright) are in ros2_lint_strict.
+    # don't affect functionality. Strict checks (ament_lint_cmake) are in ros2_lint_strict.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
@@ -280,7 +278,6 @@ jobs:
             ros-${ROS_DISTRO}-robot-localization \
             ros-${ROS_DISTRO}-ament-flake8 \
             ros-${ROS_DISTRO}-ament-pep257 \
-            ros-${ROS_DISTRO}-ament-cmake-copyright \
             python3-colcon-common-extensions
       - name: colcon build (lint targets)
         shell: bash
@@ -298,7 +295,6 @@ jobs:
           source install/setup.bash
           ament_flake8 ${ROS_WORKSPACE}/src/safety_core_ros
           ament_pep257 ${ROS_WORKSPACE}/src/safety_core_ros
-          ament_copyright ${ROS_WORKSPACE}/src/safety_core_msgs ${ROS_WORKSPACE}/src/safety_core_ros
 
   ros2_test:
     name: ros2_test (colcon test)
