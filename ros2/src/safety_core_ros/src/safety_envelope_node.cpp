@@ -58,8 +58,6 @@ namespace safety_core_ros
         config_.envelope.control_latency_s = ParamLoader::load_double(this, "envelope.control_latency_s", 0.04);
         config_.envelope.safety_buffer_m   = ParamLoader::load_double(this, "envelope.safety_buffer_m", 0.3);
 
-        RCLCPP_INFO(get_logger(), "Loaded safety_buffer_m: %.2f", config_.envelope.safety_buffer_m);
-
         // Load footprint configuration
         footprint_.length_m         = ParamLoader::load_double(this, "footprint.length_m", 0.8);
         footprint_.width_m          = ParamLoader::load_double(this, "footprint.width_m", 0.6);

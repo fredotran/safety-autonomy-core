@@ -66,12 +66,12 @@ namespace safety_core::sm
 
         latched_fault_.store(false, std::memory_order_release);
         fault_code_ = 0U;
-        
+
         // Transition to Idle mode after clearing fault
         const Mode prev = mode_.load(std::memory_order_acquire);
         mode_.store(Mode::Idle, std::memory_order_release);
         notify_transition(prev, Mode::Idle);
-        
+
         return Result::Ok();
     }
 

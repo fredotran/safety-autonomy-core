@@ -88,7 +88,7 @@ namespace safety_core_ros
     {
         latest_zone_ = static_cast<SafetyZone>(msg->zone.zone);
         const Mode current_mode = machine_->mode();
-        
+
         // Always check for auto-transition from Idle to Moving when in Clear zone
         // This ensures the transition happens even if the zone doesn't change
         if (current_mode == Mode::Idle && latest_zone_ == SafetyZone::Clear)
@@ -97,7 +97,7 @@ namespace safety_core_ros
             safe_stop_requested_ = false;
             RCLCPP_INFO(get_logger(), "Auto-transition from Idle to Moving (Clear zone)");
         }
-        
+
         handle_zone_transition(latest_zone_);
     }
 
