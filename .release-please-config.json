@@ -1,0 +1,55 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "simple",
+  "include-component-in-tag": false,
+  "tag-separator": "-",
+  "draft": false,
+  "prerelease": false,
+  "include-v-in-tag": true,
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": true,
+  "changelog-sections": [
+    {"type": "feat", "section": "Features", "hidden": false},
+    {"type": "fix", "section": "Bug Fixes", "hidden": false},
+    {"type": "perf", "section": "Performance", "hidden": false},
+    {"type": "refactor", "section": "Refactor", "hidden": false},
+    {"type": "deps", "section": "Dependencies", "hidden": false},
+    {"type": "docs", "section": "Documentation", "hidden": false},
+    {"type": "build", "section": "Build", "hidden": true},
+    {"type": "ci", "section": "CI/CD", "hidden": true},
+    {"type": "chore", "section": "Miscellaneous", "hidden": true},
+    {"type": "style", "section": "Style", "hidden": true},
+    {"type": "test", "section": "Tests", "hidden": true}
+  ],
+  "packages": {
+    ".": {
+      "package-name": "safety-autonomy-core",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "CMakeLists.txt"
+        },
+        {
+          "type": "generic",
+          "path": "ros2/src/safety_core_msgs/package.xml"
+        },
+        {
+          "type": "generic",
+          "path": "ros2/src/safety_core_ros/package.xml"
+        },
+        {
+          "type": "generic",
+          "path": "ros2/src/safety_core_bringup/package.xml"
+        },
+        {
+          "type": "generic",
+          "path": "ros2/src/safety_core_sim/package.xml"
+        },
+        {
+          "type": "generic",
+          "path": "ros2/src/safety_core_nav2/package.xml"
+        }
+      ]
+    }
+  }
+}

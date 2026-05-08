@@ -1,0 +1,263 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - "ec/**"
+      - "devin/**"
+  pull_request:
+    branches:
+      - main
+      - "ec/**"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  BUILD_DIR: build
+  CMAKE_FLAGS: "-DCMAKE_BUILD_TYPE=RelWithDebInfo -DSAFETY_CORE_ENABLE_SANITIZERS=ON"
+  COVERAGE_MIN_LINE: "80"
+  COVERAGE_MIN_BRANCH: "55"
+  ROS_DISTRO: "jazzy"
+  ROS_WORKSPACE: "ros2"
+
+jobs:
+  format_check:
+    name: format_check (clang-format)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends clang-format
+      - name: Run clang-format --dry-run --Werror
+        run: |
+          clang-format --version
+          clang-format --dry-run --Werror $(find include src tests ros2/src -name '*.hpp' -o -name '*.cpp')
+
+  clang_tidy:
+    name: clang_tidy (static analysis)
+    runs-on: ubuntu-24.04
+    # Pre-existing readability/bugprone findings in the core C++ library; tracked as known
+    # debt and intentionally non-blocking until a dedicated cleanup pass lands.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build clang clang-tidy
+      - name: Configure
+        run: cmake -S . -B ${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug -DSAFETY_CORE_ENABLE_SANITIZERS=OFF
+      - name: Build safety_core
+        run: cmake --build ${BUILD_DIR} --target safety_core
+      - name: clang-tidy
+        run: clang-tidy -p ${BUILD_DIR} $(find src include -name '*.cpp')
+
+  hook_smoke:
+    name: hook_smoke (pre-commit hook)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build clang clang-tidy clang-format git
+      - name: Configure + build safety_core
+        run: |
+          cmake -S . -B ${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug -DSAFETY_CORE_ENABLE_SANITIZERS=OFF
+          cmake --build ${BUILD_DIR} --target safety_core
+      - name: Configure git identity (required by hook-driven commits)
+        run: |
+          git config user.email "ci@safety-autonomy-core"
+          git config user.name "CI"
+      - name: Run pre-commit hook
+        run: |
+          git config core.hooksPath .githooks
+          printf "\n" >> tests/pid_controller_tests.cpp
+          git add tests/pid_controller_tests.cpp
+          AUTO_FIX_FORMAT=1 BUILD_DIR=${BUILD_DIR} .githooks/pre-commit
+          git checkout -- tests/pid_controller_tests.cpp
+          git reset tests/pid_controller_tests.cpp
+
+  policy_guard:
+    name: policy_guard (banned API check)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run policy verifier
+        run: |
+          chmod +x tools/safety/verify_policy.sh
+          tools/safety/verify_policy.sh
+
+  safety_case_guard:
+    name: safety_case_guard (artifact presence)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run safety case verifier
+        run: |
+          chmod +x tools/safety/verify_safety_case.sh
+          tools/safety/verify_safety_case.sh
+
+  build_and_test:
+    name: build_and_test (sanitizers + ctest)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build clang clang-tidy clang-format gcovr ccache
+      - name: Configure
+        run: cmake -S . -B ${BUILD_DIR} ${CMAKE_FLAGS}
+      - name: Build
+        run: cmake --build ${BUILD_DIR}
+      - name: No-heap symbol guard
+        run: |
+          for UNIT in context_factory.cpp.o task_executor.cpp.o safety_pid.cpp.o state_machine.cpp.o trajectory.cpp.o bounded_ekf_filter.cpp.o complementary_filter.cpp.o safety_supervisor.cpp.o; do
+            OBJ_FILE=$(find ${BUILD_DIR}/CMakeFiles/safety_core.dir -name "${UNIT}" | head -n 1)
+            test -n "${OBJ_FILE}"
+            if nm -u "${OBJ_FILE}" | grep -E -q '(_Znwm|_Znam|malloc|calloc|realloc)(@@.*)?$'; then
+              echo "[FAIL] ${UNIT} references heap-allocation symbols"
+              nm -u "${OBJ_FILE}"
+              exit 1
+            fi
+          done
+      - name: ctest
+        run: ctest --test-dir ${BUILD_DIR} --output-on-failure
+
+  coverage:
+    name: coverage (gcovr gate)
+    runs-on: ubuntu-24.04
+    env:
+      CC: gcc
+      CXX: g++
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build gcovr
+      - name: Configure (coverage)
+        run: cmake -S . -B build-coverage -DCMAKE_BUILD_TYPE=Debug -DSAFETY_CORE_ENABLE_SANITIZERS=OFF -DSAFETY_CORE_ENABLE_COVERAGE=ON
+      - name: Build (coverage)
+        run: cmake --build build-coverage
+      - name: ctest (coverage)
+        run: ctest --test-dir build-coverage --output-on-failure
+      - name: gcovr gate
+        run: |
+          gcovr --root . --filter src --filter include --exclude build-coverage \
+            --print-summary \
+            --fail-under-line ${COVERAGE_MIN_LINE} \
+            --fail-under-branch ${COVERAGE_MIN_BRANCH}
+
+  ros2_build:
+    name: ros2_build (colcon)
+    runs-on: ubuntu-24.04
+    container:
+      image: ros:jazzy-ros-base
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ros-gz
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends \
+            ros-${ROS_DISTRO}-ros-gz \
+            ros-${ROS_DISTRO}-robot-localization \
+            python3-colcon-common-extensions
+      - name: colcon build
+        shell: bash
+        # --base-paths picks up the root safety_autonomy_core ament package + ros2/src/* together.
+        # safety_core_nav2 needs nav2_behavior_tree which isn't in ros:jazzy-ros-base; skipping it
+        # also forces us to skip safety_core_bringup (which exec_depends on safety_core_nav2 via
+        # the unified launch files). The remaining packages still cover the C++ build surface.
+        run: |
+          source /opt/ros/${ROS_DISTRO}/setup.bash
+          colcon build --packages-skip safety_core_nav2 safety_core_bringup \
+            --base-paths . ${ROS_WORKSPACE}/src \
+            --cmake-args -DSAFETY_CORE_ENABLE_AMENT=ON \
+                         -DSAFETY_CORE_ENABLE_SANITIZERS=OFF \
+                         -DSAFETY_CORE_ENABLE_WERROR=OFF
+          source install/setup.bash
+          echo "ROS 2 build successful"
+
+  ros2_lint:
+    name: ros2_lint (ament_lint_*)
+    runs-on: ubuntu-24.04
+    container:
+      image: ros:jazzy-ros-base
+    # Pre-existing flake8/pep257 findings in legacy demo scripts (comprehensive_demo.launch.py,
+    # before_after_comparison.py, etc.) make the strict ament_flake8 / ament_pep257 jobs noisy
+    # until a dedicated cleanup pass lands. ament_lint_cmake / ament_copyright are still run.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ros-gz + ament linters
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends \
+            ros-${ROS_DISTRO}-ros-gz \
+            ros-${ROS_DISTRO}-robot-localization \
+            ros-${ROS_DISTRO}-ament-lint-cmake \
+            ros-${ROS_DISTRO}-ament-cmake-copyright \
+            ros-${ROS_DISTRO}-ament-flake8 \
+            ros-${ROS_DISTRO}-ament-pep257 \
+            python3-colcon-common-extensions
+      - name: colcon build (lint targets)
+        shell: bash
+        run: |
+          source /opt/ros/${ROS_DISTRO}/setup.bash
+          colcon build --packages-up-to safety_core_ros \
+            --base-paths . ${ROS_WORKSPACE}/src \
+            --cmake-args -DSAFETY_CORE_ENABLE_AMENT=ON \
+                         -DSAFETY_CORE_ENABLE_SANITIZERS=OFF \
+                         -DSAFETY_CORE_ENABLE_WERROR=OFF
+      - name: ament lint
+        shell: bash
+        run: |
+          source /opt/ros/${ROS_DISTRO}/setup.bash
+          source install/setup.bash
+          ament_lint_cmake --rosdistro ${ROS_DISTRO} ${ROS_WORKSPACE}/src/safety_core_msgs
+          ament_lint_cmake --rosdistro ${ROS_DISTRO} ${ROS_WORKSPACE}/src/safety_core_ros
+          ament_copyright --rosdistro ${ROS_DISTRO} ${ROS_WORKSPACE}/src/safety_core_msgs ${ROS_WORKSPACE}/src/safety_core_ros
+          ament_flake8 --rosdistro ${ROS_DISTRO} ${ROS_WORKSPACE}/src/safety_core_bringup
+          ament_pep257 --rosdistro ${ROS_DISTRO} ${ROS_WORKSPACE}/src/safety_core_bringup
+
+  ros2_test:
+    name: ros2_test (colcon test)
+    runs-on: ubuntu-24.04
+    container:
+      image: ros:jazzy-ros-base
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ros-gz
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends \
+            ros-${ROS_DISTRO}-ros-gz \
+            ros-${ROS_DISTRO}-robot-localization \
+            python3-colcon-common-extensions
+      - name: colcon build + test
+        shell: bash
+        run: |
+          source /opt/ros/${ROS_DISTRO}/setup.bash
+          colcon build --packages-skip safety_core_nav2 safety_core_bringup \
+            --base-paths . ${ROS_WORKSPACE}/src \
+            --cmake-args -DSAFETY_CORE_ENABLE_AMENT=ON \
+                         -DSAFETY_CORE_ENABLE_SANITIZERS=OFF \
+                         -DSAFETY_CORE_ENABLE_WERROR=OFF
+          source install/setup.bash
+          colcon test --packages-select safety_core_ros --event-handlers console_direct+
+          colcon test-result --all

@@ -1,4 +1,10 @@
-"""End-to-end demo: Gazebo Harmonic + AGV + safety_core wrapper nodes + Nav2 + SLAM + RViz.
+"""End-to-end demo: Gazebo Harmonic + AGV + safety_core wrapper nodes + Nav2 + RViz.
+
+Configuration for wheel odometry-based navigation (no SLAM):
+- Robot uses diff-drive wheel odometry for localization
+- Fixed frame is base_link (robot-centric)
+- Nav2 provides planning and control
+- Safety system gates commands
 
 Topology (edges show topic publish direction):
 
@@ -46,17 +52,30 @@ def generate_launch_description():
     use_rviz = LaunchConfiguration("rviz")
     use_slam = LaunchConfiguration("slam")
     use_nav2 = LaunchConfiguration("nav2")
+    use_ekf = LaunchConfiguration("ekf")
+    use_gps = LaunchConfiguration("gps")
 
     safety_params = os.path.join(pkg_bringup, "config", "safety_params.yaml")
-    nav2_params = os.path.join(pkg_bringup, "config", "nav2_params.yaml")
+    # Odometry-only Nav2 config (no AMCL / no map_server) for the default wheel-odometry mode.
+    nav2_params = os.path.join(pkg_bringup, "config", "nav2_params_odometry.yaml")
     slam_params = os.path.join(pkg_bringup, "config", "slam_toolbox.yaml")
-    rviz_config = os.path.join(pkg_bringup, "rviz", "agv_warehouse.rviz")
+    ekf_config = os.path.join(pkg_bringup, "config", "ekf_config.yaml")
+    # Robot-centric (Fixed Frame: odom) RViz config tuned for the wheel-odometry demo.
+    rviz_config = os.path.join(pkg_bringup, "rviz", "agv_nav2_robot_frame.rviz")
     sim_launch = os.path.join(pkg_sim, "launch", "sim_only.launch.py")
 
     declare_use_sim_time = DeclareLaunchArgument("use_sim_time", default_value="true")
     declare_rviz = DeclareLaunchArgument("rviz", default_value="true")
-    declare_slam = DeclareLaunchArgument("slam", default_value="true")
+    # SLAM disabled by default — the demo runs in pure wheel-odometry mode.
+    declare_slam = DeclareLaunchArgument("slam", default_value="false")
     declare_nav2 = DeclareLaunchArgument("nav2", default_value="true")
+    # EKF localization disabled by default; opt in with ekf:=true.
+    declare_ekf = DeclareLaunchArgument("ekf", default_value="false")
+    declare_gps = DeclareLaunchArgument(
+        "gps",
+        default_value="true",
+        description="When ekf:=true, also enable navsat_transform_node + map-frame EKF.",
+    )
 
     # 1. Simulation (Gazebo + AGV + ros_gz_bridge + robot_state_publisher).
     sim = IncludeLaunchDescription(
@@ -106,7 +125,54 @@ def generate_launch_description():
         ]
     )
 
-    # 3. SLAM Toolbox (online async mapping).
+    # 3. EKF localization stack (optional). Two-EKF + navsat_transform pattern:
+    #    * ekf_filter_node       -- fuses /odom + /imu, owns odom -> base_link TF.
+    #    * navsat_transform_node -- /gps + /imu + /odometry/filtered -> /odometry/gps (map frame).
+    #    * ekf_filter_node_map   -- fuses /odom + /imu + /odometry/gps, owns map -> odom TF.
+    ekf_local = Node(
+        package="robot_localization",
+        executable="ekf_node",
+        name="ekf_filter_node",
+        output="screen",
+        parameters=[ekf_config, {"use_sim_time": use_sim_time}],
+        condition=IfCondition(use_ekf),
+    )
+    use_ekf_and_gps = PythonExpression(["'", use_ekf, "' == 'true' and '", use_gps, "' == 'true'"])
+    navsat_transform = Node(
+        package="robot_localization",
+        executable="navsat_transform_node",
+        name="navsat_transform",
+        output="screen",
+        parameters=[ekf_config, {"use_sim_time": use_sim_time}],
+        remappings=[
+            ("imu/data", "/imu"),
+            ("gps/fix", "/gps"),
+            ("odometry/filtered", "/odometry/filtered"),
+            ("odometry/gps", "/odometry/gps"),
+            ("gps/filtered", "/gps/filtered"),
+        ],
+        condition=IfCondition(use_ekf_and_gps),
+    )
+    ekf_global = Node(
+        package="robot_localization",
+        executable="ekf_node",
+        name="ekf_filter_node_map",
+        output="screen",
+        parameters=[ekf_config, {"use_sim_time": use_sim_time}],
+        remappings=[("odometry/filtered", "/odometry/filtered_map")],
+        condition=IfCondition(use_ekf_and_gps),
+    )
+
+    ekf_stack = GroupAction(
+        actions=[
+            LogInfo(msg="Starting EKF localization stack (robot_localization)..."),
+            ekf_local,
+            navsat_transform,
+            ekf_global,
+        ]
+    )
+
+    # 4. SLAM Toolbox (optional - disabled by default for wheel odometry mode).
     slam = Node(
         package="slam_toolbox",
         executable="async_slam_toolbox_node",
@@ -116,7 +182,7 @@ def generate_launch_description():
         condition=IfCondition(use_slam),
     )
 
-    # 4. Nav2 stack (delayed so SLAM has time to publish a baseline map).
+    # 4. Nav2 stack (delayed startup, configured for odometry-based localization).
     # nav2_bringup is optional; if missing, skip the inclusion gracefully so
     # `ros2 launch` still works for the sim+safety subset.
     nav2_actions: list = []
@@ -134,7 +200,7 @@ def generate_launch_description():
             }.items(),
             condition=IfCondition(use_nav2),
         )
-        nav2_actions.append(TimerAction(period=8.0, actions=[nav2_launch]))
+        nav2_actions.append(TimerAction(period=5.0, actions=[nav2_launch]))
     except Exception as exc:  # PackageNotFoundError or import error
         nav2_actions.append(
             LogInfo(
@@ -147,7 +213,7 @@ def generate_launch_description():
             )
         )
 
-    # 5. RViz.
+    # 5. RViz with robot-centric fixed frame (delayed startup).
     rviz = Node(
         package="rviz2",
         executable="rviz2",
@@ -163,10 +229,13 @@ def generate_launch_description():
             declare_rviz,
             declare_slam,
             declare_nav2,
+            declare_ekf,
+            declare_gps,
             sim,
             safety_stack,
+            ekf_stack,
             slam,
             *nav2_actions,
-            rviz,
+            TimerAction(period=3.0, actions=[rviz]),  # Delay RViz by 3 seconds
         ]
     )
