@@ -66,7 +66,7 @@ Build script for safety-autonomy-core
 
 Options:
   -h, --help              Show this help message
-  -t, --type TYPE         Build type: cmake, ros2, docker (default: cmake)
+  -t, --type TYPE         Build type: cmake, ros2, docker, all (default: cmake)
   -m, --mode MODE         Build mode: Debug, Release, RelWithDebInfo (default: RelWithDebInfo)
   -s, --sanitizers        Enable address/undefined sanitizers (CMake builds only)
   -c, --clean             Clean build directory before building
@@ -81,6 +81,7 @@ Examples:
   $0 -t ros2 --test                    # Build ROS 2 packages and run tests
   $0 -t docker -c                      # Clean build with Docker
   $0 -t cmake -j 8                     # Build with 8 parallel jobs
+  $0 -t all --test                     # Build both CMake and ROS 2 packages
 
 EOF
 }
@@ -134,8 +135,8 @@ parse_args() {
     done
 
     # Validate BUILD_TYPE
-    if [[ ! "$BUILD_TYPE" =~ ^(cmake|ros2|docker)$ ]]; then
-        log_error "Invalid build type: $BUILD_TYPE. Must be cmake, ros2, or docker"
+    if [[ ! "$BUILD_TYPE" =~ ^(cmake|ros2|docker|all)$ ]]; then
+        log_error "Invalid build type: $BUILD_TYPE. Must be cmake, ros2, docker, or all"
         exit 1
     fi
 
@@ -212,6 +213,21 @@ build_cmake() {
     log_success "Build completed successfully"
 }
 
+# Build all (CMake + ROS 2)
+build_all() {
+    log_info "Building both CMake core library and ROS 2 packages"
+
+    # First build CMake core library
+    log_info "Step 1: Building CMake core library..."
+    build_cmake
+
+    # Then build ROS 2 packages
+    log_info "Step 2: Building ROS 2 packages..."
+    build_ros2
+
+    log_success "All builds completed successfully"
+}
+
 # Build with ROS 2 colcon
 build_ros2() {
     log_info "Building ROS 2 packages with colcon"
@@ -219,12 +235,33 @@ build_ros2() {
 
     # Check if ROS 2 environment is sourced
     if [[ -z "${ROS_DISTRO:-}" ]]; then
-        log_error "ROS 2 environment not found. Please source ROS 2 setup.bash first"
-        log_error "Example: source /opt/ros/\$ROS_DISTRO/setup.bash"
-        exit 1
+        log_warning "ROS 2 environment not found. Attempting to source ROS 2..."
+        
+        # Try to find and source ROS 2 setup
+        if [[ -f "/opt/ros/jazzy/setup.bash" ]]; then
+            log_info "Sourcing ROS 2 Jazzy environment..."
+            source /opt/ros/jazzy/setup.bash
+        elif [[ -f "/opt/ros/humble/setup.bash" ]]; then
+            log_info "Sourcing ROS 2 Humble environment..."
+            source /opt/ros/humble/setup.bash
+        elif [[ -f "/opt/ros/iron/setup.bash" ]]; then
+            log_info "Sourcing ROS 2 Iron environment..."
+            source /opt/ros/iron/setup.bash
+        else
+            log_error "ROS 2 not found. Please install ROS 2 or source the setup.bash manually"
+            log_error "Example: source /opt/ros/\$ROS_DISTRO/setup.bash"
+            exit 1
+        fi
     fi
 
     log_info "ROS_DISTRO: $ROS_DISTRO"
+
+    # Check if colcon is available
+    if ! command -v colcon &> /dev/null; then
+        log_error "colcon not found. Please install colcon:"
+        log_error "  sudo apt install python3-colcon-common-extensions"
+        exit 1
+    fi
 
     local build_dir="ros2/build"
     clean_build_dir "$build_dir"
@@ -303,6 +340,9 @@ main() {
             ;;
         docker)
             build_docker
+            ;;
+        all)
+            build_all
             ;;
     esac
 
