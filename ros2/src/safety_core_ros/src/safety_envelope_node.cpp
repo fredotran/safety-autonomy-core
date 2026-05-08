@@ -51,23 +51,23 @@ namespace safety_core_ros
     void SafetyEnvelopeNode::load_config_from_params()
     {
         // Load envelope configuration
-        config_.envelope.max_speed_mps = ParamLoader::load_double(this, "envelope.max_speed_mps", 1.5);
-        config_.envelope.max_accel_mps2 = ParamLoader::load_double(this, "envelope.max_accel_mps2", 0.75);
-        config_.envelope.max_comfort_decel_mps2 = ParamLoader::load_double(this, "envelope.max_comfort_decel_mps2", 1.0);
-        config_.envelope.control_latency_s = ParamLoader::load_double(this, "envelope.control_latency_s", 0.04);
-        config_.envelope.safety_buffer_m = ParamLoader::load_double(this, "envelope.safety_buffer_m", 0.3);
+        config_.envelope.max_speed_mps           = ParamLoader::load_double(this, "envelope.max_speed_mps", 1.5);
+        config_.envelope.max_accel_mps2          = ParamLoader::load_double(this, "envelope.max_accel_mps2", 0.75);
+        config_.envelope.max_comfort_decel_mps2  = ParamLoader::load_double(this, "envelope.max_comfort_decel_mps2", 1.0);
+        config_.envelope.control_latency_s       = ParamLoader::load_double(this, "envelope.control_latency_s", 0.04);
+        config_.envelope.safety_buffer_m         = ParamLoader::load_double(this, "envelope.safety_buffer_m", 0.3);
 
         // Load footprint configuration
-        footprint_.length_m = ParamLoader::load_double(this, "footprint.length_m", 0.8);
-        footprint_.width_m = ParamLoader::load_double(this, "footprint.width_m", 0.6);
+        footprint_.length_m        = ParamLoader::load_double(this, "footprint.length_m", 0.8);
+        footprint_.width_m         = ParamLoader::load_double(this, "footprint.width_m", 0.6);
         footprint_.front_overhang_m = ParamLoader::load_double(this, "footprint.front_overhang_m", 0.1);
 
         // Load operational parameters
-        params_.corridor_half_width_m = ParamLoader::load_double(this, "corridor_half_width_m", 0.5);
-        params_.scan_min_valid_range_m = ParamLoader::load_double(this, "scan_min_valid_range_m", 0.05);
-        params_.scan_ignore_min_range_m = ParamLoader::load_double(this, "scan_ignore_min_range_m", 0.5);
-        params_.startup_grace_period_s = ParamLoader::load_double(this, "startup_grace_period_s", 2.0);
-        params_.base_frame = ParamLoader::load_string(this, "base_frame", "base_link");
+        params_.corridor_half_width_m    = ParamLoader::load_double(this, "corridor_half_width_m", 0.5);
+        params_.scan_min_valid_range_m  = ParamLoader::load_double(this, "scan_min_valid_range_m", 0.05);
+        params_.scan_ignore_min_range_m  = ParamLoader::load_double(this, "scan_ignore_min_range_m", 0.5);
+        params_.startup_grace_period_s  = ParamLoader::load_double(this, "startup_grace_period_s", 2.0);
+        params_.base_frame              = ParamLoader::load_string(this, "base_frame", "base_link");
     }
 
     void SafetyEnvelopeNode::on_odom(const nav_msgs::msg::Odometry::ConstSharedPtr msg)
@@ -164,21 +164,21 @@ namespace safety_core_ros
             // During grace period, assume clear zone to allow startup
             // After grace period, assume warning zone for safety
             safety_core_msgs::msg::EnvelopeStatus status;
-            status.header                      = header;
-            status.distance_to_obstacle_m      = -1.0;  // Invalid/unknown
-            status.current_speed_mps           = speed_mps;
-            status.within_envelope             = in_grace_period;
-            status.zone.zone                   = in_grace_period ? 
+            status.header                       = header;
+            status.distance_to_obstacle_m       = -1.0;  // Invalid/unknown
+            status.current_speed_mps            = speed_mps;
+            status.within_envelope              = in_grace_period;
+            status.zone.zone                    = in_grace_period ?
                 static_cast<std::uint8_t>(safety_core::safety::SafetyZone::Clear) :
                 static_cast<std::uint8_t>(safety_core::safety::SafetyZone::Warning);
-            status.stopping_distance_m         = config_.envelope.safety_buffer_m;
-            status.required_clearance_m        = config_.envelope.safety_buffer_m;
-            status.recommended_speed_limit_mps = in_grace_period ? 
-                config_.envelope.max_speed_mps : 
+            status.stopping_distance_m          = config_.envelope.safety_buffer_m;
+            status.required_clearance_m         = config_.envelope.safety_buffer_m;
+            status.recommended_speed_limit_mps  = in_grace_period ?
+                config_.envelope.max_speed_mps :
                 std::min(speed_mps, config_.envelope.max_speed_mps * 0.5);
-            status.footprint_length_m          = footprint_.length_m;
-            status.footprint_width_m           = footprint_.width_m;
-            status.footprint_front_overhang_m  = footprint_.front_overhang_m;
+            status.footprint_length_m           = footprint_.length_m;
+            status.footprint_width_m            = footprint_.width_m;
+            status.footprint_front_overhang_m   = footprint_.front_overhang_m;
 
             envelope_pub_->publish(std::move(status));
             return;
@@ -197,17 +197,17 @@ namespace safety_core_ros
 
         // Use move semantics to avoid copies
         safety_core_msgs::msg::EnvelopeStatus status;
-        status.header                      = header;
-        status.distance_to_obstacle_m      = MathUtils::is_finite(distance_m) ? distance_m : -1.0;
-        status.current_speed_mps           = speed_mps;
-        status.within_envelope             = modified_eval.within_envelope;
-        status.zone.zone                   = static_cast<std::uint8_t>(modified_eval.zone);
-        status.stopping_distance_m         = modified_eval.stopping_distance;
-        status.required_clearance_m        = modified_eval.required_clearance;
-        status.recommended_speed_limit_mps = modified_eval.recommended_speed_limit_mps;
-        status.footprint_length_m          = footprint_.length_m;
-        status.footprint_width_m           = footprint_.width_m;
-        status.footprint_front_overhang_m  = footprint_.front_overhang_m;
+        status.header                       = header;
+        status.distance_to_obstacle_m       = MathUtils::is_finite(distance_m) ? distance_m : -1.0;
+        status.current_speed_mps            = speed_mps;
+        status.within_envelope              = modified_eval.within_envelope;
+        status.zone.zone                    = static_cast<std::uint8_t>(modified_eval.zone);
+        status.stopping_distance_m          = modified_eval.stopping_distance;
+        status.required_clearance_m         = modified_eval.required_clearance;
+        status.recommended_speed_limit_mps  = modified_eval.recommended_speed_limit_mps;
+        status.footprint_length_m           = footprint_.length_m;
+        status.footprint_width_m            = footprint_.width_m;
+        status.footprint_front_overhang_m   = footprint_.front_overhang_m;
 
         envelope_pub_->publish(std::move(status));
 
