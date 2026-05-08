@@ -12,9 +12,9 @@ NC='\033[0m' # No Color
 
 echo -e "${GREEN}=== Safety Autonomy Core ROS 2 Demo Setup ===${NC}"
 
-# Check if we're in the correct directory
-if [ ! -f "setup_demo.sh" ]; then
-    echo -e "${RED}Error: Please run this script from the ros2/ directory${NC}"
+# Check if we're in the repository root
+if [ ! -d "ros2" ]; then
+    echo -e "${RED}Error: Please run this script from the repository root${NC}"
     exit 1
 fi
 
@@ -39,6 +39,7 @@ fi
 
 # Build the workspace
 echo -e "${GREEN}Building workspace...${NC}"
+cd ros2
 colcon build \
     --cmake-args -DSAFETY_CORE_ENABLE_AMENT=ON \
                  -DSAFETY_CORE_ENABLE_SANITIZERS=OFF \

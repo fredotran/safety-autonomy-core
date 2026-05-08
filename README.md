@@ -62,6 +62,9 @@ safety-autonomy-core/
 │   └── dev/run_quality_gate.sh
 ├── markdown/                  # Safety case artifacts and documentation
 │   └── docs/safety_case/      #   ISO 26262 / ISO 13849 evidence scaffolding
+├── ros2/                      # ROS 2 wrapper + AGV simulation
+│   └── src/                   #   ROS 2 packages (safety_core_msgs, safety_core_ros, etc.)
+├── setup_demo.sh              # ROS 2 demo build + launch script
 ├── CMakeLists.txt             # Build system
 ├── CMakePresets.json          # Dev/safety/coverage presets
 ├── .clang-format              # Code style
@@ -134,6 +137,10 @@ A complete ROS 2 Jazzy + Gazebo Harmonic + Nav2 wrapper with a self-contained in
 - Top-level launch files, Nav2 params, SLAM Toolbox config, RViz visualization
 
 ```bash
+# Quick setup (build + launch)
+./setup_demo.sh
+
+# Or manually
 cd ros2
 source /opt/ros/jazzy/setup.bash
 colcon build --packages-skip safety_core_nav2 \

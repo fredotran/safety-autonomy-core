@@ -88,7 +88,7 @@ ROS 2 Jazzy + Gazebo Harmonic + Nav2 integration for the [`safety_autonomy_core`
 ### Quick setup script
 
 ```bash
-cd safety-autonomy-core/ros2
+cd safety-autonomy-core
 ./setup_demo.sh
 ```
 
@@ -250,7 +250,6 @@ The boundary contract: ROS callbacks copy data into safety_core types, run noexc
 ```
 ros2/
 ├── README.md                           ← this file
-├── setup_demo.sh                       ← Quick build + launch script
 └── src/
     ├── safety_autonomy_core (symlink)
     ├── safety_core_msgs/
