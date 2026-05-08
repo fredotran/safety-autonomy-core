@@ -57,11 +57,12 @@ source install/setup.bash
 # Launch options
 echo ""
 echo -e "${GREEN}=== Launch Options ===${NC}"
-echo "1. Full demo (Gazebo + Safety Stack + Nav2 + SLAM + RViz)"
-echo "2. Safety stack only (Gazebo + Safety Nodes)"
-echo "3. Simulation only (Gazebo only)"
+echo "1. Full demo (Gazebo + Safety Stack + Nav2 + RViz) - Wheel Odometry Navigation"
+echo "2. Safety stack + Simulation (Gazebo + Safety Nodes + RViz)"
+echo "3. Safety stack only (no simulation, for physical robot)"
+echo "4. Simulation only (Gazebo only)"
 echo ""
-read -p "Select option [1-3]: " choice
+read -p "Select option [1-4]: " choice
 
 case $choice in
     1)
@@ -69,15 +70,19 @@ case $choice in
         ros2 launch safety_core_bringup agv_warehouse.launch.py
         ;;
     2)
+        echo -e "${GREEN}Launching safety stack with simulation...${NC}"
+        ros2 launch safety_core_bringup safety_sim.launch.py
+        ;;
+    3)
         echo -e "${GREEN}Launching safety stack only...${NC}"
         ros2 launch safety_core_bringup safety_only.launch.py
         ;;
-    3)
+    4)
         echo -e "${GREEN}Launching simulation only...${NC}"
         ros2 launch safety_core_sim sim_only.launch.py
         ;;
     *)
-        echo -e "${RED}Invalid option. Defaulting to safety stack only...${NC}"
-        ros2 launch safety_core_bringup safety_only.launch.py
+        echo -e "${RED}Invalid option. Defaulting to safety stack with simulation...${NC}"
+        ros2 launch safety_core_bringup safety_sim.launch.py
         ;;
 esac

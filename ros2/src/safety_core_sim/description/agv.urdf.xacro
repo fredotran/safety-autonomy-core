@@ -224,6 +224,28 @@
   </joint>
 
   <!-- ========================================================
+       GPS (antenna on top of robot for localization)
+  ======================================================== -->
+  <link name="gps_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.08 0.08 0.02"/></geometry>
+      <material name="gps_black"><color rgba="0.1 0.1 0.1 1.0"/></material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.08 0.08 0.02"/></geometry>
+    </collision>
+    <xacro:box_inertia m="0.1" x="0.08" y="0.08" z="0.02"/>
+  </link>
+
+  <joint name="gps_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="gps_link"/>
+    <origin xyz="${lidar_x_offset} 0.05 ${base_height + 0.25}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ========================================================
        Camera (forward-facing for visualization)
   ======================================================== -->
   <link name="camera_link">
@@ -384,6 +406,25 @@
       </camera>
       <always_on>1</always_on>
       <visualize>true</visualize>
+    </sensor>
+  </gazebo>
+
+  <!-- GPS sensor -->
+  <gazebo reference="gps_link">
+    <sensor name="gps" type="navsat">
+      <pose>0 0 0 0 0 0</pose>
+      <topic>/gps</topic>
+      <update_rate>10</update_rate>
+      <always_on>1</always_on>
+      <navsat>
+        <position_reference_frame_id>world</position_reference_frame_id>
+        <velocity_reference_frame_id>world</velocity_reference_frame_id>
+      </navsat>
+      <noise>
+        <type>gaussian</type>
+        <mean>0.0</mean>
+        <stddev>1.0</stddev>
+      </noise>
     </sensor>
   </gazebo>
 

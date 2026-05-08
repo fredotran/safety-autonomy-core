@@ -37,6 +37,43 @@ ctest --test-dir build --output-on-failure
 ./build/agv_safety_demo
 ```
 
+## Demo System
+
+The project includes a comprehensive ROS 2 demo system with Gazebo simulation for testing and demonstration:
+
+### Quick Demo Start
+
+```bash
+cd ros2
+./setup_demo.sh
+# Select option 1 (Full demo) or option 2 (Safety stack only)
+```
+
+### Demo Modes
+
+- **Quick Demo** (1-2 min): Fast validation of core safety features
+- **Comprehensive Demo** (5-7 min): Complete demonstration with all edge cases
+- **Interactive Demo**: Menu-driven on-demand scenario testing
+- **Performance Benchmark**: System performance measurement and analysis
+- **Before/After Comparison**: Safety system value demonstration
+- **Sensor Failure Simulation**: Realistic sensor failure testing
+
+### Demo Features
+
+- **Colored console output** for better visual feedback
+- **Real-time metrics display** showing zone transitions and mode changes
+- **Moving obstacles** (conveyor belt, forklift) for dynamic scenarios
+- **Realistic sensor failures** (noise, dropout, latency simulation)
+- **Interactive menu system** for on-demand testing
+
+### Documentation
+
+- [DEMO_GUIDE.md](DEMO_GUIDE.md) - Complete demo documentation, including detailed instructions for each demo mode, best practices, and advanced usage examples
+- [DEMO_TROUBLESHOOTING.md](DEMO_TROUBLESHOOTING.md) - Comprehensive troubleshooting guide for simulation, safety nodes, demo scripts, and performance issues
+- [ROS 2 README](ros2/README.md) - ROS 2 integration details and package documentation
+- [RVIZ_FIX_GUIDE.md](ros2/RVIZ_FIX_GUIDE.md) - Quick fix guide for RViz display issues
+- [WHEEL_ODOMETRY_NAVIGATION.md](ros2/WHEEL_ODOMETRY_NAVIGATION.md) - Configuration guide for wheel odometry-based navigation
+
 ## Repository Layout
 
 ```
