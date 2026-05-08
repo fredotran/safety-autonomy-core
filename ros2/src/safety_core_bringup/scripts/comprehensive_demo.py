@@ -24,11 +24,21 @@ from std_msgs.msg import Bool
 import time
 import math
 import threading
+import sys
+import os
+
+# Add demo utils to path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from demo_utils import DemoLogger, MetricsDisplay
 
 
 class ComprehensiveDemo(Node):
     def __init__(self):
         super().__init__('comprehensive_demo')
+        
+        # Initialize demo logger with colored output
+        self.demo_logger = DemoLogger(self.get_logger())
+        self.metrics_display = MetricsDisplay(self.demo_logger)
         
         # Publishers
         self.cmd_pub = self.create_publisher(Twist, '/cmd_vel_nav', 10)
@@ -52,13 +62,11 @@ class ComprehensiveDemo(Node):
         self.linear_speed = 0.8  # m/s
         self.angular_speed = 0.6  # rad/s
         
-        self.get_logger().info('=' * 60)
-        self.get_logger().info('COMPREHENSIVE SAFETY AUTONOMY CORE DEMO')
-        self.get_logger().info('=' * 60)
-        self.get_logger().info('')
+        self.demo_logger.section('COMPREHENSIVE SAFETY AUTONOMY CORE DEMO')
+        self.demo_logger.info('This demo showcases all safety features and edge cases', Color.CYAN)
         
         # Wait for safety system to initialize
-        self.get_logger().info('Waiting for safety system to initialize...')
+        self.demo_logger.info('Waiting for safety system to initialize...', Color.YELLOW)
         time.sleep(3)
         
         # Run the demo sequence
@@ -66,54 +74,61 @@ class ComprehensiveDemo(Node):
     
     def safety_state_callback(self, msg):
         """Track safety state changes."""
+        prev_mode = self.current_mode
+        prev_zone = self.current_zone
+        
         self.current_mode = msg.mode
         self.fault_latched = msg.fault_latched
         self.current_zone = msg.zone.zone
         
-        mode_names = {
-            0: 'Init',
-            1: 'Idle',
-            2: 'Moving',
-            3: 'Degraded',
-            4: 'AvoidingObstacle',
-            5: 'LocalizationLost',
-            6: 'Docking',
-            7: 'SafeStop'
-        }
+        # Track transitions
+        if prev_zone is not None and self.current_zone != prev_zone:
+            self.demo_logger.track_zone_transition(prev_zone, self.current_zone)
         
-        zone_names = {
-            0: 'Clear',
-            1: 'Warning',
-            2: 'Protective',
-            3: 'Emergency'
-        }
+        if prev_mode is not None and self.current_mode != prev_mode:
+            self.demo_logger.track_mode_transition(prev_mode, self.current_mode)
         
-        mode_name = mode_names.get(self.current_mode, f'Unknown({self.current_mode})')
-        zone_name = zone_names.get(self.current_zone, f'Unknown({self.current_zone})')
+        # Track fault and safe stop events
+        if self.fault_latched and (prev_mode is None or not self.fault_latched):
+            self.demo_logger.track_fault(True)
         
-        self.get_logger().info(f'[Safety State] Mode: {mode_name} | Zone: {zone_name} | Fault: {self.fault_latched}')
+        # Update metrics display
+        self.metrics_display.update(
+            self.current_zone,
+            self.current_mode,
+            self.fault_latched,
+            self.safe_stop_requested
+        )
     
     def envelope_status_callback(self, msg):
         """Track envelope status changes."""
         self.last_envelope_status = msg
         
-        zone_names = {
-            0: 'Clear',
-            1: 'Warning',
-            2: 'Protective',
-            3: 'Emergency'
-        }
-        
-        zone_name = zone_names.get(msg.zone.zone, f'Unknown({msg.zone.zone})')
-        
-        self.get_logger().info(f'[Envelope] Zone: {zone_name} | Distance: {msg.distance_to_obstacle_m:.2f}m | '
-                              f'Speed Limit: {msg.recommended_speed_limit_mps:.2f} m/s')
+        # Update metrics display with envelope data
+        self.metrics_display.update(
+            self.current_zone,
+            self.current_mode,
+            self.fault_latched,
+            self.safe_stop_requested,
+            distance=msg.distance_to_obstacle_m,
+            speed_limit=msg.recommended_speed_limit_mps
+        )
     
     def safe_stop_callback(self, msg):
         """Track safe stop requests."""
+        prev_safe_stop = self.safe_stop_requested
         self.safe_stop_requested = msg.data
-        if msg.data:
-            self.get_logger().warn('[Safe Stop] Emergency stop requested!')
+        
+        if msg.data and not prev_safe_stop:
+            self.demo_logger.track_safe_stop(True)
+        
+        # Update metrics display
+        self.metrics_display.update(
+            self.current_zone,
+            self.current_mode,
+            self.fault_latched,
+            self.safe_stop_requested
+        )
     
     def stop_robot(self):
         """Stop the robot."""
@@ -206,17 +221,12 @@ class ComprehensiveDemo(Node):
     
     def demo_section(self, title):
         """Print a demo section header."""
-        self.get_logger().info('')
-        self.get_logger().info('=' * 60)
-        self.get_logger().info(f'DEMO SECTION: {title}')
-        self.get_logger().info('=' * 60)
-        time.sleep(1)
+        self.demo_logger.section(title)
+        time.sleep(0.5)
     
     def demo_subsection(self, title):
         """Print a demo subsection header."""
-        self.get_logger().info('')
-        self.get_logger().info(f'>>> {title}')
-        self.get_logger().info('')
+        self.demo_logger.subsection(title)
     
     def run_demo_sequence(self):
         """Run the comprehensive demo sequence."""
@@ -637,35 +647,37 @@ class ComprehensiveDemo(Node):
         
         # Demo complete
         self.demo_section('DEMO COMPLETE')
-        self.get_logger().info('')
-        self.get_logger().info('Comprehensive Safety Autonomy Core Demo completed!')
-        self.get_logger().info('')
-        self.get_logger().info('Demonstrated capabilities:')
-        self.get_logger().info('✓ State machine transitions')
-        self.get_logger().info('✓ Safety envelope zone detection')
-        self.get_logger().info('✓ Speed limiting in Warning zone')
-        self.get_logger().info('✓ Mode transitions (Idle → Moving → AvoidingObstacle)')
-        self.get_logger().info('✓ Emergency zone detection')
-        self.get_logger().info('✓ Fault latching and recovery')
-        self.get_logger().info('✓ Jerk-limited emergency stop')
-        self.get_logger().info('✓ Command freshness watchdog')
-        self.get_logger().info('✓ Complex maneuver sequences')
-        self.get_logger().info('✓ Diagnostic event publishing')
-        self.get_logger().info('')
-        self.get_logger().info('Edge cases demonstrated:')
-        self.get_logger().info('✓ Sensor failure simulation')
-        self.get_logger().info('✓ Rapid zone transitions')
-        self.get_logger().info('✓ Boundary condition handling')
-        self.get_logger().info('✓ Dynamic obstacle scenarios')
-        self.get_logger().info('✓ Extreme value handling')
-        self.get_logger().info('✓ Conflicting condition resolution')
-        self.get_logger().info('✓ Recovery scenario testing')
-        self.get_logger().info('✓ Timing edge case handling')
-        self.get_logger().info('✓ System stress testing')
-        self.get_logger().info('')
-        self.get_logger().info('The safety_autonomy_core system successfully demonstrated')
-        self.get_logger().info('all key safety features, edge cases, and autonomous capabilities.')
-        self.get_logger().info('=' * 60)
+        
+        # Print metrics summary
+        self.demo_logger.print_metrics()
+        
+        self.demo_logger.info('', Color.GREEN)
+        self.demo_logger.success('Comprehensive Safety Autonomy Core Demo completed!')
+        self.demo_logger.info('', Color.GREEN)
+        self.demo_logger.info('Demonstrated capabilities:', Color.CYAN)
+        self.demo_logger.info('✓ State machine transitions')
+        self.demo_logger.info('✓ Safety envelope zone detection')
+        self.demo_logger.info('✓ Speed limiting in Warning zone')
+        self.demo_logger.info('✓ Mode transitions (Idle → Moving → AvoidingObstacle)')
+        self.demo_logger.info('✓ Emergency zone detection')
+        self.demo_logger.info('✓ Fault latching and recovery')
+        self.demo_logger.info('✓ Jerk-limited emergency stop')
+        self.demo_logger.info('✓ Command freshness watchdog')
+        self.demo_logger.info('✓ Complex maneuver sequences')
+        self.demo_logger.info('✓ Diagnostic event publishing')
+        self.demo_logger.info('', Color.CYAN)
+        self.demo_logger.info('Edge cases demonstrated:', Color.CYAN)
+        self.demo_logger.info('✓ Sensor failure simulation')
+        self.demo_logger.info('✓ Rapid zone transitions')
+        self.demo_logger.info('✓ Boundary condition handling')
+        self.demo_logger.info('✓ Dynamic obstacle scenarios')
+        self.demo_logger.info('✓ Extreme value handling')
+        self.demo_logger.info('✓ Conflicting condition resolution')
+        self.demo_logger.info('✓ Recovery scenario testing')
+        self.demo_logger.info('✓ Timing edge case handling')
+        self.demo_logger.info('✓ System stress testing')
+        self.demo_logger.info('', Color.CYAN)
+        self.demo_logger.success('The safety_autonomy_core system successfully demonstrated all key safety features, edge cases, and autonomous capabilities.')
 
 
 def main():

@@ -266,5 +266,104 @@
       </link>
     </model>
 
+    <!-- ===========================================================
+         MOVING CONVEYOR BELT (dynamic obstacle)
+         Moves back and forth along the warehouse aisle
+    =========================================================== -->
+    <model name="conveyor_belt">
+      <pose>0 2 0.5 0 0 0</pose>
+      <static>false</static>
+      <link name="link">
+        <inertial><mass>50</mass></inertial>
+        <collision name="c"><geometry><box><size>3 0.5 0.2</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>3 0.5 0.2</size></box></geometry>
+          <material><ambient>0.3 0.3 0.3 1</ambient><diffuse>0.4 0.4 0.4 1</diffuse></material>
+        </visual>
+      </link>
+      <!-- Animation for back-and-forth movement -->
+      <plugin filename="gz-sim-animation-system" name="animation">
+        <animation name="conveyor_move">
+          <script>
+            <loop>true</loop>
+            <delay><float>0.0</float></delay>
+            <translation>
+              <xyz>0 3 0</xyz>
+              <duration>5.0</duration>
+            </translation>
+            <translation>
+              <xyz>0 -3 0</xyz>
+              <duration>5.0</duration>
+            </translation>
+          </script>
+        </animation>
+      </plugin>
+    </model>
+
+    <!-- ===========================================================
+         MOVING FORKLIFT (dynamic obstacle)
+         Moves in a pattern through the warehouse
+    =========================================================== -->
+    <model name="moving_forklift">
+      <pose>-8 5 0.6 0 0 0</pose>
+      <static>false</static>
+      <link name="link">
+        <inertial><mass>200</mass></inertial>
+        <collision name="c"><geometry><box><size>2.0 1.0 1.2</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>2.0 1.0 1.2</size></box></geometry>
+          <material><ambient>0.95 0.55 0.05 1</ambient><diffuse>1.0 0.65 0.10 1</diffuse></material>
+        </visual>
+      </link>
+      <!-- Animation for forklift movement pattern -->
+      <plugin filename="gz-sim-animation-system" name="animation">
+        <animation name="forklift_patrol">
+          <script>
+            <loop>true</loop>
+            <delay><float>0.0</float></delay>
+            <!-- Move along one aisle -->
+            <translation>
+              <xyz>16 0 0</xyz>
+              <duration>8.0</duration>
+            </translation>
+            <!-- Rotate and move back -->
+            <pose>
+              <xyz>0 0 0</xyz>
+              <rpy>0 0 3.14159</rpy>
+              <duration>1.0</duration>
+            </pose>
+            <translation>
+              <xyz>-16 0 0</xyz>
+              <duration>8.0</duration>
+            </translation>
+            <!-- Rotate and move to other aisle -->
+            <pose>
+              <xyz>0 0 0</xyz>
+              <rpy>0 0 1.5708</rpy>
+              <duration>1.0</duration>
+            </pose>
+            <translation>
+              <xyz>0 -10 0</xyz>
+              <duration>6.0</duration>
+            </translation>
+            <!-- Return to start -->
+            <translation>
+              <xyz>0 10 0</xyz>
+              <duration>6.0</duration>
+            </translation>
+            <pose>
+              <xyz>0 0 0</xyz>
+              <rpy>0 0 -1.5708</rpy>
+              <duration>1.0</duration>
+            </pose>
+          </script>
+        </animation>
+      </plugin>
+    </model>
+
+    <!-- ===========================================================
+         AGV ROBOT (spawned by launch file, not included here)
+    =========================================================== -->
+
   </world>
 </sdf>

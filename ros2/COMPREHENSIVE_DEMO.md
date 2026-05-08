@@ -31,6 +31,80 @@ The comprehensive demo demonstrates:
 18. **Timing Scenarios** - Fast obstacle approach and slow creep detection
 19. **System Stress** - Rapid mode transitions and stability testing
 
+## Available Demo Modes
+
+### 1. Quick Demo (NEW)
+A fast-paced 1-2 minute demo covering core safety features:
+- Initial state and normal operation
+- Speed limiting in Warning zone
+- Protective zone and obstacle avoidance
+- Emergency zone and emergency stop
+- Fault recovery
+
+**Run with:**
+```bash
+python3 ros2/src/safety_core_bringup/scripts/quick_demo.py
+```
+
+### 2. Comprehensive Demo (Enhanced)
+The full 5-7 minute demo with all features and edge cases, now with:
+- **Colored console output** for better visual feedback
+- **Real-time metrics display** showing zone transitions, mode changes, and events
+- **Performance statistics** at the end of the demo
+
+**Run with:**
+```bash
+python3 ros2/src/safety_core_bringup/scripts/comprehensive_demo.py
+```
+
+### 3. Interactive Demo (NEW)
+Menu-driven demo for on-demand scenario testing:
+- Select specific safety scenarios to test
+- Trigger individual features on demand
+- Real-time state monitoring
+- Perfect for debugging and feature validation
+
+**Run with:**
+```bash
+python3 ros2/src/safety_core_bringup/scripts/interactive_demo.py
+```
+
+### 4. Performance Benchmark (NEW)
+Measures and reports performance characteristics:
+- Message latency (safety state, envelope status, scan)
+- Processing throughput
+- CPU and memory usage
+- Performance assessment and recommendations
+
+**Run with:**
+```bash
+python3 ros2/src/safety_core_bringup/scripts/performance_benchmark.py
+```
+
+### 5. Before/After Comparison (NEW)
+Demonstrates the value of the safety system:
+- **With safety**: Robot stops before collision
+- **Without safety**: Robot continues (collision risk)
+- Shows the importance of safety envelope protection
+
+**Run with:**
+```bash
+python3 ros2/src/safety_core_bringup/scripts/before_after_comparison.py
+```
+
+### 6. Sensor Failure Simulation (NEW)
+Realistic sensor failure simulation for testing:
+- Noise injection (Gaussian noise on readings)
+- Partial dropout (random missing readings)
+- Latency injection (delayed readings)
+- Complete failure (stop publishing)
+- Interactive mode for dynamic failure testing
+
+**Run with:**
+```bash
+python3 ros2/src/safety_core_bringup/scripts/sensor_failure_sim.py --interactive
+```
+
 ## Running the Demo
 
 ### Quick Start
@@ -208,7 +282,7 @@ The Gazebo window shows:
 - Industrial warehouse with shelves, pallets, forklift
 - AGV robot moving through the environment
 - Realistic physics and sensor simulation
-- Animated worker in the environment
+- **NEW: Moving obstacles** (conveyor belt and forklift) for dynamic scenarios
 
 ## Customizing the Demo
 
@@ -331,3 +405,32 @@ For issues or questions about the comprehensive demo:
 - Review the safety state and envelope status topics
 - Consult the main README for troubleshooting
 - Check the PATH_FOLLOWING.md for manual control options
+
+## New Features Summary
+
+The demo has been significantly enhanced with the following new capabilities:
+
+### Enhanced User Experience
+- **Colored console output** for better visual feedback
+- **Real-time metrics display** showing current system state
+- **Performance statistics** with detailed analysis
+- **Interactive menu system** for on-demand testing
+
+### New Demo Modes
+- **Quick Demo** (1-2 minutes) for rapid validation
+- **Interactive Demo** for scenario testing
+- **Performance Benchmark** for performance analysis
+- **Before/After Comparison** to demonstrate safety value
+- **Sensor Failure Simulation** for realistic testing
+
+### Enhanced Simulation Environment
+- **Moving obstacles** (conveyor belt and forklift)
+- Dynamic environment for more realistic testing
+- Improved obstacle scenarios
+
+### Realistic Testing
+- **Sensor failure simulation** with multiple failure modes
+- Noise injection, partial dropout, latency simulation
+- Complete failure scenarios
+
+These enhancements make the demo more engaging, informative, and suitable for both validation and demonstration purposes.
