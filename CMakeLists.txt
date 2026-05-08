@@ -19,6 +19,18 @@ if(SAFETY_CORE_ENABLE_AMENT)
     find_package(ament_cmake REQUIRED)
 endif()
 
+# Find Eigen3
+find_package(Eigen3 QUIET)
+
+# Always set Eigen3 include directories (CMake package might not set them properly)
+set(EIGEN3_INCLUDE_DIR "/usr/include/eigen3" CACHE PATH "Eigen3 include directory")
+if(EXISTS ${EIGEN3_INCLUDE_DIR})
+    set(Eigen3_INCLUDE_DIRS ${EIGEN3_INCLUDE_DIR})
+    message(STATUS "Using Eigen3 include path: ${EIGEN3_INCLUDE_DIR}")
+else()
+    message(FATAL_ERROR "Eigen3 not found at ${EIGEN3_INCLUDE_DIR}. Please install Eigen3.")
+endif()
+
 add_library(safety_core STATIC
     src/result.cpp
     src/common/time.cpp
@@ -44,6 +56,7 @@ target_include_directories(safety_core
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
+        ${Eigen3_INCLUDE_DIRS}
 )
 
 add_executable(safety_core_app
