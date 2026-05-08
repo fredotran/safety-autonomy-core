@@ -1,5 +1,8 @@
 # Safety Autonomy Core
 
+[![CI](https://github.com/fredotran/safety-autonomy-core/actions/workflows/ci.yml/badge.svg)](https://github.com/fredotran/safety-autonomy-core/actions/workflows/ci.yml)
+[![Release](https://github.com/fredotran/safety-autonomy-core/actions/workflows/release.yml/badge.svg)](https://github.com/fredotran/safety-autonomy-core/actions/workflows/release.yml)
+
 High-assurance C++20 library for safety-critical robotics and autonomous vehicles. Provides deterministic state machines, bounded executors, sensor fusion filters, motion primitives, and multi-zone safety envelopes with MISRA/AUTOSAR-inspired coding rules.
 
 Designed for AGV/AMR platforms operating in dynamic warehouses (pedestrians, forklifts, pop-up obstacles, temporary localization loss).
@@ -112,7 +115,8 @@ safety-autonomy-core/
 ├── CMakePresets.json          # Dev/safety/coverage presets
 ├── .clang-format              # Code style
 ├── .clang-tidy                # Static analysis rules
-├── .gitlab-ci.yml             # CI pipeline
+├── .github/workflows/         # GitHub Actions CI + release-please pipeline
+├── .gitlab-ci.yml             # Legacy GitLab CI pipeline (kept for parity)
 └── package.xml                # ROS 2 ament package manifest
 ```
 
@@ -309,16 +313,31 @@ Controls:
 
 ## CI Pipeline
 
+GitHub Actions workflows live under [`.github/workflows/`](.github/workflows/):
+
 | Stage | Job | Description |
 |-------|-----|-------------|
 | Lint | `format_check` | clang-format guard |
-| Lint | `clang_tidy` | Static analysis |
+| Lint | `clang_tidy` | Static analysis (currently `continue-on-error` while pre-existing findings are cleaned up) |
 | Lint | `hook_smoke` | Pre-commit hook validation |
 | Policy | `policy_guard` | Banned API checks (exceptions, dynamic alloc, abort) |
 | Policy | `safety_case_guard` | Safety artifact presence verification |
 | Build | `build_and_test` | CMake build + ctest (sanitizers enabled) |
 | Coverage | `coverage` | gcovr gate (line: 80%, branch: 55%) |
-| Security | SAST + Secret Detection | GitLab templates |
+| ROS 2 | `ros2_build` | `colcon build` of all ROS 2 packages (skips `safety_core_nav2`) |
+| ROS 2 | `ros2_lint` | `ament_lint_cmake`, `ament_copyright`, `ament_flake8`, `ament_pep257` |
+| ROS 2 | `ros2_test` | `colcon test --packages-select safety_core_ros` |
+
+## Release Process
+
+Releases are automated via **[release-please](https://github.com/googleapis/release-please-action)**. The workflow lives in [`.github/workflows/release.yml`](.github/workflows/release.yml).
+
+Flow:
+1. Land [Conventional Commits](https://www.conventionalcommits.org/) on `main` (`feat:`, `fix:`, `feat!:` for breaking changes, etc.).
+2. release-please opens / updates a release PR on `main` that bumps the version (CMake `project(... VERSION ...)` + every `package.xml`) and updates `CHANGELOG.md`.
+3. Merging the release PR creates an annotated git tag (e.g. `v0.2.0`) **and** a GitHub Release with the changelog notes.
+
+Config: [`.release-please-config.json`](.release-please-config.json) and [`.release-please-manifest.json`](.release-please-manifest.json).
 
 ## Coding Standards
 
