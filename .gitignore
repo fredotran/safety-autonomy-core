@@ -3,7 +3,6 @@ build-coverage/
 install/
 log/
 .vscode/
-.devin/
 
 # Coverage artifacts
 *.gcov
