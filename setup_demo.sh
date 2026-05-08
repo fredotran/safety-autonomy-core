@@ -92,9 +92,10 @@ if [ "$USE_DOCKER" = true ]; then
     echo "2. Safety stack + Simulation (Gazebo + Safety Nodes + RViz)"
     echo "3. Safety stack only (no simulation, for physical robot)"
     echo "4. Simulation only (Gazebo only)"
-    echo "5. Interactive bash shell in container"
+    echo "5. Diagnostic mode (Sim + Safety + Teleop) - For debugging movement issues"
+    echo "6. Interactive bash shell in container"
     echo ""
-    read -p "Select option [1-5]: " choice
+    read -p "Select option [1-6]: " choice
     
     # Launch the appropriate demo in Docker
     case $choice in
@@ -119,6 +120,11 @@ if [ "$USE_DOCKER" = true ]; then
                 bash -c "source install/setup.bash && ros2 launch safety_core_sim sim_only.launch.py"
             ;;
         5)
+            echo -e "${GREEN}Launching diagnostic mode in Docker...${NC}"
+            $DOCKER_COMPOSE run --rm safety-autonomy-demo \
+                bash -c "source install/setup.bash && ros2 launch safety_core_bringup diagnostics.launch.py"
+            ;;
+        6)
             echo -e "${GREEN}Launching interactive bash shell in Docker...${NC}"
             $DOCKER_COMPOSE run --rm safety-autonomy-demo
             ;;
@@ -182,8 +188,9 @@ echo "1. Full demo (Gazebo + Safety Stack + Nav2 + RViz) - Wheel Odometry Naviga
 echo "2. Safety stack + Simulation (Gazebo + Safety Nodes + RViz)"
 echo "3. Safety stack only (no simulation, for physical robot)"
 echo "4. Simulation only (Gazebo only)"
+echo "5. Diagnostic mode (Sim + Safety + Teleop) - For debugging movement issues"
 echo ""
-read -p "Select option [1-4]: " choice
+read -p "Select option [1-5]: " choice
 
 case $choice in
     1)
@@ -200,7 +207,11 @@ case $choice in
         ;;
     4)
         echo -e "${GREEN}Launching simulation only...${NC}"
-        ros2 launch safety_core_sim sim_only.launch.py
+        ros2 launch safety_core_bringup sim_only.launch.py
+        ;;
+    5)
+        echo -e "${GREEN}Launching diagnostic mode...${NC}"
+        ros2 launch safety_core_bringup diagnostics.launch.py
         ;;
     *)
         echo -e "${RED}Invalid option. Defaulting to safety stack with simulation...${NC}"

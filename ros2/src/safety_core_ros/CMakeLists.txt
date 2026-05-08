@@ -123,6 +123,15 @@ ament_target_dependencies(safety_drive_bridge_node
   rclcpp std_msgs geometry_msgs nav_msgs safety_core_msgs)
 
 # ----------------------------------------------------------------------------
+# Node 4: teleop_node (keyboard teleoperation for testing)
+# ----------------------------------------------------------------------------
+add_executable(teleop_node
+  src/teleop_node.cpp)
+target_include_directories(teleop_node PRIVATE include)
+ament_target_dependencies(teleop_node
+  rclcpp geometry_msgs std_msgs)
+
+# ----------------------------------------------------------------------------
 # Install
 # ----------------------------------------------------------------------------
 install(TARGETS
@@ -137,6 +146,7 @@ install(TARGETS
     safety_envelope_node
     safety_supervisor_node
     safety_drive_bridge_node
+    teleop_node
   RUNTIME DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY include/
