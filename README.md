@@ -22,11 +22,34 @@ Designed for AGV/AMR platforms operating in dynamic warehouses (pedestrians, for
 
 ## Requirements
 
+### For Library Development
 - CMake 3.20+
 - C++20 compiler (GCC 12+ or Clang 15+)
 - Optional: ROS 2 Humble/Iron (for ament integration)
 
+### For Docker Demo (Recommended)
+- Docker Engine 20.10+
+- Docker Compose 2.0+
+- For GPU support: NVIDIA Docker runtime (nvidia-docker2)
+- For display forwarding: X11 server (Linux/Mac) or XQuartz (Mac)
+
 ## Quick Start
+
+### Docker Demo (Recommended - No ROS2 Installation Required)
+
+The fastest way to see the safety system in action:
+
+```bash
+# Run the interactive demo launcher
+./setup_demo.sh
+# Select demo option from the menu
+```
+
+This uses Docker to run the complete ROS2 Jazzy + Gazebo simulation without requiring any local ROS2 installation. See [DOCKER.md](DOCKER.md) for complete Docker setup guide.
+
+### Library Development
+
+For library development and testing:
 
 ```bash
 # Configure and build
@@ -36,7 +59,7 @@ cmake --build build
 # Run tests
 ctest --test-dir build --output-on-failure
 
-# Run AGV safety demo
+# Run AGV safety demo (requires local ROS2)
 ./build/agv_safety_demo
 ```
 
@@ -46,21 +69,50 @@ The project includes a comprehensive ROS 2 demo system with Gazebo simulation fo
 
 ### Quick Demo Start
 
-**Default: Docker (recommended, no ROS2 installation required)**
+**🐳 Docker (Recommended - No ROS2 Installation Required)**
+
+Docker is the default and recommended way to run the demo. It provides a complete, isolated environment with ROS2 Jazzy, Gazebo Harmonic, Nav2, and all dependencies pre-configured.
 
 ```bash
 ./setup_demo.sh
-# Select demo option from the menu
+# Select demo option from the interactive menu
 ```
 
-**Alternative: Local ROS2 installation**
+**Docker Benefits:**
+- ✅ No local ROS2 installation required
+- ✅ Consistent environment across all platforms
+- ✅ GPU support for Gazebo rendering
+- ✅ Display forwarding for RViz visualization
+- ✅ Easy setup with single command
+- ✅ Isolated from system dependencies
+
+**Docker Requirements:**
+- Docker Engine 20.10+
+- Docker Compose 2.0+
+- NVIDIA Docker runtime (for GPU support)
+- X11 server (for display forwarding)
+
+See [DOCKER.md](DOCKER.md) for complete Docker deployment guide, including:
+- GPU setup and configuration
+- Display forwarding for Linux/Mac/Windows
+- Hardware integration (sensors, actuators)
+- Performance optimization
+- Troubleshooting common issues
+
+**💻 Local ROS2 Installation**
+
+For developers with local ROS2 Jazzy installation:
 
 ```bash
 ./setup_demo.sh --local
 # Select option 1 (Full demo) or option 2 (Safety stack only)
 ```
 
-See [DOCKER.md](DOCKER.md) for complete Docker deployment guide, including GPU support, display forwarding, and hardware integration.
+**Local Requirements:**
+- ROS 2 Jazzy installed
+- Gazebo Harmonic
+- Nav2 navigation stack
+- All ROS2 dependencies installed via rosdep
 
 ### Demo Modes
 
@@ -117,7 +169,13 @@ safety-autonomy-core/
 │       └── safety_case/       #   ISO 26262 / ISO 13849 evidence scaffolding
 ├── ros2/                      # ROS 2 wrapper + AGV simulation
 │   └── src/                   #   ROS 2 packages (safety_core_msgs, safety_core_ros, etc.)
-├── setup_demo.sh              # ROS 2 demo build + launch script
+├── Dockerfile                 # Multi-stage Docker build for ROS2 demo
+├── docker-compose.yml         # Docker orchestration with GPU/display support
+├── .dockerignore              # Docker build context optimization
+├── .env.example               # Environment variable template for Docker
+├── Makefile                   # Docker convenience commands
+├── DOCKER.md                  # Complete Docker deployment guide
+├── setup_demo.sh              # ROS 2 demo build + launch script (Docker-first)
 ├── README.md                  # Project documentation
 ├── CHANGELOG.md               # Version history
 ├── CONTRIBUTING.md            # Contribution guidelines
@@ -194,14 +252,14 @@ A complete ROS 2 Jazzy + Gazebo Harmonic + Nav2 wrapper with a self-contained in
 - AGV URDF + warehouse SDF + `ros_gz_bridge` config
 - Top-level launch files, Nav2 params, SLAM Toolbox config, RViz visualization
 
+**🐳 Quick Start with Docker (Recommended):**
 ```bash
-# Quick setup (build + launch)
 ./setup_demo.sh
+# Select comprehensive demo from the menu
+```
 
-# Comprehensive demo (showcases all safety capabilities)
-ros2 launch safety_core_bringup comprehensive_demo.launch.py
-
-# Or manually
+**💻 Manual Local Setup:**
+```bash
 cd ros2
 source /opt/ros/jazzy/setup.bash
 colcon build --packages-skip safety_core_nav2 \
@@ -210,6 +268,11 @@ colcon build --packages-skip safety_core_nav2 \
                  -DSAFETY_CORE_ENABLE_WERROR=OFF
 source install/setup.bash
 ros2 launch safety_core_bringup agv_warehouse.launch.py
+```
+
+**Comprehensive demo (showcases all safety capabilities):**
+```bash
+ros2 launch safety_core_bringup comprehensive_demo.launch.py
 ```
 
 See [`ros2/README.md`](ros2/README.md) for full architecture, topic map, parameter list, and run instructions.
