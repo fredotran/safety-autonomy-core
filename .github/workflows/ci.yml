@@ -203,13 +203,17 @@ jobs:
             build-coverage/coverage.xml
 
   docker_build:
-    name: docker_build (ROS 2 via Docker Compose)
+    name: docker_build (ROS 2 via Docker Compose with BuildKit)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            image=ghcr.io/docker/buildx-buildkit:latest
+            network=host
       - name: Cache Docker layers
         uses: actions/cache@v4
         with:
@@ -217,8 +221,9 @@ jobs:
           key: ${{ runner.os }}-buildx-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-buildx-
-      - name: Build Docker image with BuildKit
+      - name: Build Docker image with BuildKit and ROS2 workspace
         run: |
+          echo "Building Docker image with ROS2 workspace using BuildKit..."
           docker buildx build \
             --file Dockerfile \
             --target development \
@@ -226,8 +231,23 @@ jobs:
             --cache-from type=local,src=/tmp/.buildx-cache \
             --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
             --load \
+            --progress=plain \
             .
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache || true
+          echo "✓ Docker image built successfully with ROS2 workspace"
+      - name: Verify ROS2 packages in built image
+        run: |
+          echo "Verifying ROS2 packages in built image..."
+          docker compose run --rm safety-autonomy-demo bash -c "
+            source /opt/ros/jazzy/setup.bash &&
+            source /workspace/ros2_ws/install/setup.bash &&
+            echo '=== ROS2 Packages ===' &&
+            colcon list &&
+            echo '' &&
+            echo '=== Package Count ===' &&
+            colcon list | wc -l &&
+            echo 'ROS2 packages built and verified successfully'
+          "
       - name: Save Docker image
         run: docker save safety-autonomy-core:latest | gzip > docker-image.tar.gz
       - name: Upload Docker image artifact
@@ -236,14 +256,6 @@ jobs:
           name: docker-image
           path: docker-image.tar.gz
           retention-days: 1
-      - name: Verify ROS 2 build
-        run: |
-          docker compose run --rm safety-autonomy-demo bash -c "
-            source /opt/ros/jazzy/setup.bash &&
-            source /workspace/ros2_ws/install/setup.bash &&
-            colcon list &&
-            echo 'ROS 2 packages built successfully'
-          "
 
   demo_tests:
     name: demo_tests (comprehensive Docker demo validation)
