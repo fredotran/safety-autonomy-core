@@ -217,9 +217,16 @@ jobs:
           key: ${{ runner.os }}-buildx-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-buildx-
-      - name: Build Docker image with BuildKit caching
+      - name: Build Docker image with BuildKit
         run: |
-          docker compose build --build-arg BUILDKIT_INLINE_CACHE=1 --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max
+          docker buildx build \
+            --file Dockerfile \
+            --target development \
+            --tag safety-autonomy-core:latest \
+            --cache-from type=local,src=/tmp/.buildx-cache \
+            --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
+            --load \
+            .
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache || true
       - name: Save Docker image
         run: docker save safety-autonomy-core:latest | gzip > docker-image.tar.gz
