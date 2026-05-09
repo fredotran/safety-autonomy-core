@@ -78,3 +78,78 @@ If a package fails to build in the container:
    docker exec safety-autonomy-demo bash -c "cd /workspace/ros2_ws && source /opt/ros/jazzy/setup.bash && colcon build --packages-select safety_autonomy_core"
    ```
    Then rebuild the package that depends on it.
+
+## Agent Parallelization Guidelines
+
+### When to Use Parallel Subagents
+
+Use the `run_subagent` tool to parallelize work when:
+
+1. **Independent file operations**: Multiple files can be read/edited simultaneously without conflicts
+2. **Exploratory searches**: Different parts of the codebase can be explored in parallel
+3. **Multi-step independent tasks**: Tasks that don't depend on each other can run concurrently
+4. **Cross-cutting concerns**: Different aspects of a problem can be investigated simultaneously
+
+### Parallelization Strategy
+
+For this repository, effective parallelization patterns include:
+
+**Codebase Exploration:**
+- Launch multiple subagents to explore different directories (src/, include/, ros2/, tests/)
+- Parallelize dependency tracing across multiple packages
+- Concurrent search for different patterns or functions
+
+**Testing and Validation:**
+- Run different test suites in parallel when possible
+- Validate multiple launch files concurrently
+- Parallelize integration tests across different scenarios
+
+**Build and CI:**
+- Investigate build failures in parallel across different packages
+- Analyze CI logs from different jobs simultaneously
+- Parallelize Docker image testing across different configurations
+
+### Example Parallelization
+
+```bash
+# Explore multiple package structures in parallel
+run_subagent "Explore safety_core_ros package structure" "subagent_explore"
+run_subagent "Explore safety_core_bringup package structure" "subagent_explore"
+run_subagent "Explore test structure and coverage" "subagent_explore"
+
+# Analyze different aspects of a problem in parallel
+run_subagent "Search for memory allocation patterns" "subagent_general"
+run_subagent "Search for thread safety issues" "subagent_general"
+run_subagent "Search for error handling patterns" "subagent_general"
+```
+
+### Parallelization Constraints
+
+**Do NOT parallelize when:**
+- Tasks have dependencies on each other's results
+- File modifications would conflict (same files being edited)
+- Resources are limited (Docker container, build artifacts)
+- Sequential execution is required for correctness
+
+**Safe parallelization:**
+- Read-only operations across different files
+- Independent writes to different files
+- Separate Docker containers or environments
+- Non-overlapping resource usage
+
+### Repository-Specific Parallelization
+
+**Docker Operations:**
+- Only one Docker container operation at a time (safety-autonomy-demo)
+- Parallelize Docker image building across different stages if using BuildKit
+- CI jobs can run in parallel (as implemented in Phase 1 optimizations)
+
+**ROS 2 Operations:**
+- Multiple ROS 2 nodes can be investigated in parallel
+- Different launch files can be validated concurrently
+- Topic and service analysis can be parallelized
+
+**Build Operations:**
+- Package builds are generally sequential due to dependencies
+- Build analysis can be parallelized across different packages
+- Test execution can be parallelized when tests are independent
