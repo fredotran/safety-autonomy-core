@@ -41,11 +41,6 @@ RUN pip3 install --break-system-packages --no-cache-dir \
     pytest-cov \
     vcstool
 
-# Install Xvfb for headless GUI testing in CI
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    xvfb \
-    && rm -rf /var/lib/apt/lists/*
-
 # Stage 2: Development stage with workspace setup and build
 FROM base AS development
 
