@@ -213,7 +213,7 @@ validate_quick_demo() {
     
     # Run quick demo with timeout and capture output
     echo -e "${YELLOW}Starting quick demo...${NC}"
-    timeout 90s python3 /workspace/ros2_ws/src/safety_core_bringup/scripts/quick_demo.py > /tmp/quick_demo.log 2>&1
+    timeout 120s python3 /workspace/ros2_ws/src/safety_core_bringup/scripts/quick_demo.py > /tmp/quick_demo.log 2>&1
     local demo_exit_code=$?
     
     # Stop safety stack

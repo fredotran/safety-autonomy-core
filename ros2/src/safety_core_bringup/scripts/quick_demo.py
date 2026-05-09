@@ -44,6 +44,8 @@ class QuickDemo(Node):
         self.fault_latched = False
         self.safe_stop_requested = False
         self.last_envelope_status = None
+        self.demo_started = False
+        self.demo_completed = False
         
         # Demo parameters (faster for quick demo)
         self.linear_speed = 1.0  # m/s
@@ -54,17 +56,17 @@ class QuickDemo(Node):
         self.last_zone = None
         self.start_time = time.time()
         
+        # Demo sequence state
+        self.demo_step = 0
+        self.demo_timer = self.create_timer(0.1, self.demo_timer_callback)
+        
         self.get_logger().info('=' * 60)
         self.get_logger().info('QUICK SAFETY AUTONOMY CORE DEMO')
         self.get_logger().info('=' * 60)
         self.get_logger().info('')
         
-        # Wait for safety system to initialize
-        self.get_logger().info('Waiting for safety system to initialize...')
-        time.sleep(2)
-        
-        # Run the quick demo sequence
-        self.run_demo_sequence()
+        # Wait for safety system to initialize, then start demo
+        self.init_timer = self.create_timer(3.0, self.start_demo_sequence)
     
     def safety_state_callback(self, msg):
         """Track safety state changes."""
@@ -127,97 +129,134 @@ class QuickDemo(Node):
         if msg.data:
             self.get_logger().warn('[SafeStop] REQUESTED')
     
-    def publish_velocity(self, linear_x, angular_z, duration):
-        """Publish velocity command for a specified duration."""
-        cmd = Twist()
-        cmd.linear.x = linear_x
-        cmd.angular.z = angular_z
+    def start_demo_sequence(self):
+        """Start the demo sequence after initialization."""
+        self.init_timer.cancel()
+        self.demo_started = True
+        self.get_logger().info('Starting demo sequence...')
+    
+    def demo_timer_callback(self):
+        """Timer-based demo execution to allow ROS2 callbacks to process."""
+        if not self.demo_started or self.demo_completed:
+            return
         
-        start_time = time.time()
-        while time.time() - start_time < duration:
-            self.cmd_pub.publish(cmd)
-            time.sleep(0.05)
+        # Execute demo steps based on current step
+        if self.demo_step == 0:
+            self.step_initial_state()
+        elif self.demo_step == 1:
+            self.step_normal_operation()
+        elif self.demo_step == 2:
+            self.step_warning_zone()
+        elif self.demo_step == 3:
+            self.step_protective_zone()
+        elif self.demo_step == 4:
+            self.step_emergency_zone()
+        elif self.demo_step == 5:
+            self.step_fault_recovery()
+        elif self.demo_step == 6:
+            self.step_summary()
+        elif self.demo_step == 7:
+            self.demo_completed = True
+            self.get_logger().info('Demo completed, shutting down...')
+            self.destroy_node()
+            rclpy.shutdown()
     
-    def stop_robot(self):
-        """Stop the robot."""
-        self.publish_velocity(0.0, 0.0, 0.5)
-    
-    def print_section(self, title):
-        """Print a section header."""
-        self.get_logger().info('')
-        self.get_logger().info('=' * 60)
-        self.get_logger().info(f'  {title}')
-        self.get_logger().info('=' * 60)
-    
-    def run_demo_sequence(self):
-        """Run the quick demo sequence."""
-        
-        # Section 1: Initial State and Normal Operation
+    def step_initial_state(self):
+        """Step 0: Initial state verification."""
         self.print_section('Section 1: Initial State and Normal Operation')
         self.get_logger().info('Verifying initial safety state...')
-        time.sleep(1)
-        self.get_logger().info(f'Initial Mode: {self.current_mode} (should be Idle)')
-        self.get_logger().info(f'Initial Zone: {self.current_zone} (should be Clear)')
-        self.get_logger().info(f'Fault Latched: {self.fault_latched} (should be False)')
         
+        if self.current_mode is not None:
+            mode_names = {0: 'Init', 1: 'Idle', 2: 'Moving', 3: 'Degraded', 4: 'AvoidingObstacle', 
+                        5: 'LocalizationLost', 6: 'Docking', 7: 'SafeStop'}
+            mode_name = mode_names.get(self.current_mode, f'Unknown({self.current_mode})')
+            zone_names = {0: 'Clear', 1: 'Warning', 2: 'Protective', 3: 'Emergency'}
+            zone_name = zone_names.get(self.current_zone, 'Unknown') if self.current_zone is not None else 'Unknown'
+            
+            self.get_logger().info(f'Initial Mode: {mode_name} (expected: Idle)')
+            self.get_logger().info(f'Initial Zone: {zone_name} (expected: Clear)')
+            self.get_logger().info(f'Fault Latched: {self.fault_latched} (expected: False)')
+        
+        self.demo_step = 1
+        self.step_timer = self.create_timer(1.0, lambda: setattr(self, 'demo_step', 2))
+    
+    def step_normal_operation(self):
+        """Step 1: Normal operation in clear zone."""
         self.get_logger().info('Driving forward in Clear zone...')
-        self.publish_velocity(self.linear_speed, 0.0, 2.0)
-        self.stop_robot()
-        time.sleep(0.5)
-        
-        # Section 2: Speed Limiting in Warning Zone
+        self.publish_velocity(self.linear_speed, 0.0)
+        self.step_timer = self.create_timer(2.0, lambda: setattr(self, 'demo_step', 3))
+    
+    def step_warning_zone(self):
+        """Step 2: Speed limiting in warning zone."""
         self.print_section('Section 2: Speed Limiting in Warning Zone')
         self.get_logger().info('Driving toward obstacles to trigger Warning zone...')
-        self.publish_velocity(self.linear_speed, 0.0, 3.0)
-        self.stop_robot()
-        
+        self.publish_velocity(self.linear_speed, 0.0)
+        self.step_timer = self.create_timer(3.0, self.step_warning_zone_check)
+    
+    def step_warning_zone_check(self):
+        """Check if warning zone was triggered."""
         if self.last_envelope_status:
             self.get_logger().info(f'Recommended speed limit: {self.last_envelope_status.recommended_speed_limit_mps:.2f} m/s')
-        
-        time.sleep(0.5)
-        
-        # Section 3: Protective Zone and Obstacle Avoidance
+        self.stop_robot()
+        self.demo_step = 4
+        self.step_timer = self.create_timer(0.5, lambda: setattr(self, 'demo_step', 5))
+    
+    def step_protective_zone(self):
+        """Step 3: Protective zone and obstacle avoidance."""
         self.print_section('Section 3: Protective Zone and Obstacle Avoidance')
         self.get_logger().info('Continuing approach to trigger Protective zone...')
-        self.publish_velocity(self.linear_speed * 0.5, 0.0, 2.0)
+        self.publish_velocity(self.linear_speed * 0.5, 0.0)
+        self.step_timer = self.create_timer(2.0, self.step_protective_zone_check)
+    
+    def step_protective_zone_check(self):
+        """Check if protective zone was triggered."""
         self.stop_robot()
-        
         if self.current_mode == 4:  # AvoidingObstacle
             self.get_logger().info('Successfully entered AvoidingObstacle mode')
-        
-        time.sleep(0.5)
-        
-        # Section 4: Emergency Zone and Emergency Stop
+        self.demo_step = 6
+        self.step_timer = self.create_timer(0.5, lambda: setattr(self, 'demo_step', 7))
+    
+    def step_emergency_zone(self):
+        """Step 4: Emergency zone and emergency stop."""
         self.print_section('Section 4: Emergency Zone and Emergency Stop')
         self.get_logger().info('Aggressive approach to trigger Emergency zone...')
-        self.publish_velocity(self.linear_speed * 0.8, 0.0, 1.5)
+        self.publish_velocity(self.linear_speed * 0.8, 0.0)
+        self.step_timer = self.create_timer(1.5, self.step_emergency_zone_check)
+    
+    def step_emergency_zone_check(self):
+        """Check if emergency zone was triggered."""
         self.stop_robot()
-        
         if self.current_zone == 3:  # Emergency
             self.get_logger().info('Successfully entered Emergency zone')
-        
         if self.fault_latched:
             self.get_logger().info('Fault successfully latched')
-        
-        time.sleep(1.0)
-        
-        # Section 5: Fault Recovery
+        self.demo_step = 8
+        self.step_timer = self.create_timer(1.0, lambda: setattr(self, 'demo_step', 9))
+    
+    def step_fault_recovery(self):
+        """Step 5: Fault recovery."""
         self.print_section('Section 5: Fault Recovery')
         self.get_logger().info('Backing away to clear zone...')
-        self.publish_velocity(-self.linear_speed * 0.5, 0.0, 2.0)
+        self.publish_velocity(-self.linear_speed * 0.5, 0.0)
+        self.step_timer = self.create_timer(2.0, self.step_fault_recovery_check)
+    
+    def step_fault_recovery_check(self):
+        """Check fault recovery."""
         self.stop_robot()
-        
         self.get_logger().info('Attempting to drive with latched fault (should fail)...')
-        self.publish_velocity(self.linear_speed, 0.0, 1.0)
+        self.publish_velocity(self.linear_speed, 0.0)
+        self.step_timer = self.create_timer(1.0, self.step_fault_recovery_final)
+    
+    def step_fault_recovery_final(self):
+        """Final fault recovery step."""
         self.stop_robot()
-        
-        # Clear fault by restarting safety nodes (simulated)
         self.get_logger().info('Clearing fault (requires safety node restart in production)')
         self.get_logger().info('For demo purposes, we will demonstrate recovery by backing away')
-        
-        time.sleep(0.5)
-        
-        # Summary
+        self.demo_step = 10
+        self.step_timer = self.create_timer(0.5, lambda: setattr(self, 'demo_step', 11))
+    
+    def step_summary(self):
+        """Step 6: Demo summary."""
         self.print_section('Demo Summary')
         total_time = time.time() - self.start_time
         self.get_logger().info(f'Total demo duration: {total_time:.1f} seconds')
@@ -231,22 +270,55 @@ class QuickDemo(Node):
         self.get_logger().info('')
         self.get_logger().info('Quick demo completed successfully!')
         self.get_logger().info('For comprehensive edge cases, run comprehensive_demo.py')
-        
-        # Shutdown
         self.stop_robot()
-        time.sleep(0.5)
+        self.demo_step = 12
+        self.step_timer = self.create_timer(0.5, lambda: setattr(self, 'demo_step', 13))
+    
+    def publish_velocity(self, linear_x, angular_z):
+        """Publish velocity command."""
+        cmd = Twist()
+        cmd.linear.x = linear_x
+        cmd.angular.z = angular_z
+        self.cmd_pub.publish(cmd)
+    
+    def stop_robot(self):
+        """Stop the robot."""
+        self.publish_velocity(0.0, 0.0)
+    
+    def print_section(self, title):
+        """Print a section header."""
+        self.get_logger().info('')
+        self.get_logger().info('=' * 60)
+        self.get_logger().info(f'  {title}')
+        self.get_logger().info('=' * 60)
 
 
 def main():
     rclpy.init()
     demo = QuickDemo()
+    
     try:
-        rclpy.spin(demo)
+        # Spin with timeout to prevent hanging
+        # The demo should complete within 60 seconds
+        start_time = time.time()
+        while rclpy.ok() and not demo.demo_completed:
+            rclpy.spin_once(demo, timeout_sec=0.1)
+            
+            # Timeout after 60 seconds
+            if time.time() - start_time > 60:
+                demo.get_logger().error('Demo timed out after 60 seconds')
+                break
+                
     except KeyboardInterrupt:
-        pass
+        demo.get_logger().info('Demo interrupted by user')
+    except Exception as e:
+        demo.get_logger().error(f'Demo failed with exception: {e}')
     finally:
         demo.stop_robot()
-        demo.destroy_node()
+        try:
+            demo.destroy_node()
+        except:
+            pass
         rclpy.shutdown()
 
 
