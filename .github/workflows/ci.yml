@@ -232,7 +232,7 @@ jobs:
   demo_tests:
     name: demo_tests (comprehensive Docker demo validation)
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     needs: docker_build
     steps:
       - uses: actions/checkout@v4
@@ -256,13 +256,25 @@ jobs:
             chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
             /workspace/safety-autonomy-core/tools/ci/validate_demo.sh comprehensive
           "
-      - name: Verify safety stack launch
+      - name: Run localization stack test
+        run: |
+          docker run --rm --network host -v ${{ github.workspace }}:/workspace/safety-autonomy-core safety-autonomy-core:latest bash -c "
+            chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
+            /workspace/safety-autonomy-core/tools/ci/validate_demo.sh localization
+          "
+      - name: Run odometry stack test
+        run: |
+          docker run --rm --network host -v ${{ github.workspace }}:/workspace/safety-autonomy-core safety-autonomy-core:latest bash -c "
+            chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
+            /workspace/safety-autonomy-core/tools/ci/validate_demo.sh odometry
+          "
+      - name: Verify safety stack launch (headless)
         run: |
           docker run --rm --network host -v ${{ github.workspace }}:/workspace/safety-autonomy-core safety-autonomy-core:latest bash -c "
             chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
             /workspace/safety-autonomy-core/tools/ci/validate_demo.sh launch safety_core_bringup safety_sim.launch.py
           "
-      - name: Verify diagnostic mode launch
+      - name: Verify diagnostic mode launch (headless)
         run: |
           docker run --rm --network host -v ${{ github.workspace }}:/workspace/safety-autonomy-core safety-autonomy-core:latest bash -c "
             chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
