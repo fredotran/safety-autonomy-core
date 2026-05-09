@@ -45,7 +45,7 @@ The fastest way to see the safety system in action:
 # Select demo option from the menu
 ```
 
-This uses Docker to run the complete ROS2 Jazzy + Gazebo simulation without requiring any local ROS2 installation. See [DOCKER.md](DOCKER.md) for complete Docker setup guide.
+This uses Docker to run the complete ROS2 Jazzy + Gazebo simulation without requiring any local ROS2 installation. See [markdown/docs/DOCKER.md](markdown/docs/DOCKER.md) for complete Docker setup guide.
 
 ### Library Development
 
@@ -92,7 +92,7 @@ Docker is the default and recommended way to run the demo. It provides a complet
 - NVIDIA Docker runtime (for GPU support)
 - X11 server (for display forwarding)
 
-See [DOCKER.md](DOCKER.md) for complete Docker deployment guide, including:
+See [markdown/docs/DOCKER.md](markdown/docs/DOCKER.md) for complete Docker deployment guide, including:
 - GPU setup and configuration
 - Display forwarding for Linux/Mac/Windows
 - Hardware integration (sensors, actuators)
@@ -133,7 +133,7 @@ For developers with local ROS2 Jazzy installation:
 
 ### Documentation
 
-- [DOCKER.md](DOCKER.md) - Complete Docker deployment guide, including GPU support, display forwarding, and hardware integration
+- [markdown/docs/DOCKER.md](markdown/docs/DOCKER.md) - Complete Docker deployment guide, including GPU support, display forwarding, and hardware integration
 - [DEMO_GUIDE.md](DEMO_GUIDE.md) - Complete demo documentation, including detailed instructions for each demo mode, best practices, and advanced usage examples
 - [DEMO_TROUBLESHOOTING.md](DEMO_TROUBLESHOOTING.md) - Comprehensive troubleshooting guide for simulation, safety nodes, demo scripts, and performance issues
 - [ROS 2 README](ros2/README.md) - ROS 2 integration details and package documentation
@@ -165,6 +165,7 @@ safety-autonomy-core/
 │   └── dev/run_quality_gate.sh
 ├── markdown/                  # Documentation and safety case artifacts
 │   └── docs/                  #   Documentation
+│       ├── DOCKER.md          #   Complete Docker deployment guide
 │       ├── diagnostics/       #   Integration guides
 │       └── safety_case/       #   ISO 26262 / ISO 13849 evidence scaffolding
 ├── ros2/                      # ROS 2 wrapper + AGV simulation
@@ -174,7 +175,6 @@ safety-autonomy-core/
 ├── .dockerignore              # Docker build context optimization
 ├── .env.example               # Environment variable template for Docker
 ├── Makefile                   # Docker convenience commands
-├── DOCKER.md                  # Complete Docker deployment guide
 ├── setup_demo.sh              # ROS 2 demo build + launch script (Docker-first)
 ├── README.md                  # Project documentation
 ├── CHANGELOG.md               # Version history
