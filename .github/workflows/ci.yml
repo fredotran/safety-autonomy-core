@@ -212,6 +212,14 @@ jobs:
         uses: docker/setup-buildx-action@v3
       - name: Build Docker image
         run: docker compose build
+      - name: Save Docker image
+        run: docker save safety-autonomy-core:latest | gzip > docker-image.tar.gz
+      - name: Upload Docker image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: docker-image.tar.gz
+          retention-days: 1
       - name: Verify ROS 2 build
         run: |
           docker compose run --rm safety-autonomy-demo bash -c "
@@ -224,35 +232,39 @@ jobs:
   demo_tests:
     name: demo_tests (comprehensive Docker demo validation)
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 20
     needs: docker_build
     steps:
       - uses: actions/checkout@v4
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Build Docker image
-        run: docker compose build
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+      - name: Load Docker image
+        run: docker load < docker-image.tar.gz
       - name: Run quick demo validation
         run: |
-          docker compose run --rm safety-autonomy-demo bash -c "
+          docker run --rm --network host safety-autonomy-core:latest bash -c "
             chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
             /workspace/safety-autonomy-core/tools/ci/validate_demo.sh quick
           "
       - name: Run comprehensive demo validation
         run: |
-          docker compose run --rm safety-autonomy-demo bash -c "
+          docker run --rm --network host safety-autonomy-core:latest bash -c "
             chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
             /workspace/safety-autonomy-core/tools/ci/validate_demo.sh comprehensive
           "
       - name: Verify safety stack launch
         run: |
-          docker compose run --rm safety-autonomy-demo bash -c "
+          docker run --rm --network host safety-autonomy-core:latest bash -c "
             chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
             /workspace/safety-autonomy-core/tools/ci/validate_demo.sh launch safety_core_bringup safety_sim.launch.py
           "
       - name: Verify diagnostic mode launch
         run: |
-          docker compose run --rm safety-autonomy-demo bash -c "
+          docker run --rm --network host safety-autonomy-core:latest bash -c "
             chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
             /workspace/safety-autonomy-core/tools/ci/validate_demo.sh launch safety_core_bringup diagnostics.launch.py
           "
