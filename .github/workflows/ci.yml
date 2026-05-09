@@ -205,13 +205,20 @@ jobs:
   docker_build:
     name: docker_build (ROS 2 via Docker Compose)
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Build Docker image
-        run: docker compose build
+        with:
+          driver-opts: |
+            image=ghcr.io/moby/buildkit:latest
+            network=host
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Build Docker image with BuildKit caching
+        run: |
+          docker compose build --build-arg BUILDKIT_INLINE_CACHE=1
       - name: Save Docker image
         run: docker save safety-autonomy-core:latest | gzip > docker-image.tar.gz
       - name: Upload Docker image artifact
@@ -232,8 +239,15 @@ jobs:
   demo_tests:
     name: demo_tests (comprehensive Docker demo validation)
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 10
     needs: docker_build
+    if: |
+      contains(github.event.head_commit.message, '[skip-demo]') == false &&
+      (contains(github.event.head_commit.message, '[ci skip]') == false ||
+       contains(github.event.head_commit.message, '[skip ci]') == false)
+    strategy:
+      matrix:
+        demo_type: [quick, comprehensive, launch_safety, launch_diagnostic]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Docker Buildx
@@ -244,35 +258,59 @@ jobs:
           name: docker-image
       - name: Load Docker image
         run: docker load < docker-image.tar.gz
-      - name: Run quick demo validation
+      - name: Check if Docker-related files changed
+        id: check_changes
         run: |
-          docker run --rm --network host safety-autonomy-core:latest bash -c "
-            chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
-            /workspace/safety-autonomy-core/tools/ci/validate_demo.sh quick
-          "
-      - name: Run comprehensive demo validation
+          # Fetch main branch for comparison
+          git fetch origin main
+          
+          # Get list of changed files
+          CHANGED_FILES=$(git diff --name-only origin/main HEAD)
+          
+          # Check if any Docker-related files changed
+          if echo "$CHANGED_FILES" | grep -E '(docker-compose\.yml|Dockerfile|\.github/workflows/ci\.yml|ros2/)'; then
+            echo "docker_changed=true" >> $GITHUB_OUTPUT
+            echo "Docker-related files changed, running demo tests"
+            echo "Changed files:"
+            echo "$CHANGED_FILES" | grep -E '(docker-compose\.yml|Dockerfile|\.github/workflows/ci\.yml|ros2/)'
+          else
+            echo "docker_changed=false" >> $GITHUB_OUTPUT
+            echo "No Docker-related files changed, skipping demo tests"
+          fi
+      - name: Run ${{ matrix.demo_type }} demo validation
+        if: steps.check_changes.outputs.docker_changed == 'true'
         run: |
-          docker run --rm --network host safety-autonomy-core:latest bash -c "
-            chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
-            /workspace/safety-autonomy-core/tools/ci/validate_demo.sh comprehensive
-          "
-      - name: Verify safety stack launch
-        run: |
-          docker run --rm --network host safety-autonomy-core:latest bash -c "
-            chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
-            /workspace/safety-autonomy-core/tools/ci/validate_demo.sh launch safety_core_bringup safety_sim.launch.py
-          "
-      - name: Verify diagnostic mode launch
-        run: |
-          docker run --rm --network host safety-autonomy-core:latest bash -c "
-            chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
-            /workspace/safety-autonomy-core/tools/ci/validate_demo.sh launch safety_core_bringup diagnostics.launch.py
-          "
+          case "${{ matrix.demo_type }}" in
+            quick)
+              docker run --rm --network host safety-autonomy-core:latest bash -c "
+                chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
+                /workspace/safety-autonomy-core/tools/ci/validate_demo.sh quick
+              "
+              ;;
+            comprehensive)
+              docker run --rm --network host safety-autonomy-core:latest bash -c "
+                chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
+                /workspace/safety-autonomy-core/tools/ci/validate_demo.sh comprehensive
+              "
+              ;;
+            launch_safety)
+              docker run --rm --network host safety-autonomy-core:latest bash -c "
+                chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
+                /workspace/safety-autonomy-core/tools/ci/validate_demo.sh launch safety_core_bringup safety_sim.launch.py
+              "
+              ;;
+            launch_diagnostic)
+              docker run --rm --network host safety-autonomy-core:latest bash -c "
+                chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
+                /workspace/safety-autonomy-core/tools/ci/validate_demo.sh launch safety_core_bringup diagnostics.launch.py
+              "
+              ;;
+          esac
       - name: Upload demo logs
-        if: always()
+        if: always() && steps.check_changes.outputs.docker_changed == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: demo-logs
+          name: demo-logs-${{ matrix.demo_type }}
           path: |
             ~/.ros/log/
             /tmp/
