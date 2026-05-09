@@ -261,51 +261,28 @@ jobs:
       - name: Check if Docker-related files changed
         id: check_changes
         run: |
-          # Fetch main branch for comparison
-          git fetch origin main
-          
-          # Get list of changed files
-          CHANGED_FILES=$(git diff --name-only origin/main HEAD)
-          
-          # Check if any Docker-related files changed
-          if echo "$CHANGED_FILES" | grep -E '(docker-compose\.yml|Dockerfile|\.github/workflows/ci\.yml|ros2/)'; then
-            echo "docker_changed=true" >> $GITHUB_OUTPUT
-            echo "Docker-related files changed, running demo tests"
-            echo "Changed files:"
-            echo "$CHANGED_FILES" | grep -E '(docker-compose\.yml|Dockerfile|\.github/workflows/ci\.yml|ros2/)'
-          else
-            echo "docker_changed=false" >> $GITHUB_OUTPUT
-            echo "No Docker-related files changed, skipping demo tests"
-          fi
-      - name: Run ${{ matrix.demo_type }} demo validation
-        if: steps.check_changes.outputs.docker_changed == 'true'
+          docker run --rm --network host -v ${{ github.workspace }}:/workspace/safety-autonomy-core safety-autonomy-core:latest bash -c "
+            chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
+            /workspace/safety-autonomy-core/tools/ci/validate_demo.sh quick
+          "
+      - name: Run comprehensive demo validation
         run: |
-          case "${{ matrix.demo_type }}" in
-            quick)
-              docker run --rm --network host -v ${{ github.workspace }}:/workspace/safety-autonomy-core safety-autonomy-core:latest bash -c "
-                chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
-                /workspace/safety-autonomy-core/tools/ci/validate_demo.sh quick
-              "
-              ;;
-            comprehensive)
-              docker run --rm --network host -v ${{ github.workspace }}:/workspace/safety-autonomy-core safety-autonomy-core:latest bash -c "
-                chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
-                /workspace/safety-autonomy-core/tools/ci/validate_demo.sh comprehensive
-              "
-              ;;
-            launch_safety)
-              docker run --rm --network host -v ${{ github.workspace }}:/workspace/safety-autonomy-core safety-autonomy-core:latest bash -c "
-                chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
-                /workspace/safety-autonomy-core/tools/ci/validate_demo.sh launch safety_core_bringup safety_sim.launch.py
-              "
-              ;;
-            launch_diagnostic)
-              docker run --rm --network host -v ${{ github.workspace }}:/workspace/safety-autonomy-core safety-autonomy-core:latest bash -c "
-                chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
-                /workspace/safety-autonomy-core/tools/ci/validate_demo.sh launch safety_core_bringup diagnostics.launch.py
-              "
-              ;;
-          esac
+          docker run --rm --network host -v ${{ github.workspace }}:/workspace/safety-autonomy-core safety-autonomy-core:latest bash -c "
+            chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
+            /workspace/safety-autonomy-core/tools/ci/validate_demo.sh comprehensive
+          "
+      - name: Verify safety stack launch
+        run: |
+          docker run --rm --network host -v ${{ github.workspace }}:/workspace/safety-autonomy-core safety-autonomy-core:latest bash -c "
+            chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
+            /workspace/safety-autonomy-core/tools/ci/validate_demo.sh launch safety_core_bringup safety_sim.launch.py
+          "
+      - name: Verify diagnostic mode launch
+        run: |
+          docker run --rm --network host -v ${{ github.workspace }}:/workspace/safety-autonomy-core safety-autonomy-core:latest bash -c "
+            chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
+            /workspace/safety-autonomy-core/tools/ci/validate_demo.sh launch safety_core_bringup diagnostics.launch.py
+          "
       - name: Upload demo logs
         if: always() && steps.check_changes.outputs.docker_changed == 'true'
         uses: actions/upload-artifact@v4
