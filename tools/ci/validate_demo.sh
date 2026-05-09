@@ -72,7 +72,7 @@ launch_safety_stack() {
     
     # Wait for safety stack to initialize
     echo -e "${YELLOW}Waiting for safety stack to initialize...${NC}"
-    sleep 10
+    sleep 15
     
     # Check if launch process is still running
     if ps -p $launch_pid > /dev/null; then
@@ -125,6 +125,9 @@ stop_safety_stack() {
 # Function to validate safety nodes are running
 validate_safety_nodes() {
     echo -e "${YELLOW}Checking safety nodes...${NC}"
+    
+    # Give extra time for nodes to fully initialize
+    sleep 5
     
     local nodes_found=0
     local nodes_total=0
@@ -194,7 +197,7 @@ validate_quick_demo() {
     launch_safety_stack "true"
     
     # Wait a bit more for system to be fully ready
-    sleep 5
+    sleep 10
     
     # Validate infrastructure
     validate_safety_nodes || { stop_safety_stack; return 1; }
@@ -232,7 +235,7 @@ validate_comprehensive_demo() {
     launch_safety_stack "true"
     
     # Wait a bit more for system to be fully ready
-    sleep 5
+    sleep 10
     
     # Validate infrastructure
     validate_safety_nodes || { stop_safety_stack; return 1; }
@@ -295,7 +298,7 @@ validate_launch_file() {
     local launch_pid=$!
     
     # Wait for launch to start
-    sleep 10
+    sleep 15
     
     # Check if launch process is still running
     if ps -p $launch_pid > /dev/null; then
