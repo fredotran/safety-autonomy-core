@@ -41,6 +41,10 @@ launch_safety_stack() {
     pkill -f "ros2 launch" || true
     sleep 2
     
+    # Set environment for headless Gazebo (no display)
+    export QT_QPA_PLATFORM=offscreen
+    export DISPLAY=""
+    
     # Launch safety stack in background
     ros2 launch safety_core_bringup safety_sim.launch.py > /tmp/safety_stack.log 2>&1 &
     local launch_pid=$!
@@ -163,7 +167,7 @@ validate_quick_demo() {
     
     # Run quick demo with timeout and capture output
     echo -e "${YELLOW}Starting quick demo...${NC}"
-    timeout 120s python3 /workspace/ros2_ws/src/safety_core_bringup/scripts/quick_demo.py > /tmp/quick_demo.log 2>&1
+    timeout 90s python3 /workspace/ros2_ws/src/safety_core_bringup/scripts/quick_demo.py > /tmp/quick_demo.log 2>&1
     local demo_exit_code=$?
     
     # Stop safety stack
@@ -174,7 +178,7 @@ validate_quick_demo() {
         echo -e "${GREEN}✓ Quick demo completed successfully${NC}"
         return 0
     elif [ $demo_exit_code -eq 124 ]; then
-        echo -e "${YELLOW}⚠ Quick demo timed out (120s)${NC}"
+        echo -e "${YELLOW}⚠ Quick demo timed out (90s)${NC}"
         echo -e "${YELLOW}This may indicate slow performance or hanging${NC}"
         return 1
     else
@@ -201,7 +205,7 @@ validate_comprehensive_demo() {
     
     # Run comprehensive demo with timeout and capture output
     echo -e "${YELLOW}Starting comprehensive demo...${NC}"
-    timeout 300s python3 /workspace/ros2_ws/src/safety_core_bringup/scripts/comprehensive_demo.py > /tmp/comprehensive_demo.log 2>&1
+    timeout 240s python3 /workspace/ros2_ws/src/safety_core_bringup/scripts/comprehensive_demo.py > /tmp/comprehensive_demo.log 2>&1
     local demo_exit_code=$?
     
     # Stop safety stack
@@ -212,7 +216,7 @@ validate_comprehensive_demo() {
         echo -e "${GREEN}✓ Comprehensive demo completed successfully${NC}"
         return 0
     elif [ $demo_exit_code -eq 124 ]; then
-        echo -e "${YELLOW}⚠ Comprehensive demo timed out (300s)${NC}"
+        echo -e "${YELLOW}⚠ Comprehensive demo timed out (240s)${NC}"
         echo -e "${YELLOW}This may indicate slow performance or hanging${NC}"
         return 1
     else
@@ -232,12 +236,16 @@ validate_launch_file() {
     pkill -f "ros2 launch" || true
     sleep 2
     
+    # Set environment for headless Gazebo (no display)
+    export QT_QPA_PLATFORM=offscreen
+    export DISPLAY=""
+    
     # Launch in background with logging
-    timeout 30s ros2 launch $launch_file > /tmp/launch_validation.log 2>&1 &
+    timeout 20s ros2 launch $launch_file > /tmp/launch_validation.log 2>&1 &
     local launch_pid=$!
     
     # Wait for launch to start
-    sleep 15
+    sleep 10
     
     # Check if launch process is still running
     if ps -p $launch_pid > /dev/null; then
