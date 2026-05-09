@@ -508,4 +508,12 @@ See `CONTRIBUTING.md` for:
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
+**Current License:** MIT License
+- ✅ Free to use, modify, and distribute
+- ✅ Suitable for commercial use
+- ✅ No warranty or liability included
+- ✅ Community-driven development
+
+**Future Considerations:** Commercial licensing and services may be offered in the future to support enterprise deployments, certification support, and enhanced services. See [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md) for details on potential future commercial offerings.
+
 Copyright (c) 2026 RedEarth OS
