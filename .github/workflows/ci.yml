@@ -282,25 +282,25 @@ jobs:
         run: |
           case "${{ matrix.demo_type }}" in
             quick)
-              docker run --rm --network host safety-autonomy-core:latest bash -c "
+              docker run --rm --network host -v ${{ github.workspace }}:/workspace/safety-autonomy-core safety-autonomy-core:latest bash -c "
                 chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
                 /workspace/safety-autonomy-core/tools/ci/validate_demo.sh quick
               "
               ;;
             comprehensive)
-              docker run --rm --network host safety-autonomy-core:latest bash -c "
+              docker run --rm --network host -v ${{ github.workspace }}:/workspace/safety-autonomy-core safety-autonomy-core:latest bash -c "
                 chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
                 /workspace/safety-autonomy-core/tools/ci/validate_demo.sh comprehensive
               "
               ;;
             launch_safety)
-              docker run --rm --network host safety-autonomy-core:latest bash -c "
+              docker run --rm --network host -v ${{ github.workspace }}:/workspace/safety-autonomy-core safety-autonomy-core:latest bash -c "
                 chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
                 /workspace/safety-autonomy-core/tools/ci/validate_demo.sh launch safety_core_bringup safety_sim.launch.py
               "
               ;;
             launch_diagnostic)
-              docker run --rm --network host safety-autonomy-core:latest bash -c "
+              docker run --rm --network host -v ${{ github.workspace }}:/workspace/safety-autonomy-core safety-autonomy-core:latest bash -c "
                 chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
                 /workspace/safety-autonomy-core/tools/ci/validate_demo.sh launch safety_core_bringup diagnostics.launch.py
               "
@@ -313,4 +313,4 @@ jobs:
           name: demo-logs-${{ matrix.demo_type }}
           path: |
             ~/.ros/log/
-            /tmp/
+            /tmp/*.log
