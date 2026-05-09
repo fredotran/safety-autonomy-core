@@ -41,6 +41,10 @@ launch_safety_stack() {
     pkill -f "ros2 launch" || true
     sleep 2
     
+    # Set environment for headless Gazebo (no display)
+    export QT_QPA_PLATFORM=offscreen
+    export DISPLAY=""
+    
     # Launch safety stack in background
     ros2 launch safety_core_bringup safety_sim.launch.py > /tmp/safety_stack.log 2>&1 &
     local launch_pid=$!
@@ -231,6 +235,10 @@ validate_launch_file() {
     # Kill any existing processes
     pkill -f "ros2 launch" || true
     sleep 2
+    
+    # Set environment for headless Gazebo (no display)
+    export QT_QPA_PLATFORM=offscreen
+    export DISPLAY=""
     
     # Launch in background with logging
     timeout 20s ros2 launch $launch_file > /tmp/launch_validation.log 2>&1 &
