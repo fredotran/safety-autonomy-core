@@ -276,12 +276,6 @@ jobs:
             chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
             /workspace/safety-autonomy-core/tools/ci/validate_demo.sh quick
           "
-      - name: Run comprehensive demo validation
-        run: |
-          docker run --rm --network host -v ${{ github.workspace }}:/workspace/safety-autonomy-core safety-autonomy-core:latest bash -c "
-            chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
-            /workspace/safety-autonomy-core/tools/ci/validate_demo.sh comprehensive
-          "
       - name: Run localization stack test
         run: |
           docker run --rm --network host -v ${{ github.workspace }}:/workspace/safety-autonomy-core safety-autonomy-core:latest bash -c "

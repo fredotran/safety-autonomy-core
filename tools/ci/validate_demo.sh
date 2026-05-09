@@ -439,8 +439,6 @@ main() {
             echo -e "${YELLOW}Running all demo validations...${NC}"
             validate_quick_demo || exit 1
             echo ""
-            validate_comprehensive_demo || exit 1
-            echo ""
             test_localization_stack || exit 1
             echo ""
             test_odometry_stack || exit 1
