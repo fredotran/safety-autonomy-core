@@ -43,9 +43,28 @@ launch_safety_stack() {
     pkill -f "Xvfb" || true
     sleep 2
     
-    # Set environment for headless Gazebo (no display)
-    export QT_QPA_PLATFORM=offscreen
-    export DISPLAY=""
+    if [ "$headless" = "true" ]; then
+        # Start Xvfb for virtual display
+        echo -e "${YELLOW}Starting Xvfb virtual display...${NC}"
+        Xvfb :99 -screen 0 1920x1080x24 > /tmp/xvfb.log 2>&1 &
+        local xvfb_pid=$!
+        export DISPLAY=:99
+        sleep 2
+        
+        # Check if Xvfb started successfully
+        if ps -p $xvfb_pid > /dev/null; then
+            echo -e "${GREEN}✓ Xvfb started successfully (PID: $xvfb_pid, DISPLAY: $DISPLAY)${NC}"
+            echo $xvfb_pid > /tmp/xvfb.pid
+        else
+            echo -e "${RED}✗ Xvfb failed to start${NC}"
+            cat /tmp/xvfb.log
+            return 1
+        fi
+    else
+        # Set environment for headless Gazebo (no display)
+        export QT_QPA_PLATFORM=offscreen
+        export DISPLAY=""
+    fi
     
     # Launch safety stack in background
     ros2 launch safety_core_bringup safety_sim.launch.py > /tmp/safety_stack.log 2>&1 &
@@ -63,6 +82,10 @@ launch_safety_stack() {
         echo -e "${RED}✗ Safety stack failed to launch${NC}"
         echo -e "${RED}Log output:${NC}"
         cat /tmp/safety_stack.log
+        if [ "$headless" = "true" ] && [ -f /tmp/xvfb.log ]; then
+            echo -e "${RED}Xvfb log:${NC}"
+            cat /tmp/xvfb.log
+        fi
         return 1
     fi
 }
@@ -77,6 +100,15 @@ stop_safety_stack() {
             kill $pid || true
         fi
         rm /tmp/safety_stack.pid
+    fi
+    
+    # Kill Xvfb if running
+    if [ -f /tmp/xvfb.pid ]; then
+        local xvfb_pid=$(cat /tmp/xvfb.pid)
+        if ps -p $xvfb_pid > /dev/null; then
+            kill $xvfb_pid || true
+        fi
+        rm /tmp/xvfb.pid
     fi
     
     # Kill any remaining safety processes
@@ -241,9 +273,22 @@ validate_launch_file() {
     pkill -f "Xvfb" || true
     sleep 2
     
-    # Set environment for headless Gazebo (no display)
-    export QT_QPA_PLATFORM=offscreen
-    export DISPLAY=""
+    # Start Xvfb for virtual display (headless mode)
+    echo -e "${YELLOW}Starting Xvfb virtual display...${NC}"
+    Xvfb :99 -screen 0 1920x1080x24 > /tmp/xvfb_launch.log 2>&1 &
+    local xvfb_pid=$!
+    export DISPLAY=:99
+    sleep 2
+    
+    # Check if Xvfb started successfully
+    if ps -p $xvfb_pid > /dev/null; then
+        echo -e "${GREEN}✓ Xvfb started successfully (PID: $xvfb_pid, DISPLAY: $DISPLAY)${NC}"
+        echo $xvfb_pid > /tmp/xvfb_launch.pid
+    else
+        echo -e "${RED}✗ Xvfb failed to start${NC}"
+        cat /tmp/xvfb_launch.log
+        return 1
+    fi
     
     # Launch in background with logging
     timeout 20s ros2 launch $launch_file > /tmp/launch_validation.log 2>&1 &
@@ -273,6 +318,10 @@ validate_launch_file() {
         echo -e "${RED}✗ Launch file $package/$launch_file failed to start${NC}"
         echo -e "${RED}Log output:${NC}"
         cat /tmp/launch_validation.log
+        if [ -f /tmp/xvfb_launch.log ]; then
+            echo -e "${RED}Xvfb log:${NC}"
+            cat /tmp/xvfb_launch.log
+        fi
         pkill -f "Xvfb" || true
         return 1
     fi

@@ -256,15 +256,12 @@ jobs:
   demo_tests:
     name: demo_tests (comprehensive Docker demo validation)
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 30
     needs: docker_build
     if: |
       contains(github.event.head_commit.message, '[skip-demo]') == false &&
       (contains(github.event.head_commit.message, '[ci skip]') == false ||
        contains(github.event.head_commit.message, '[skip ci]') == false)
-    strategy:
-      matrix:
-        demo_type: [quick, comprehensive, launch_safety, launch_diagnostic]
     steps:
       - uses: actions/checkout@v4
       - name: Download Docker image artifact
@@ -273,8 +270,7 @@ jobs:
           name: docker-image
       - name: Load Docker image
         run: docker load < docker-image.tar.gz
-      - name: Check if Docker-related files changed
-        id: check_changes
+      - name: Run quick demo validation
         run: |
           docker run --rm --network host -v ${{ github.workspace }}:/workspace/safety-autonomy-core safety-autonomy-core:latest bash -c "
             chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
@@ -311,10 +307,10 @@ jobs:
             /workspace/safety-autonomy-core/tools/ci/validate_demo.sh launch safety_core_bringup diagnostics.launch.py
           "
       - name: Upload demo logs
-        if: always() && steps.check_changes.outputs.docker_changed == 'true'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: demo-logs-${{ matrix.demo_type }}
+          name: demo-logs
           path: |
             ~/.ros/log/
             /tmp/*.log
