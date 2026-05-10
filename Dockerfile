@@ -1,5 +1,5 @@
 # Multi-stage Dockerfile for safety-autonomy-core ROS2 demo
-# Stage 1: Base image with build dependencies
+# Stage 1: Base image with build dependencies (cached separately)
 FROM ros:jazzy-perception AS base
 
 # Avoid interactive prompts
@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
     make \
+    ninja-build \
     python3-pip \
     python3-vcstool \
     python3-colcon-common-extensions \
@@ -61,19 +62,34 @@ RUN cd /workspace/safety-autonomy-core/ros2/src && \
         fi \
     done
 
+# Build safety_autonomy_core standalone library first (required by safety_core_ros)
+RUN bash -c "source /opt/ros/jazzy/setup.bash && \
+    cd /workspace/safety-autonomy-core && \
+    mkdir -p build && \
+    cd build && \
+    cmake .. -DCMAKE_BUILD_TYPE=Release \
+             -DSAFETY_CORE_ENABLE_AMENT=ON \
+             -DSAFETY_CORE_ENABLE_SANITIZERS=OFF \
+             -DSAFETY_CORE_ENABLE_WERROR=OFF \
+             -G Ninja && \
+    ninja && \
+    ninja install"
+
 # Install dependencies using rosdep (skip already installed packages)
 RUN bash -c "source /opt/ros/jazzy/setup.bash && \
     cd /workspace/ros2_ws && \
+    mkdir -p /home/rosdep_cache && \
     rosdep update && \
-    rosdep install --from-paths src --ignore-src -r -y --skip-keys='ros-jazzy-ros-gz-sim ros-jazzy-ros-gz-bridge ros-jazzy-joint-state-publisher ros-jazzy-xacro ros-jazzy-nav2-bringup ros-jazzy-nav2-lifecycle-manager ros-jazzy-nav2-collision-monitor ros-jazzy-slam-toolbox ros-jazzy-rviz2 ros-jazzy-robot-localization ros-jazzy-behaviortree-cpp-v3 ros-jazzy-nav2-behavior-tree' || true"
+    rosdep install --from-paths src --ignore-src -r -y \
+        --skip-keys='ros-jazzy-ros-gz-sim ros-jazzy-ros-gz-bridge ros-jazzy-joint-state-publisher ros-jazzy-xacro ros-jazzy-nav2-bringup ros-jazzy-nav2-lifecycle-manager ros-jazzy-nav2-collision-monitor ros-jazzy-slam-toolbox ros-jazzy-rviz2 ros-jazzy-robot-localization ros-jazzy-behaviortree-cpp-v3 ros-jazzy-nav2-behavior-tree' || true"
 
-# Build the workspace with safety-critical flags
+# Build the ROS2 workspace with safety-critical flags and parallel workers
 RUN bash -c "source /opt/ros/jazzy/setup.bash && \
     cd /workspace/ros2_ws && \
     colcon build \
-        --cmake-args -DSAFETY_CORE_ENABLE_AMENT=ON \
-                     -DSAFETY_CORE_ENABLE_SANITIZERS=OFF \
+        --cmake-args -DSAFETY_CORE_ENABLE_SANITIZERS=OFF \
                      -DSAFETY_CORE_ENABLE_WERROR=OFF \
+        --cmake-args --parallel-workers $(nproc) \
         --event-handlers console_direct+"
 
 # Set up environment
