@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Before/After Comparison Demo
+Before/After Comparison Demo.
 
 Demonstrates the difference between the safety system enabled and disabled:
 - Without safety: Robot can collide with obstacles
@@ -8,23 +8,26 @@ Demonstrates the difference between the safety system enabled and disabled:
 - Shows the value of the safety envelope system
 """
 
-import rclpy
-from rclpy.node import Node
-from geometry_msgs.msg import Twist
-from safety_core_msgs.msg import SafetyState, EnvelopeStatus
-from std_msgs.msg import Bool
-import time
-import math
-import sys
 import os
+import sys
+import time
+
+import rclpy
+from geometry_msgs.msg import Twist
+from rclpy.node import Node
+from safety_core_msgs.msg import EnvelopeStatus, SafetyState
+from std_msgs.msg import Bool
 
 # Add demo utils to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from demo_utils import DemoLogger, Color
+from demo_utils import Color, DemoLogger
 
 
 class BeforeAfterComparison(Node):
+    """Before/after comparison demo for safety system."""
+
     def __init__(self):
+        """Initialize the before/after comparison demo node."""
         super().__init__('before_after_comparison')
         
         # Initialize demo logger

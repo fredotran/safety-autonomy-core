@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Comprehensive Safety Autonomy Core Demo
+Comprehensive Safety Autonomy Core Demo.
 
 This script demonstrates all key capabilities of the safety_autonomy_core library:
 1. State machine transitions (Init → Idle → Moving → AvoidingObstacle → SafeStop)
@@ -16,24 +16,27 @@ The demo performs a choreographed sequence of maneuvers that trigger
 different safety conditions and showcases the system's response.
 """
 
-import rclpy
-from rclpy.node import Node
-from geometry_msgs.msg import Twist
-from safety_core_msgs.msg import SafetyState, EnvelopeStatus
-from std_msgs.msg import Bool
-import time
 import math
-import threading
-import sys
 import os
+import sys
+import time
+
+import rclpy
+from geometry_msgs.msg import Twist
+from rclpy.node import Node
+from safety_core_msgs.msg import EnvelopeStatus, SafetyState
+from std_msgs.msg import Bool
 
 # Add demo utils to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from demo_utils import DemoLogger, MetricsDisplay
+from demo_utils import Color, DemoLogger, MetricsDisplay
 
 
 class ComprehensiveDemo(Node):
+    """Comprehensive demo for safety autonomy core system."""
+
     def __init__(self):
+        """Initialize the comprehensive demo node."""
         super().__init__('comprehensive_demo')
         
         # Initialize demo logger with colored output

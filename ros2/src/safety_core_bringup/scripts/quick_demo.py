@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Quick Safety Autonomy Core Demo
+Quick Safety Autonomy Core Demo.
 
 A fast-paced 1-2 minute demo covering core safety features:
 1. Initial state and normal operation
@@ -10,17 +10,21 @@ A fast-paced 1-2 minute demo covering core safety features:
 5. Fault recovery
 """
 
-import rclpy
-from rclpy.node import Node
-from geometry_msgs.msg import Twist
-from safety_core_msgs.msg import SafetyState, EnvelopeStatus
-from std_msgs.msg import Bool
-import time
 import math
+import time
+
+import rclpy
+from geometry_msgs.msg import Twist
+from rclpy.node import Node
+from safety_core_msgs.msg import EnvelopeStatus, SafetyState
+from std_msgs.msg import Bool
 
 
 class QuickDemo(Node):
+    """Quick demo for safety autonomy core system."""
+
     def __init__(self):
+        """Initialize the quick demo node."""
         super().__init__('quick_demo')
         
         # Publishers

@@ -1,5 +1,8 @@
 #pragma once
 
+// Copyright (c) 2026 RedEarth OS
+// SPDX-License-Identifier: MIT
+
 #include "safety_core/diag/diagnostic_transport.hpp"
 
 #include <iostream>

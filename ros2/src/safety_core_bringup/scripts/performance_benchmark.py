@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Performance Benchmark for Safety Autonomy Core
+Performance Benchmark for Safety Autonomy Core.
 
 Measures and reports performance characteristics of the safety system:
 - Message latency
@@ -9,23 +9,27 @@ Measures and reports performance characteristics of the safety system:
 - Throughput metrics
 """
 
+import os
+import sys
+import threading
+import time
+
+import psutil
 import rclpy
 from rclpy.node import Node
-from safety_core_msgs.msg import SafetyState, EnvelopeStatus
+from safety_core_msgs.msg import EnvelopeStatus, SafetyState
 from sensor_msgs.msg import LaserScan
-import time
-import psutil
-import sys
-import os
-import threading
 
 # Add demo utils to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from demo_utils import DemoLogger, Color
+from demo_utils import Color, DemoLogger
 
 
 class PerformanceBenchmark(Node):
+    """Performance benchmark for safety autonomy core system."""
+
     def __init__(self):
+        """Initialize the performance benchmark node."""
         super().__init__('performance_benchmark')
         
         # Initialize demo logger

@@ -39,6 +39,7 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
+    """Generate launch description for EKF localization stack."""
     pkg_bringup = get_package_share_directory("safety_core_bringup")
     ekf_config = os.path.join(pkg_bringup, "config", "ekf_config.yaml")
 

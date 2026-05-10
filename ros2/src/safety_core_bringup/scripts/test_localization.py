@@ -2,7 +2,7 @@
 """Localization diagnostics for the safety_core warehouse AGV.
 
 Subscribes to the inputs and outputs of the EKF / navsat_transform pipeline and
-prints a periodic dashboard:
+prints a periodic dashboard.
 
 * sensor liveness    -- Hz, time since last message, missing-source warnings
 * fusion health      -- /odometry/filtered, /odometry/filtered_map, /odometry/gps

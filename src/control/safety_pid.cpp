@@ -1,3 +1,6 @@
+// Copyright (c) 2026 RedEarth OS
+// SPDX-License-Identifier: MIT
+
 #include "safety_core/control/safety_pid.hpp"
 
 #include "safety_core/common/time.hpp"

@@ -1,3 +1,6 @@
+// Copyright (c) 2026 RedEarth OS
+// SPDX-License-Identifier: MIT
+
 #include "safety_core_nav2/is_safe_condition.hpp"
 
 #include <behaviortree_cpp_v3/bt_factory.h>

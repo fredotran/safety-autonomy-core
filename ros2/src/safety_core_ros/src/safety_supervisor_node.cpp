@@ -1,3 +1,6 @@
+// Copyright (c) 2026 RedEarth OS
+// SPDX-License-Identifier: MIT
+
 #include "safety_core_ros/safety_supervisor_node.hpp"
 
 #include <chrono>
