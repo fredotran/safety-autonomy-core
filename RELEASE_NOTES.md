@@ -34,9 +34,10 @@ We are excited to announce the first stable release of Safety Autonomy Core v1.0
 ### Low-Resource Build Configuration
 - New `minimal` CMake preset for size-optimized builds
 - Size optimization flags (-Os, -ffunction-sections, -fdata-sections, --gc-sections)
-- Optional Link Time Optimization (LTO) support
+- **WARNING**: Not suitable for safety-critical applications
 - Optimized for embedded systems and low-end hardware
-- Reduces memory footprint while maintaining safety-critical guarantees
+- Reduces memory footprint while maintaining basic functionality
+- **IMPORTANT**: Use `safety` preset (Release build) for safety-critical applications
 
 ### Documentation Improvements
 - **Streamlined README**: Focus on quick start and core features

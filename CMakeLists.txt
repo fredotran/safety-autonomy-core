@@ -5,8 +5,7 @@ project(safety_autonomy_core VERSION 1.0.0 LANGUAGES CXX)
 option(SAFETY_CORE_ENABLE_SANITIZERS "Enable runtime sanitizers for non-safety builds" ON)
 option(SAFETY_CORE_ENABLE_WERROR "Treat compiler warnings as errors" ON)
 option(SAFETY_CORE_ENABLE_COVERAGE "Enable coverage instrumentation" OFF)
-option(SAFETY_CORE_ENABLE_SIZE_OPTIMIZATIONS "Enable size optimizations for low-resource systems" OFF)
-option(SAFETY_CORE_ENABLE_LTO "Enable Link Time Optimization" OFF)
+option(SAFETY_CORE_ENABLE_SIZE_OPTIMIZATIONS "Enable size optimizations for low-resource systems (NOT for safety-critical use)" OFF)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -100,7 +99,9 @@ if(SAFETY_CORE_ENABLE_COVERAGE)
     endif()
 endif()
 
-# Size optimizations for low-resource systems
+# Size optimizations for low-resource systems (NOT for safety-critical use)
+# WARNING: These optimizations prioritize size over performance and may affect
+# timing determinism. Use the 'safety' preset for safety-critical applications.
 if(SAFETY_CORE_ENABLE_SIZE_OPTIMIZATIONS)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(safety_core PRIVATE -Os)
@@ -109,20 +110,10 @@ if(SAFETY_CORE_ENABLE_SIZE_OPTIMIZATIONS)
         if(NOT APPLE)
             target_link_options(safety_core PRIVATE -Wl,--gc-sections)
         endif()
-        message(STATUS "Size optimizations enabled for low-resource systems")
+        message(WARNING "Size optimizations enabled - NOT recommended for safety-critical systems")
+        message(WARNING "Use 'safety' preset (Release build) for safety-critical applications")
     else()
         message(WARNING "Size optimizations requested but compiler is not GNU or Clang")
-    endif()
-endif()
-
-# Link Time Optimization
-if(SAFETY_CORE_ENABLE_LTO)
-    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-        target_compile_options(safety_core PRIVATE -flto)
-        target_link_options(safety_core PRIVATE -flto)
-        message(STATUS "Link Time Optimization enabled")
-    else()
-        message(WARNING "LTO requested but compiler is not GNU or Clang")
     endif()
 endif()
 

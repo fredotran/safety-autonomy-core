@@ -42,15 +42,14 @@
     },
     {
       "name": "minimal",
-      "displayName": "Minimal Resource (Size-optimized, no sanitizers)",
+      "displayName": "Minimal Resource (Size-optimized, NOT for safety-critical use)",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/minimal",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "MinSizeRel",
         "SAFETY_CORE_ENABLE_SANITIZERS": "OFF",
         "SAFETY_CORE_ENABLE_WERROR": "ON",
-        "SAFETY_CORE_ENABLE_SIZE_OPTIMIZATIONS": "ON",
-        "SAFETY_CORE_ENABLE_LTO": "OFF"
+        "SAFETY_CORE_ENABLE_SIZE_OPTIMIZATIONS": "ON"
       }
     }
   ],
