@@ -64,16 +64,19 @@ RUN cd /workspace/safety-autonomy-core/ros2/src && \
 # Install dependencies using rosdep (skip already installed packages)
 RUN bash -c "source /opt/ros/jazzy/setup.bash && \
     cd /workspace/ros2_ws && \
+    mkdir -p /home/rosdep_cache && \
     rosdep update && \
-    rosdep install --from-paths src --ignore-src -r -y --skip-keys='ros-jazzy-ros-gz-sim ros-jazzy-ros-gz-bridge ros-jazzy-joint-state-publisher ros-jazzy-xacro ros-jazzy-nav2-bringup ros-jazzy-nav2-lifecycle-manager ros-jazzy-nav2-collision-monitor ros-jazzy-slam-toolbox ros-jazzy-rviz2 ros-jazzy-robot-localization ros-jazzy-behaviortree-cpp-v3 ros-jazzy-nav2-behavior-tree' || true"
+    rosdep install --from-paths src --ignore-src -r -y \
+        --skip-keys='ros-jazzy-ros-gz-sim ros-jazzy-ros-gz-bridge ros-jazzy-joint-state-publisher ros-jazzy-xacro ros-jazzy-nav2-bringup ros-jazzy-nav2-lifecycle-manager ros-jazzy-nav2-collision-monitor ros-jazzy-slam-toolbox ros-jazzy-rviz2 ros-jazzy-robot-localization ros-jazzy-behaviortree-cpp-v3 ros-jazzy-nav2-behavior-tree' || true"
 
-# Build the workspace with safety-critical flags
+# Build the workspace with safety-critical flags and parallel workers
 RUN bash -c "source /opt/ros/jazzy/setup.bash && \
     cd /workspace/ros2_ws && \
     colcon build \
         --cmake-args -DSAFETY_CORE_ENABLE_AMENT=ON \
                      -DSAFETY_CORE_ENABLE_SANITIZERS=OFF \
                      -DSAFETY_CORE_ENABLE_WERROR=OFF \
+        --cmake-args --parallel-workers $(nproc) \
         --event-handlers console_direct+"
 
 # Set up environment
