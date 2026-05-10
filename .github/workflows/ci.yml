@@ -298,5 +298,6 @@ jobs:
         with:
           name: demo-logs-${{ matrix.test }}
           path: |
-            ~/.ros/log/
+            $HOME/.ros/log/
             /tmp/*.log
+          if-no-files-found: ignore
