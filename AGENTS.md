@@ -52,6 +52,32 @@ docker exec safety-autonomy-demo bash -c "source install/setup.bash && ros2 laun
 - Pre-commit hook uses Docker container's clang-format if not available on host
 - Configure git hooks: `git config core.hooksPath .githooks`
 
+### Commit Hygiene
+
+**CRITICAL**: Always squash related commits to keep the commit tree as clean as possible.
+
+**Before pushing changes:**
+1. Review your commits with `git log --oneline`
+2. Identify groups of related commits (e.g., multiple CI fixes, feature iterations, bug fixes)
+3. Squash related commits into single, meaningful commits using:
+   - Interactive rebase: `git rebase -i <base-commit>`
+   - Or soft reset: `git reset --soft <base-commit>` then `git commit`
+4. Use descriptive commit messages that explain the "why" not just the "what"
+
+**Commit grouping guidelines:**
+- CI/CD improvements → single commit
+- Feature development (localization, teleop, Docker) → single commit per feature
+- Bug fixes for the same issue → single commit
+- Documentation updates → single commit
+- Release commits → keep separate
+
+**Example:**
+```bash
+# Squash the last 5 commits into one
+git reset --soft HEAD~5
+git commit -m "feat: Add comprehensive localization improvements"
+```
+
 ## Common Issues
 
 ### Launch File Not Found
