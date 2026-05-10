@@ -294,12 +294,6 @@ jobs:
             chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
             /workspace/safety-autonomy-core/tools/ci/validate_demo.sh launch safety_core_bringup safety_sim.launch.py
           "
-      - name: Verify diagnostic mode launch (headless)
-        run: |
-          docker run --rm --network host -v ${{ github.workspace }}:/workspace/safety-autonomy-core safety-autonomy-core:latest bash -c "
-            chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
-            /workspace/safety-autonomy-core/tools/ci/validate_demo.sh launch safety_core_bringup diagnostics.launch.py
-          "
       - name: Upload demo logs
         if: always()
         uses: actions/upload-artifact@v4

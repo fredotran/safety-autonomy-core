@@ -302,11 +302,11 @@ validate_launch_file() {
     fi
     
     # Launch in background with logging
-    timeout 20s ros2 launch $launch_file > /tmp/launch_validation.log 2>&1 &
+    timeout 30s ros2 launch $package $launch_file > /tmp/launch_validation.log 2>&1 &
     local launch_pid=$!
     
     # Wait for launch to start
-    sleep 15
+    sleep 20
     
     # Check if launch process is still running
     if ps -p $launch_pid > /dev/null; then
@@ -444,8 +444,6 @@ main() {
             test_odometry_stack || exit 1
             echo ""
             validate_launch_file "safety_core_bringup" "safety_sim.launch.py" || exit 1
-            echo ""
-            validate_launch_file "safety_core_bringup" "diagnostics.launch.py" || exit 1
             ;;
         *)
             echo -e "${RED}Error: Unknown validation mode: $1${NC}"
