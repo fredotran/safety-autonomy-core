@@ -15,8 +15,8 @@ endif()
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 
-  # Performance optimizations
-  add_compile_options(-O3 -march=native -ffast-math)
+  # Performance optimizations (portable)
+  add_compile_options(-O2)
 
   # Link-time optimization
   add_link_options(-flto)

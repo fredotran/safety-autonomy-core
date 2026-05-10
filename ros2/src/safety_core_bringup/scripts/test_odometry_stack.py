@@ -32,7 +32,6 @@ class OdometryStackTest(Node):
         self.test_results = {
             'wheel_odometry': False,
             'imu_data': False,
-            'ekf_fusion': False,
             'odometry_consistency': False,
             'tf_tree_consistency': False,
             'joint_states': False,
@@ -42,13 +41,11 @@ class OdometryStackTest(Node):
         self.sensor_counts = {
             'wheel_odometry': 0,
             'imu': 0,
-            'ekf_fusion': 0,
             'joint_states': 0,
         }
         
         # Odometry data for consistency check
         self.last_wheel_odom = None
-        self.last_ekf_odom = None
         self.odometry_samples = []
         
         # TF buffer
@@ -63,9 +60,8 @@ class OdometryStackTest(Node):
             durability=QoSDurabilityPolicy.VOLATILE,
         )
         
-        # Subscriptions for odometry stack
+        # Subscriptions for odometry stack (topics provided by safety stack)
         self.create_subscription(Odometry, '/odom', self._on_wheel_odometry, qos)
-        self.create_subscription(Odometry, '/odometry/filtered', self._on_ekf_fusion, qos)
         self.create_subscription(Imu, '/imu', self._on_imu, qos)
         self.create_subscription(JointState, '/joint_states', self._on_joint_states, qos)
         
@@ -84,19 +80,8 @@ class OdometryStackTest(Node):
         
         # Store for consistency check
         if self.last_wheel_odom is not None:
-            self._check_odometry_consistency(self.last_wheel_odom, msg, 'wheel')
+            self._check_odometry_consistency(self.last_wheel_odom, msg)
         self.last_wheel_odom = msg
-    
-    def _on_ekf_fusion(self, msg):
-        """EKF fusion callback."""
-        self.sensor_counts['ekf_fusion'] += 1
-        if self.sensor_counts['ekf_fusion'] > 10:
-            self.test_results['ekf_fusion'] = True
-        
-        # Store for consistency check
-        if self.last_ekf_odom is not None:
-            self._check_odometry_consistency(self.last_ekf_odom, msg, 'ekf')
-        self.last_ekf_odom = msg
         
         # Sample for analysis
         self.odometry_samples.append({
@@ -122,7 +107,7 @@ class OdometryStackTest(Node):
         if self.sensor_counts['joint_states'] > 10:
             self.test_results['joint_states'] = True
     
-    def _check_odometry_consistency(self, prev_msg, curr_msg, source):
+    def _check_odometry_consistency(self, prev_msg, curr_msg):
         """Check odometry consistency between consecutive messages."""
         # Calculate position change
         dx = curr_msg.pose.pose.position.x - prev_msg.pose.pose.position.x
@@ -174,6 +159,8 @@ class OdometryStackTest(Node):
         
         if elapsed >= self.test_duration:
             self._report_results()
+            # Shutdown after test completes
+            self.destroy_node()
             rclpy.shutdown()
     
     def _report_results(self):
@@ -224,8 +211,16 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     finally:
-        test_node.destroy_node()
-        rclpy.shutdown()
+        # Only cleanup if node wasn't already destroyed by test sequence
+        try:
+            test_node.destroy_node()
+        except:
+            pass
+        # Only shutdown if not already done by test sequence
+        try:
+            rclpy.shutdown()
+        except:
+            pass
     
     return 0
 

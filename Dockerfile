@@ -6,7 +6,7 @@ FROM ros:jazzy-perception AS base
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
 
-# Install build dependencies and development tools
+# Install build dependencies, ROS2 packages, Python deps, and Xvfb in a single layer
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
@@ -17,10 +17,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-vcstool \
     python3-colcon-common-extensions \
     python3-rosdep \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install ROS2 Jazzy additional packages (Nav2, Gazebo, visualization, etc.)
-RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-jazzy-nav2-bringup \
     ros-jazzy-nav2-lifecycle-manager \
     ros-jazzy-nav2-collision-monitor \
@@ -33,18 +29,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-jazzy-nav2-behavior-tree \
     ros-jazzy-ros-gz-sim \
     ros-jazzy-ros-gz-bridge \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Python testing dependencies (using --break-system-packages for Ubuntu 24.04)
-RUN pip3 install --break-system-packages --no-cache-dir \
+    xvfb \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip3 install --break-system-packages --no-cache-dir \
     pytest \
     pytest-cov \
     vcstool
-
-# Install Xvfb for headless GUI testing in CI
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    xvfb \
-    && rm -rf /var/lib/apt/lists/*
 
 # Stage 2: Development stage with workspace setup and build
 FROM base AS development

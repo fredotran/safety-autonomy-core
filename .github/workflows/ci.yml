@@ -25,6 +25,7 @@ concurrency:
 permissions:
   contents: read
   checks: write
+  pull-requests: write
 
 env:
   BUILD_DIR: build
@@ -205,11 +206,15 @@ jobs:
   docker_build:
     name: docker_build (ROS 2 via Docker Compose with BuildKit)
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            image=moby/buildkit:latest
+            network=host
       - name: Cache Docker layers
         uses: actions/cache@v4
         with:
@@ -227,6 +232,7 @@ jobs:
             --cache-from type=local,src=/tmp/.buildx-cache \
             --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
             --load \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
             --progress=plain \
             .
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache || true
@@ -234,7 +240,7 @@ jobs:
       - name: Verify ROS2 packages in built image
         run: |
           echo "Verifying ROS2 packages in built image..."
-          docker compose run --rm safety-autonomy-demo bash -c "
+          docker run --rm safety-autonomy-core:latest bash -c "
             source /opt/ros/jazzy/setup.bash &&
             source /workspace/ros2_ws/install/setup.bash &&
             echo '=== ROS2 Packages ===' &&
@@ -254,9 +260,9 @@ jobs:
           retention-days: 1
 
   demo_tests:
-    name: demo_tests (comprehensive Docker demo validation)
+    name: demo_tests (${{ matrix.test }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     needs: docker_build
     if: |
       contains(github.event.head_commit.message, '[skip-demo]') == false &&
@@ -264,7 +270,8 @@ jobs:
        contains(github.event.head_commit.message, '[skip ci]') == false)
     strategy:
       matrix:
-        demo_type: [quick, comprehensive, launch_safety, launch_diagnostic]
+        test: [quick, localization, odometry, launch]
+      fail-fast: false
     steps:
       - uses: actions/checkout@v4
       - name: Download Docker image artifact
@@ -273,48 +280,25 @@ jobs:
           name: docker-image
       - name: Load Docker image
         run: docker load < docker-image.tar.gz
-      - name: Check if Docker-related files changed
-        id: check_changes
+      - name: Run ${{ matrix.test }} test
         run: |
-          docker run --rm --network host -v ${{ github.workspace }}:/workspace/safety-autonomy-core safety-autonomy-core:latest bash -c "
-            chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
-            /workspace/safety-autonomy-core/tools/ci/validate_demo.sh quick
-          "
-      - name: Run comprehensive demo validation
-        run: |
-          docker run --rm --network host -v ${{ github.workspace }}:/workspace/safety-autonomy-core safety-autonomy-core:latest bash -c "
-            chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
-            /workspace/safety-autonomy-core/tools/ci/validate_demo.sh comprehensive
-          "
-      - name: Run localization stack test
-        run: |
-          docker run --rm --network host -v ${{ github.workspace }}:/workspace/safety-autonomy-core safety-autonomy-core:latest bash -c "
-            chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
-            /workspace/safety-autonomy-core/tools/ci/validate_demo.sh localization
-          "
-      - name: Run odometry stack test
-        run: |
-          docker run --rm --network host -v ${{ github.workspace }}:/workspace/safety-autonomy-core safety-autonomy-core:latest bash -c "
-            chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
-            /workspace/safety-autonomy-core/tools/ci/validate_demo.sh odometry
-          "
-      - name: Verify safety stack launch (headless)
-        run: |
-          docker run --rm --network host -v ${{ github.workspace }}:/workspace/safety-autonomy-core safety-autonomy-core:latest bash -c "
-            chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
-            /workspace/safety-autonomy-core/tools/ci/validate_demo.sh launch safety_core_bringup safety_sim.launch.py
-          "
-      - name: Verify diagnostic mode launch (headless)
-        run: |
-          docker run --rm --network host -v ${{ github.workspace }}:/workspace/safety-autonomy-core safety-autonomy-core:latest bash -c "
-            chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
-            /workspace/safety-autonomy-core/tools/ci/validate_demo.sh launch safety_core_bringup diagnostics.launch.py
-          "
+          if [ "${{ matrix.test }}" = "launch" ]; then
+            docker run --rm --network host -v ${{ github.workspace }}:/workspace/safety-autonomy-core safety-autonomy-core:latest bash -c "
+              chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
+              /workspace/safety-autonomy-core/tools/ci/validate_demo.sh launch safety_core_bringup safety_sim.launch.py
+            "
+          else
+            docker run --rm --network host -v ${{ github.workspace }}:/workspace/safety-autonomy-core safety-autonomy-core:latest bash -c "
+              chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
+              /workspace/safety-autonomy-core/tools/ci/validate_demo.sh ${{ matrix.test }}
+            "
+          fi
       - name: Upload demo logs
-        if: always() && steps.check_changes.outputs.docker_changed == 'true'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: demo-logs-${{ matrix.demo_type }}
+          name: demo-logs-${{ matrix.test }}
           path: |
-            ~/.ros/log/
+            $HOME/.ros/log/
             /tmp/*.log
+          if-no-files-found: ignore

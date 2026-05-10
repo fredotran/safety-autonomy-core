@@ -5,6 +5,37 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3](https://github.com/fredotran/safety-autonomy-core/compare/v0.1.2...v0.1.3) (2026-05-10)
+
+
+### Bug Fixes
+
+* Add headless mode support and comprehensive localization/odometry tests ([f652755](https://github.com/fredotran/safety-autonomy-core/commit/f652755e20b27a06ad371d378e59474d09d03143))
+* Add headless mode support and comprehensive localization/odometry tests ([0fe26ed](https://github.com/fredotran/safety-autonomy-core/commit/0fe26ed229013a09a33cf5170bcc11e3f1568943))
+* Add headless mode support and comprehensive localization/odometry tests ([#24](https://github.com/fredotran/safety-autonomy-core/issues/24)) ([808a89f](https://github.com/fredotran/safety-autonomy-core/commit/808a89f8777270e842f6602d5b582fa479688b75))
+* Add volume mount to demo_tests docker run commands ([b339a5c](https://github.com/fredotran/safety-autonomy-core/commit/b339a5c901a9eec66bf6eaf6903f0b2f9ec9c5ee))
+* Correct artifact upload paths in CI workflow ([bf7d374](https://github.com/fredotran/safety-autonomy-core/commit/bf7d374d42cff492267902e45e31f0b645edc5b8))
+* Fix launch file validation and remove failing diagnostics test ([d5b19e9](https://github.com/fredotran/safety-autonomy-core/commit/d5b19e9d823fa69ca3af22ae6bf235956dcbcde6))
+* Increase wait times in validate_demo.sh for reliable node detection ([cde3cb1](https://github.com/fredotran/safety-autonomy-core/commit/cde3cb1bb989a385c8f7bf8da0d18724689b372d))
+* Remove comprehensive demo from CI pipeline ([b372f02](https://github.com/fredotran/safety-autonomy-core/commit/b372f022b03860662462b982af9e6069d8efda08))
+* Remove custom BuildKit image to avoid GHCR authentication issues ([9c6ab0a](https://github.com/fredotran/safety-autonomy-core/commit/9c6ab0adb433a43d831ddf59559bcca3debac639))
+* Resolve CI failures - Xvfb implementation and compiler flag fixes ([d7e2c5d](https://github.com/fredotran/safety-autonomy-core/commit/d7e2c5d30f140cad0a1f401a4bf12af89a7f2be4))
+* Simplify quick_demo.py to use single timer callback ([2797d62](https://github.com/fredotran/safety-autonomy-core/commit/2797d6264b88b16079bb239f34359df30d24df63))
+* Thoroughly fix exit code 124 timeout in quick_demo.py ([a63b0fb](https://github.com/fredotran/safety-autonomy-core/commit/a63b0fbe27d3a011d3055a418e5625ea851000d8))
+* Update localization and odometry stack tests for safety stack ([eb21391](https://github.com/fredotran/safety-autonomy-core/commit/eb21391d6e417299eaa0b9552ab8ed79b731b823))
+* Use topic-based detection for safety_envelope_node in CI validation ([c36c2ef](https://github.com/fredotran/safety-autonomy-core/commit/c36c2efacd9cc56eadee4f5c7a4af669a5baac99))
+
+
+### Performance
+
+* Optimize CI pipeline for faster execution ([266a9d7](https://github.com/fredotran/safety-autonomy-core/commit/266a9d76f0b48de22e177ac79ed0abbfc3a43048))
+
+
+### Documentation
+
+* Add agent parallelization guidelines to AGENTS.md ([d1726fe](https://github.com/fredotran/safety-autonomy-core/commit/d1726fe5af3453522b00ecb617ac40f926878ca8))
+* Update README to remove commercial license and add recent updates ([ddfc206](https://github.com/fredotran/safety-autonomy-core/commit/ddfc2067a77d69675e257de978c22aed29ca62d0))
+
 ## [0.1.2](https://github.com/fredotran/safety-autonomy-core/compare/v0.1.1...v0.1.2) (2026-05-08)
 
 
