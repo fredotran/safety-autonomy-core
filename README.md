@@ -22,7 +22,7 @@ Designed for AGV/AMR platforms operating in dynamic industrial environments with
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start {#quick-start}
 
 ### Option 1: Docker Demo (Recommended)
 
@@ -46,7 +46,7 @@ ctest --test-dir build --output-on-failure
 
 ---
 
-## ✨ Features
+## ✨ Features {#features}
 
 ### Core Safety Components
 
@@ -71,7 +71,7 @@ ctest --test-dir build --output-on-failure
 
 ---
 
-## 🎮 Demo
+## 🎮 Demo {#demo}
 
 ### Interactive Demo System
 
@@ -107,7 +107,7 @@ The project includes a comprehensive ROS2 demo with Gazebo simulation:
 
 ---
 
-## 📋 Requirements
+## 📋 Requirements {#requirements}
 
 ### For Library Development
 
@@ -125,7 +125,7 @@ The project includes a comprehensive ROS2 demo with Gazebo simulation:
 
 ---
 
-## 🔧 Installation
+## 🔧 Installation {#installation}
 
 ### Method 1: Docker (Recommended)
 
@@ -163,7 +163,7 @@ cmake --preset coverage # Coverage instrumentation
 
 ---
 
-## 💻 Usage
+## 💻 Usage {#usage}
 
 ### Library Integration
 
@@ -196,7 +196,7 @@ auto context = system::build_context();
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ Architecture {#architecture}
 
 ### System Overview
 
@@ -243,7 +243,7 @@ Monitors:
 
 ---
 
-## 📚 Documentation
+## 📚 Documentation {#documentation}
 
 ### Core Documentation
 
