@@ -1,5 +1,5 @@
 # Multi-stage Dockerfile for safety-autonomy-core ROS2 demo
-# Stage 1: Base image with build dependencies
+# Stage 1: Base image with build dependencies (cached separately)
 FROM ros:jazzy-perception AS base
 
 # Avoid interactive prompts
@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
     make \
+    ninja-build \
     python3-pip \
     python3-vcstool \
     python3-colcon-common-extensions \

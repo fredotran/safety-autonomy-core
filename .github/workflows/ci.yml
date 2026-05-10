@@ -33,6 +33,7 @@ env:
   COVERAGE_MIN_LINE: "80"
   COVERAGE_MIN_BRANCH: "55"
   CCACHE_DIR: /tmp/ccache
+  APT_CACHE_DIR: /var/cache/apt
 
 jobs:
   format_check:
@@ -44,6 +45,12 @@ jobs:
       (contains(github.event.head_commit.message, '[skip-format]') == false &&
        contains(github.event.head_commit.message, '[ci skip]') == false &&
        contains(github.event.head_commit.message, '[skip ci]') == false)
+    paths:
+      - 'include/**'
+      - 'src/**'
+      - 'tests/**'
+      - 'ros2/src/**'
+      - '.github/workflows/ci.yml'
     steps:
       - uses: actions/checkout@v4
       - name: Run clang-format --dry-run --Werror
@@ -65,6 +72,12 @@ jobs:
       (contains(github.event.head_commit.message, '[skip-tidy]') == false &&
        contains(github.event.head_commit.message, '[ci skip]') == false &&
        contains(github.event.head_commit.message, '[skip ci]') == false)
+    paths:
+      - 'include/**'
+      - 'src/**'
+      - 'tests/**'
+      - '.github/workflows/ci.yml'
+      - '.cppcheck-suppressions'
     steps:
       - uses: actions/checkout@v4
       - name: Cache ccache
@@ -77,10 +90,10 @@ jobs:
       - name: Cache apt packages
         uses: actions/cache@v4
         with:
-          path: /var/cache/apt
-          key: apt-${{ runner.os }}-clang-tidy-${{ github.sha }}
+          path: ${{ env.APT_CACHE_DIR }}
+          key: apt-${{ runner.os }}-${{ hashFiles('**/lockfiles') }}
           restore-keys: |
-            apt-${{ runner.os }}-clang-tidy-
+            apt-${{ runner.os }}-
       - name: Install build deps
         run: |
           sudo apt-get update -qq
@@ -134,10 +147,10 @@ jobs:
       - name: Cache apt packages
         uses: actions/cache@v4
         with:
-          path: /var/cache/apt
-          key: apt-${{ runner.os }}-hook-smoke-${{ github.sha }}
+          path: ${{ env.APT_CACHE_DIR }}
+          key: apt-${{ runner.os }}-${{ hashFiles('**/lockfiles') }}
           restore-keys: |
-            apt-${{ runner.os }}-hook-smoke-
+            apt-${{ runner.os }}-
       - name: Install build deps
         run: |
           sudo apt-get update -qq
@@ -194,6 +207,12 @@ jobs:
     name: build_and_test (sanitizers + ctest)
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    paths:
+      - 'include/**'
+      - 'src/**'
+      - 'tests/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/ci.yml'
     steps:
       - uses: actions/checkout@v4
       - name: Cache ccache
@@ -215,10 +234,10 @@ jobs:
       - name: Cache apt packages
         uses: actions/cache@v4
         with:
-          path: /var/cache/apt
-          key: apt-${{ runner.os }}-build-and-test-${{ github.sha }}
+          path: ${{ env.APT_CACHE_DIR }}
+          key: apt-${{ runner.os }}-${{ hashFiles('**/lockfiles') }}
           restore-keys: |
-            apt-${{ runner.os }}-build-and-test-
+            apt-${{ runner.os }}-
       - name: Install build deps
         run: |
           sudo apt-get update -qq
@@ -249,7 +268,7 @@ jobs:
             fi
           done
       - name: ctest with parallel execution
-        run: ctest --test-dir ${BUILD_DIR} --output-on-failure --parallel $(nproc)
+        run: ctest --test-dir ${BUILD_DIR} --output-on-failure --parallel $(nproc) --schedule-random
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -266,6 +285,12 @@ jobs:
     env:
       CC: gcc
       CXX: g++
+    paths:
+      - 'include/**'
+      - 'src/**'
+      - 'tests/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/ci.yml'
     steps:
       - uses: actions/checkout@v4
       - name: Cache ccache
@@ -285,10 +310,10 @@ jobs:
       - name: Cache apt packages
         uses: actions/cache@v4
         with:
-          path: /var/cache/apt
-          key: apt-${{ runner.os }}-coverage-${{ github.sha }}
+          path: ${{ env.APT_CACHE_DIR }}
+          key: apt-${{ runner.os }}-${{ hashFiles('**/lockfiles') }}
           restore-keys: |
-            apt-${{ runner.os }}-coverage-
+            apt-${{ runner.os }}-
       - name: Install build deps
         run: |
           sudo apt-get update -qq
@@ -309,7 +334,7 @@ jobs:
       - name: Show ccache stats
         run: ccache -s
       - name: ctest (coverage)
-        run: ctest --test-dir build-coverage --output-on-failure --parallel $(nproc)
+        run: ctest --test-dir build-coverage --output-on-failure --parallel $(nproc) --schedule-random
       - name: gcovr gate
         run: |
           gcovr --root . --filter src --filter include --exclude build-coverage \
@@ -329,6 +354,12 @@ jobs:
     name: docker_build (ROS 2 via Docker Compose with BuildKit)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    paths:
+      - 'ros2/**'
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - '.dockerignore'
+      - '.github/workflows/ci.yml'
     steps:
       - uses: actions/checkout@v4
       - name: Set up Docker Buildx
@@ -337,29 +368,53 @@ jobs:
           driver-opts: |
             image=moby/buildkit:latest
             network=host
-      - name: Cache Docker layers
+      - name: Cache Docker layers (base)
         uses: actions/cache@v4
         with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          path: /tmp/.buildx-cache-base
+          key: ${{ runner.os }}-buildx-base-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-buildx-
-      - name: Build Docker image with BuildKit and ROS2 workspace
+            ${{ runner.os }}-buildx-base-
+      - name: Cache Docker layers (development)
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache-dev
+          key: ${{ runner.os }}-buildx-dev-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-dev-
+      - name: Build Docker base image (cached separately)
         run: |
-          echo "Building Docker image with ROS2 workspace using BuildKit..."
+          echo "Building Docker base image with dependencies..."
+          docker buildx build \
+            --file Dockerfile \
+            --target base \
+            --tag safety-autonomy-core:base \
+            --cache-from type=local,src=/tmp/.buildx-cache-base \
+            --cache-to type=local,dest=/tmp/.buildx-cache-base-new,mode=max \
+            --cache-from type=gha \
+            --cache-to type=gha,mode=max \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
+            --progress=plain \
+            .
+          mv /tmp/.buildx-cache-base-new /tmp/.buildx-cache-base || true
+          echo "✓ Base image built successfully"
+      - name: Build Docker development image with ROS2 workspace
+        run: |
+          echo "Building Docker development image with ROS2 workspace using BuildKit..."
           docker buildx build \
             --file Dockerfile \
             --target development \
             --tag safety-autonomy-core:latest \
-            --cache-from type=local,src=/tmp/.buildx-cache \
+            --cache-from type=local,src=/tmp/.buildx-cache-dev \
+            --cache-from type=local,src=/tmp/.buildx-cache-base \
+            --cache-to type=local,dest=/tmp/.buildx-cache-dev-new,mode=max \
             --cache-from type=gha \
-            --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
             --cache-to type=gha,mode=max \
             --load \
             --build-arg BUILDKIT_INLINE_CACHE=1 \
             --progress=plain \
             .
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache || true
+          mv /tmp/.buildx-cache-dev-new /tmp/.buildx-cache-dev || true
           echo "✓ Docker image built successfully with ROS2 workspace"
       - name: Verify ROS2 packages in built image
         run: |
