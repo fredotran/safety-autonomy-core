@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>safety_autonomy_core</name>
-  <version>0.1.0</version>
+  <version>1.0.0</version>
   <description>Safety Autonomy Core library packaged for ROS 2 via ament_cmake.</description>
 
   <maintainer email="contact@redearthos.com">RedEarth OS</maintainer>

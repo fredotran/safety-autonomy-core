@@ -291,7 +291,19 @@ Monitors:
 | `SAFETY_CORE_ENABLE_SANITIZERS` | `ON` | Address/UB sanitizers for dev builds |
 | `SAFETY_CORE_ENABLE_WERROR` | `ON` | Treat warnings as errors |
 | `SAFETY_CORE_ENABLE_COVERAGE` | `OFF` | GCC coverage instrumentation |
+| `SAFETY_CORE_ENABLE_SIZE_OPTIMIZATIONS` | `OFF` | Size optimizations for low-resource systems (NOT for safety-critical use) |
 | `SAFETY_CORE_ENABLE_AMENT` | `OFF` | ROS 2 ament_cmake integration |
+
+### Build Presets
+
+| Preset | Use Case | Safety-Critical |
+|---------|----------|-----------------|
+| `dev` | Development with sanitizers | No |
+| `safety` | Safety-critical release build | **Yes** |
+| `coverage` | Coverage instrumentation | No |
+| `minimal` | Size-optimized for low-resource systems | **No** |
+
+**IMPORTANT**: For safety-critical applications, always use the `safety` preset (Release build). The `minimal` preset prioritizes size over performance and may affect timing determinism, making it unsuitable for safety-critical systems.
 
 ---
 

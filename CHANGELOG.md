@@ -5,6 +5,34 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] (2026-05-10)
+
+### Added
+- **Low-Resource Build Configuration**: New `minimal` preset for size-optimized builds on low-budget PCs
+  - Added `SAFETY_CORE_ENABLE_SIZE_OPTIMIZATIONS` option for size optimization flags (-Os, -ffunction-sections, -fdata-sections, --gc-sections)
+  - Added `SAFETY_CORE_ENABLE_LTO` option for Link Time Optimization
+  - New CMake preset `minimal` with MinSizeRel build type and size optimizations enabled
+  - Optimized for systems with limited CPU and memory resources
+- **Performance Optimizations**: Size-optimized builds reduce memory footprint while maintaining safety-critical guarantees
+- **Build Configuration**: Enhanced CMake presets with minimal resource configuration for embedded and low-end systems
+
+### Changed
+- **Version Update**: Bumped version from 0.1.3 to 1.0.0 for first stable release
+- **Documentation**: Removed emojis from all section headers to ensure reliable GitHub anchor links
+- **Build System**: Improved CMake configuration with better optimization options for different use cases
+
+### Performance
+- **Size Optimization**: Minimal build reduces library size while maintaining full functionality
+- **Memory Efficiency**: Optimized for low-memory systems with size-focused compiler flags
+- **Build Options**: Flexible build configurations for different deployment scenarios (dev, safety, coverage, minimal)
+
+### Documentation
+- **README.md**: Streamlined with focus on quick start and core features
+- **OVERVIEW.md**: Comprehensive project overview with architecture and features
+- **CONTRIBUTING.md**: Enhanced contribution guidelines with getting started section
+- **CI_DOCUMENTATION.md**: Consolidated CI/CD pipeline documentation
+- **All Documentation**: Fixed table of contents anchor links by removing emojis from headers
+
 ## [0.1.3](https://github.com/fredotran/safety-autonomy-core/compare/v0.1.2...v0.1.3) (2026-05-10)
 
 
@@ -249,8 +277,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Time Utilities**: Budget helpers and time-point abstractions.
 - CMakeLists.txt with library and test targets.
 
-[Unreleased]: https://gitlab.com/fredotran/safety-autonomy-core/-/compare/v0.1.0...HEAD
-[0.1.0]: https://gitlab.com/fredotran/safety-autonomy-core/-/compare/v0.0.9...v0.1.0
+[Unreleased]: https://gitlab.com/fredotran/safety-autonomy-core/-/compare/v1.0.0...HEAD
+[1.0.0]: https://gitlab.com/fredotran/safety-autonomy-core/-/compare/v0.1.3...v1.0.0
+[0.1.3]: https://gitlab.com/fredotran/safety-autonomy-core/-/compare/v0.1.2...v0.1.3
 [0.0.9]: https://gitlab.com/fredotran/safety-autonomy-core/-/compare/v0.0.8...v0.0.9
 [0.0.8]: https://gitlab.com/fredotran/safety-autonomy-core/-/compare/v0.0.7...v0.0.8
 [0.0.7]: https://gitlab.com/fredotran/safety-autonomy-core/-/compare/v0.0.6...v0.0.7
