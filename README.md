@@ -20,6 +20,27 @@ Designed for AGV/AMR platforms operating in dynamic warehouses (pedestrians, for
 | **Diagnostics** | Fixed-capacity diagnostic events (no heap in transport path), health beacons, truncation observability, pluggable transports |
 | **Platform HAL** | Clock abstraction, 6-DOF IMU interface, odometry increments, drive actuator with command freshness watchdog |
 
+## Recent Updates
+
+### CI/CD Enhancements (Latest)
+- **Headless Mode Support**: Added Xvfb virtual display for CI environments, enabling Gazebo simulation without physical display
+- **Comprehensive Testing**: Added localization and odometry stack tests with advanced sensor fusion validation
+- **Docker Build Optimization**: Enhanced BuildKit configuration with layer caching and improved verification
+- **Enhanced CI Pipeline**: Merged build and verification steps, improved progress output, and fixed authentication issues
+
+### Advanced Localization Stack
+- **Visual Odometry**: ORB feature tracking using OpenCV for camera-based pose estimation
+- **Adaptive EKF**: Dynamic process noise adjustment based on wheel slip detection
+- **IMU Bias Estimation**: 21-state EKF with online gyro/accel bias calibration
+- **Sensor Fault Detection**: Comprehensive fault monitoring for wheel odometry, IMU, GPS, and visual odometry
+- **Kidnapping Detection**: Pose jump analysis for detecting unexpected robot repositioning
+- **Localization Confidence Scoring**: Real-time uncertainty assessment
+
+### Testing Infrastructure
+- **Localization Stack Tests**: Comprehensive validation of visual odometry, adaptive EKF, IMU bias estimation, sensor fault detection, kidnapping detection, and localization confidence scoring
+- **Odometry Stack Tests**: Validation of wheel odometry, IMU integration, EKF fusion, odometry accuracy, TF tree consistency, and joint states
+- **CI Integration**: Automated testing of localization and odometry stacks with 45-second timeouts
+
 ## Requirements
 
 ### For Library Development
@@ -45,7 +66,7 @@ The fastest way to see the safety system in action:
 # Select demo option from the menu
 ```
 
-This uses Docker to run the complete ROS2 Jazzy + Gazebo simulation without requiring any local ROS2 installation. See [DOCKER.md](DOCKER.md) for complete Docker setup guide.
+This uses Docker to run the complete ROS2 Jazzy + Gazebo simulation without requiring any local ROS2 installation. See [markdown/docs/DOCKER.md](markdown/docs/DOCKER.md) for complete Docker setup guide.
 
 ### Library Development
 
@@ -92,7 +113,7 @@ Docker is the default and recommended way to run the demo. It provides a complet
 - NVIDIA Docker runtime (for GPU support)
 - X11 server (for display forwarding)
 
-See [DOCKER.md](DOCKER.md) for complete Docker deployment guide, including:
+See [markdown/docs/DOCKER.md](markdown/docs/DOCKER.md) for complete Docker deployment guide, including:
 - GPU setup and configuration
 - Display forwarding for Linux/Mac/Windows
 - Hardware integration (sensors, actuators)
@@ -133,7 +154,7 @@ For developers with local ROS2 Jazzy installation:
 
 ### Documentation
 
-- [DOCKER.md](DOCKER.md) - Complete Docker deployment guide, including GPU support, display forwarding, and hardware integration
+- [markdown/docs/DOCKER.md](markdown/docs/DOCKER.md) - Complete Docker deployment guide, including GPU support, display forwarding, and hardware integration
 - [DEMO_GUIDE.md](DEMO_GUIDE.md) - Complete demo documentation, including detailed instructions for each demo mode, best practices, and advanced usage examples
 - [DEMO_TROUBLESHOOTING.md](DEMO_TROUBLESHOOTING.md) - Comprehensive troubleshooting guide for simulation, safety nodes, demo scripts, and performance issues
 - [ROS 2 README](ros2/README.md) - ROS 2 integration details and package documentation
@@ -165,6 +186,7 @@ safety-autonomy-core/
 │   └── dev/run_quality_gate.sh
 ├── markdown/                  # Documentation and safety case artifacts
 │   └── docs/                  #   Documentation
+│       ├── DOCKER.md          #   Complete Docker deployment guide
 │       ├── diagnostics/       #   Integration guides
 │       └── safety_case/       #   ISO 26262 / ISO 13849 evidence scaffolding
 ├── ros2/                      # ROS 2 wrapper + AGV simulation
@@ -174,12 +196,11 @@ safety-autonomy-core/
 ├── .dockerignore              # Docker build context optimization
 ├── .env.example               # Environment variable template for Docker
 ├── Makefile                   # Docker convenience commands
-├── DOCKER.md                  # Complete Docker deployment guide
 ├── setup_demo.sh              # ROS 2 demo build + launch script (Docker-first)
 ├── README.md                  # Project documentation
 ├── CHANGELOG.md               # Version history
 ├── CONTRIBUTING.md            # Contribution guidelines
-├── LICENSE                    # Commercial license terms
+├── LICENSE                    # MIT License
 ├── CMakeLists.txt             # Build system
 ├── CMakePresets.json          # Dev/safety/coverage presets
 ├── .clang-format              # Code style
@@ -431,8 +452,17 @@ GitHub Actions workflows live under [`.github/workflows/`](.github/workflows/):
 | Policy | `policy_guard` | Banned API checks (exceptions, dynamic alloc, abort) |
 | Policy | `safety_case_guard` | Safety artifact presence verification |
 | Build | `build_and_test` | CMake build + ctest (sanitizers enabled) |
-| Coverage | `coverage` | gcovr gate (line: 80%, branch: 55%) |
-| ROS 2 | `docker_build` | Docker Compose build of ROS 2 packages (Jazzy + Gazebo + Nav2) |
+|| Coverage | `coverage` | gcovr gate (line: 80%, branch: 55%) |
+|| ROS 2 | `docker_build` | Docker Compose build of ROS 2 packages (Jazzy + Gazebo + Nav2) with BuildKit optimizations |
+|| ROS 2 | `localization_tests` | Localization stack validation (visual odometry, adaptive EKF, sensor fault detection) |
+|| ROS 2 | `odometry_tests` | Odometry stack validation (wheel odometry, IMU integration, EKF fusion) |
+|| ROS 2 | `demo_tests` | Comprehensive demo validation with headless mode (Xvfb) |
+
+**Recent CI Enhancements:**
+- **Headless Mode**: Xvfb virtual display for Gazebo simulation in CI environments
+- **BuildKit Optimization**: Layer caching and enhanced verification for faster builds
+- **Comprehensive Testing**: Localization and odometry stack tests with 45-second timeouts
+- **Enhanced Verification**: Package count and structured output for better debugging
 
 ## Release Process
 
@@ -484,5 +514,11 @@ See `CONTRIBUTING.md` for:
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
+
+**License Terms:**
+- ✅ Free to use, modify, and distribute
+- ✅ Suitable for commercial use
+- ✅ No warranty or liability included
+- ✅ Community-driven development
 
 Copyright (c) 2026 RedEarth OS
