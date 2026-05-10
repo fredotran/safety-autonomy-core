@@ -9,7 +9,7 @@ Designed for AGV/AMR platforms operating in dynamic industrial environments with
 
 ---
 
-## 📑 Table of Contents
+## Table of Contents
 
 - [Quick Start](#quick-start)
 - [Features](#features)
@@ -22,7 +22,7 @@ Designed for AGV/AMR platforms operating in dynamic industrial environments with
 
 ---
 
-## 🚀 Quick Start {#quick-start}
+## Quick Start
 
 ### Option 1: Docker Demo (Recommended)
 
@@ -46,7 +46,7 @@ ctest --test-dir build --output-on-failure
 
 ---
 
-## ✨ Features {#features}
+## Features
 
 ### Core Safety Components
 
@@ -71,7 +71,7 @@ ctest --test-dir build --output-on-failure
 
 ---
 
-## 🎮 Demo {#demo}
+## Demo
 
 ### Interactive Demo System
 
@@ -107,7 +107,7 @@ The project includes a comprehensive ROS2 demo with Gazebo simulation:
 
 ---
 
-## 📋 Requirements {#requirements}
+## Requirements
 
 ### For Library Development
 
@@ -125,7 +125,7 @@ The project includes a comprehensive ROS2 demo with Gazebo simulation:
 
 ---
 
-## 🔧 Installation {#installation}
+## Installation
 
 ### Method 1: Docker (Recommended)
 
@@ -163,7 +163,7 @@ cmake --preset coverage # Coverage instrumentation
 
 ---
 
-## 💻 Usage {#usage}
+## Usage
 
 ### Library Integration
 
@@ -196,7 +196,7 @@ auto context = system::build_context();
 
 ---
 
-## 🏗️ Architecture {#architecture}
+## Architecture
 
 ### System Overview
 
@@ -243,7 +243,7 @@ Monitors:
 
 ---
 
-## 📚 Documentation {#documentation}
+## Documentation
 
 ### Core Documentation
 
@@ -266,7 +266,7 @@ Monitors:
 
 ---
 
-## 🔒 Safety-Critical Features
+## Safety-Critical Features
 
 ### Compliance
 
@@ -284,7 +284,7 @@ Monitors:
 
 ---
 
-## 📊 Build Options
+## Build Options
 
 | Option | Default | Description |
 |--------|---------|-------------|
@@ -295,7 +295,7 @@ Monitors:
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
@@ -316,7 +316,7 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 
 ---
 
-## 📦 Packaging
+## Packaging
 
 Generate installable archives:
 
@@ -328,13 +328,13 @@ Produces `.tar.gz` and `.zip` artifacts with CMake config files for downstream i
 
 ---
 
-## 📄 License
+## License
 
 MIT License - See [LICENSE](LICENSE) file for details
 
 ---
 
-## 🆘 Support
+## Support
 
 - **Documentation**: See [OVERVIEW.md](OVERVIEW.md) for comprehensive project information
 - **CI/CD**: See [CI_DOCUMENTATION.md](CI_DOCUMENTATION.md) for pipeline details
