@@ -15,6 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Advanced Localization Stack**: Comprehensive sensor fusion and fault detection system for robust AGV localization
+  - **Visual Odometry Node**: ORB feature tracking using OpenCV for camera-based pose estimation with motion estimation and camera calibration support
+  - **Adaptive EKF with Wheel Slip Detection**: Dynamic process noise adjustment based on motion state, compares wheel odometry with IMU/visual odometry to detect slip events
+  - **IMU Bias Estimation**: 21-state EKF configuration with online gyro/accel bias estimation for long-term IMU accuracy and automatic calibration
+  - **Sensor Fault Detection**: Comprehensive fault monitoring for wheel odometry, IMU, GPS, and visual odometry with timeout, noise, out-of-range, and frozen sensor detection
+  - **Enhanced SLAM Configurations**: Warehouse-optimized SLAM parameters with extended loop closure parameters and localization mode support for pre-built maps
+  - **Environment-Specific Parameter Presets**: Optimized configurations for outdoor (GPS-available), indoor (GPS-denied SLAM), and warehouse (map-based) navigation scenarios
+  - **Enhanced Localization Monitor**: Kidnapping detection via pose jump analysis, localization confidence scoring, TF tree consistency monitoring, and sensor timeout monitoring
+  - **EKF YAML Parsing Fix**: Converted multi-line YAML arrays to single-line format to fix ROS2 container parsing errors
 - **Setup Demo Script**: `setup_demo.sh` convenience script at repository root for automated ROS 2 workspace build and launch with interactive menu.
 - **LICENSE File**: Added proprietary commercial license with per-robot/per-project licensing terms.
 - **CI Improvements**: Enhanced GitLab CI with:

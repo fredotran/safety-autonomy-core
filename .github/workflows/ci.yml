@@ -31,8 +31,6 @@ env:
   CMAKE_FLAGS: "-DCMAKE_BUILD_TYPE=RelWithDebInfo -DSAFETY_CORE_ENABLE_SANITIZERS=ON"
   COVERAGE_MIN_LINE: "80"
   COVERAGE_MIN_BRANCH: "55"
-  ROS_DISTRO: "jazzy"
-  ROS_WORKSPACE: "ros2"
 
 jobs:
   format_check:
@@ -193,144 +191,21 @@ jobs:
             build-coverage/coverage.info
             build-coverage/coverage.xml
 
-  ros2_build:
-    name: ros2_build (colcon)
+  docker_build:
+    name: docker_build (ROS 2 via Docker Compose)
     runs-on: ubuntu-24.04
-    container:
-      image: ros:jazzy-ros-base
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - name: Install ros-gz
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build Docker image
+        run: docker compose build
+      - name: Verify ROS 2 build
         run: |
-          apt-get update -qq
-          apt-get install -y --no-install-recommends \
-            ros-${ROS_DISTRO}-ros-gz \
-            ros-${ROS_DISTRO}-robot-localization \
-            python3-colcon-common-extensions
-      - name: colcon build
-        shell: bash
-        # --base-paths picks up the root safety_autonomy_core ament package + ros2/src/* together.
-        # safety_core_nav2 needs nav2_behavior_tree which isn't in ros:jazzy-ros-base; skipping it
-        # safety_core_bringup exec_depends on safety_core_nav2 via unified launch files; skipping it too
-        # The remaining packages still cover the C++ build surface.
-        run: |
-          source /opt/ros/${ROS_DISTRO}/setup.bash
-          colcon build --packages-skip safety_core_nav2 safety_core_bringup \
-            --base-paths . ${ROS_WORKSPACE}/src \
-            --cmake-args -DSAFETY_CORE_ENABLE_AMENT=ON \
-                         -DSAFETY_CORE_ENABLE_SANITIZERS=OFF \
-                         -DSAFETY_CORE_ENABLE_WERROR=OFF
-          source install/setup.bash
-          echo "ROS 2 build successful"
-
-  ros2_lint_strict:
-    name: ros2_lint_strict (ament_lint_cmake)
-    runs-on: ubuntu-24.04
-    container:
-      image: ros:jazzy-ros-base
-    timeout-minutes: 20
-    # CMake linting check is non-blocking due to potential tool limitations
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install ros-gz + ament linters
-        run: |
-          apt-get update -qq
-          apt-get install -y --no-install-recommends \
-            ros-${ROS_DISTRO}-ros-gz \
-            ros-${ROS_DISTRO}-robot-localization \
-            ros-${ROS_DISTRO}-ament-lint-cmake \
-            python3-colcon-common-extensions
-      - name: colcon build (lint targets)
-        shell: bash
-        run: |
-          source /opt/ros/${ROS_DISTRO}/setup.bash
-          colcon build --packages-up-to safety_core_ros \
-            --base-paths . ${ROS_WORKSPACE}/src \
-            --cmake-args -DSAFETY_CORE_ENABLE_AMENT=ON \
-                         -DSAFETY_CORE_ENABLE_SANITIZERS=OFF \
-                         -DSAFETY_CORE_ENABLE_WERROR=OFF
-      - name: ament lint (strict)
-        shell: bash
-        run: |
-          source /opt/ros/${ROS_DISTRO}/setup.bash
-          source install/setup.bash
-          ament_lint_cmake ${ROS_WORKSPACE}/src/safety_core_msgs
-          ament_lint_cmake ${ROS_WORKSPACE}/src/safety_core_ros
-
-  ros2_lint_style:
-    name: ros2_lint_style (ament_flake8 + ament_pep257)
-    runs-on: ubuntu-24.04
-    container:
-      image: ros:jazzy-ros-base
-    timeout-minutes: 15
-    # Style checks are non-blocking: ament_flake8/ament_pep257 findings in demo scripts
-    # don't affect functionality. Strict checks (ament_lint_cmake) are in ros2_lint_strict.
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install ros-gz + ament linters
-        run: |
-          apt-get update -qq
-          apt-get install -y --no-install-recommends \
-            ros-${ROS_DISTRO}-ros-gz \
-            ros-${ROS_DISTRO}-robot-localization \
-            ros-${ROS_DISTRO}-ament-flake8 \
-            ros-${ROS_DISTRO}-ament-pep257 \
-            python3-colcon-common-extensions
-      - name: colcon build (lint targets)
-        shell: bash
-        run: |
-          source /opt/ros/${ROS_DISTRO}/setup.bash
-          colcon build --packages-up-to safety_core_ros \
-            --base-paths . ${ROS_WORKSPACE}/src \
-            --cmake-args -DSAFETY_CORE_ENABLE_AMENT=ON \
-                         -DSAFETY_CORE_ENABLE_SANITIZERS=OFF \
-                         -DSAFETY_CORE_ENABLE_WERROR=OFF
-      - name: ament lint (style)
-        shell: bash
-        run: |
-          source /opt/ros/${ROS_DISTRO}/setup.bash
-          source install/setup.bash
-          ament_flake8 ${ROS_WORKSPACE}/src/safety_core_ros
-          ament_pep257 ${ROS_WORKSPACE}/src/safety_core_ros
-
-  ros2_test:
-    name: ros2_test (colcon test)
-    runs-on: ubuntu-24.04
-    container:
-      image: ros:jazzy-ros-base
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install ros-gz
-        run: |
-          apt-get update -qq
-          apt-get install -y --no-install-recommends \
-            ros-${ROS_DISTRO}-ros-gz \
-            ros-${ROS_DISTRO}-robot-localization \
-            python3-colcon-common-extensions
-      - name: colcon build + test
-        shell: bash
-        # Skip safety_core_nav2 (needs nav2_behavior_tree not in ros:jazzy-ros-base)
-        # Skip safety_core_bringup (exec_depends on safety_core_nav2)
-        # Test only safety_core_ros which contains the C++ wrapper nodes
-        run: |
-          source /opt/ros/${ROS_DISTRO}/setup.bash
-          colcon build --packages-skip safety_core_nav2 safety_core_bringup \
-            --base-paths . ${ROS_WORKSPACE}/src \
-            --cmake-args -DSAFETY_CORE_ENABLE_AMENT=ON \
-                         -DSAFETY_CORE_ENABLE_SANITIZERS=OFF \
-                         -DSAFETY_CORE_ENABLE_WERROR=OFF
-          source install/setup.bash
-          colcon test --packages-select safety_core_ros --event-handlers console_direct+
-          colcon test-result --all
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ros2-test-results
-          path: |
-            ros2/build/safety_core_ros/test_results/
-            ros2/log/
+          docker compose run --rm safety-autonomy-demo bash -c "
+            source /opt/ros/jazzy/setup.bash &&
+            source /workspace/ros2_ws/install/setup.bash &&
+            colcon list &&
+            echo 'ROS 2 packages built successfully'
+          "

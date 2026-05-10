@@ -312,7 +312,7 @@ export(EXPORT safety_core_targets
 set(CPACK_PACKAGE_NAME "safety-core")
 set(CPACK_PACKAGE_VENDOR "LeafHatRobotics Inc.")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Safety Autonomy Core library and demo application")
-set(CPACK_PACKAGE_CONTACT "support@leafhatrobotics.com")
+set(CPACK_PACKAGE_CONTACT "noreply@example.com")
 set(CPACK_PACKAGE_FILE_NAME
     "${CPACK_PACKAGE_NAME}-${PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
 set(CPACK_GENERATOR "TGZ;ZIP")

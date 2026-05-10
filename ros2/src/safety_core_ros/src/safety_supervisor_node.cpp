@@ -9,6 +9,7 @@ using namespace std::chrono_literals;
 using safety_core::safety::SafetyZone;
 using safety_core::sm::Mode;
 using std::placeholders::_1;
+using std::placeholders::_2;
 
 namespace safety_core_ros
 {
@@ -32,6 +33,10 @@ namespace safety_core_ros
         odom_sub_ = create_subscription<nav_msgs::msg::Odometry>("odom", QosConfig::sensor_qos(),
                                                                  std::bind(&SafetySupervisorNode::on_odom, this, _1));
 
+        // Create clear fault service for simulation/testing
+        clear_fault_srv_ = create_service<std_srvs::srv::Trigger>(
+            "safety/clear_fault", std::bind(&SafetySupervisorNode::on_clear_fault, this, _1, _2));
+
         // Create timer for periodic checks
         timer_ = create_wall_timer(50ms, std::bind(&SafetySupervisorNode::timer_tick, this));
 
@@ -46,6 +51,20 @@ namespace safety_core_ros
 
         supervisor_ = std::make_unique<safety_core::safety::SafetySupervisor>(
             machine_.get(), diagnostic_transport_.get(), clock_.get());
+
+        // Clear any latched fault from previous runs (for simulation/testing)
+        if (machine_->fault_latched())
+        {
+            const safety_core::Result clear_result = machine_->clear_fault();
+            if (clear_result.ok())
+            {
+                RCLCPP_INFO(get_logger(), "Cleared latched fault from previous run");
+            }
+            else
+            {
+                RCLCPP_WARN(get_logger(), "Failed to clear fault: %s", clear_result.message.data());
+            }
+        }
 
         // Initialize in Idle state
         (void)machine_->transition_to(Mode::Idle);
@@ -68,7 +87,18 @@ namespace safety_core_ros
 
     void SafetySupervisorNode::on_envelope(const safety_core_msgs::msg::EnvelopeStatus::ConstSharedPtr msg)
     {
-        latest_zone_ = static_cast<SafetyZone>(msg->zone.zone);
+        latest_zone_            = static_cast<SafetyZone>(msg->zone.zone);
+        const Mode current_mode = machine_->mode();
+
+        // Always check for auto-transition from Idle to Moving when in Clear zone
+        // This ensures the transition happens even if the zone doesn't change
+        if (current_mode == Mode::Idle && latest_zone_ == SafetyZone::Clear)
+        {
+            (void)machine_->transition_to(Mode::Moving);
+            safe_stop_requested_ = false;
+            RCLCPP_INFO(get_logger(), "Auto-transition from Idle to Moving (Clear zone)");
+        }
+
         handle_zone_transition(latest_zone_);
     }
 
@@ -162,6 +192,26 @@ namespace safety_core_ros
         std_msgs::msg::Bool stop;
         stop.data = safe_stop_requested_ || (current_mode == Mode::SafeStop);
         safe_stop_pub_->publish(std::move(stop));
+    }
+
+    void SafetySupervisorNode::on_clear_fault(const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+                                              std::shared_ptr<std_srvs::srv::Trigger::Response> response)
+    {
+        (void)request; // Unused
+        const safety_core::Result result = machine_->clear_fault();
+        if (result.ok())
+        {
+            safe_stop_requested_ = false;
+            response->success    = true;
+            response->message    = "Fault cleared successfully";
+            RCLCPP_INFO(get_logger(), "Fault cleared via service call");
+        }
+        else
+        {
+            response->success = false;
+            response->message = result.message;
+            RCLCPP_WARN(get_logger(), "Failed to clear fault: %s", result.message.data());
+        }
     }
 
 } // namespace safety_core_ros

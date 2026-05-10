@@ -1,0 +1,25 @@
+# Environment-specific parameters for outdoor navigation
+# Optimized for GPS-available outdoor environments
+
+localization:
+  ekf_enabled: true
+  gps_enabled: true
+  slam_enabled: false
+  visual_odom_enabled: true
+  adaptive_noise_enabled: true
+  
+ekf:
+  config_file: ekf_config.yaml
+  process_noise_base: 0.05
+  process_noise_slip: 0.5
+  
+sensors:
+  wheel_odom_timeout: 0.2
+  imu_timeout: 0.2
+  gps_timeout: 2.0
+  visual_odom_timeout: 0.5
+  
+navigation:
+  max_speed: 1.5
+  max_acceleration: 1.0
+  safety_distance: 1.0

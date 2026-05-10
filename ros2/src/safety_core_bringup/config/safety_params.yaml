@@ -4,12 +4,12 @@
 
 safety_envelope_node:
   ros__parameters:
-    # Motion envelope (matches examples/agv_safety_demo.cpp warehouse profile)
+    # Motion envelope (adjusted for human-robot interaction)
     envelope.max_speed_mps: 1.5
     envelope.max_accel_mps2: 0.75
     envelope.max_comfort_decel_mps2: 1.0
     envelope.control_latency_s: 0.04
-    envelope.safety_buffer_m: 0.30
+    envelope.safety_buffer_m: 1.0  # Increased from 0.30 to 1.0m for human-robot interaction
 
     # Robot footprint (used by safety_core::safety::evaluate_stop_distance overload)
     footprint.length_m: 0.80
@@ -19,6 +19,8 @@ safety_envelope_node:
     # Lateral corridor (added to footprint half-width for forward-cone scan filtering)
     corridor_half_width_m: 0.40
     scan_min_valid_range_m: 0.05
+    scan_ignore_min_range_m: 0.5  # Ignore obstacles closer than 0.5m (workers on robot)
+    startup_grace_period_s: 2.0  # Grace period to allow sensor stabilization on startup
     base_frame: "base_link"
 
 safety_supervisor_node:

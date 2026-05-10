@@ -287,7 +287,7 @@
       <frame_id>odom</frame_id>
       <child_frame_id>base_footprint</child_frame_id>
       <odom_publish_frequency>50</odom_publish_frequency>
-      <enable_ros2_control>false</enable_ros2_control>
+      <enable_ros2_control>true</enable_ros2_control>
     </plugin>
   </gazebo>
 

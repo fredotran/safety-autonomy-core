@@ -44,6 +44,7 @@ find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 find_package(safety_core_msgs REQUIRED)
 find_package(safety_autonomy_core REQUIRED)
 
@@ -106,7 +107,7 @@ target_link_libraries(safety_supervisor_node
   ${SAFETY_CORE_TARGET})
 ament_target_dependencies(safety_supervisor_node
   rclcpp rclcpp_lifecycle std_msgs nav_msgs sensor_msgs
-  diagnostic_msgs safety_core_msgs)
+  diagnostic_msgs std_srvs safety_core_msgs)
 
 # ----------------------------------------------------------------------------
 # Node 3: safety_drive_bridge_node
@@ -120,6 +121,15 @@ target_link_libraries(safety_drive_bridge_node
   ${SAFETY_CORE_TARGET})
 ament_target_dependencies(safety_drive_bridge_node
   rclcpp std_msgs geometry_msgs nav_msgs safety_core_msgs)
+
+# ----------------------------------------------------------------------------
+# Node 4: teleop_node (keyboard teleoperation for testing)
+# ----------------------------------------------------------------------------
+add_executable(teleop_node
+  src/teleop_node.cpp)
+target_include_directories(teleop_node PRIVATE include)
+ament_target_dependencies(teleop_node
+  rclcpp geometry_msgs std_msgs)
 
 # ----------------------------------------------------------------------------
 # Install
@@ -136,6 +146,7 @@ install(TARGETS
     safety_envelope_node
     safety_supervisor_node
     safety_drive_bridge_node
+    teleop_node
   RUNTIME DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY include/
