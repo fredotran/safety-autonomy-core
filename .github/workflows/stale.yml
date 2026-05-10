@@ -1,0 +1,27 @@
+name: Stale PR Cleanup
+
+on:
+  schedule:
+    # Run every Monday at 00:00 UTC
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          stale-message: 'This pull request has been automatically marked as stale because it has not had recent activity. It will be closed in 7 days if no further activity occurs.'
+          close-issue-message: 'This pull request was closed due to inactivity. If you believe this was a mistake, please reopen the PR.'
+          days-before-stale: 30
+          days-before-close: 7
+          exempt-issue-labels: security, high-priority, release
+          exempt-pr-labels: security, high-priority, release
+          stale-pr-label: stale
+          operations-per-run: 100

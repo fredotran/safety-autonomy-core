@@ -1,0 +1,42 @@
+# Automatic PR labeling based on changed files
+# Labels are applied automatically when PR is opened or files are added
+
+C++:
+  - any: ['*.cpp', '*.hpp', '*.h', '*.cc', '*.cxx']
+    labels: ['C++']
+
+Docker:
+  - any: ['Dockerfile', 'docker-compose.yml', '.dockerignore']
+    labels: ['docker']
+
+CI:
+  - any: ['.github/workflows/*.yml']
+    labels: ['CI']
+
+Documentation:
+  - any: ['*.md', 'markdown/**']
+    labels: ['documentation']
+
+ROS2:
+  - any: ['ros2/**']
+    labels: ['ROS2']
+
+Tests:
+  - any: ['tests/**', 'test_*.py', '*_test.cpp', '*_test.hpp']
+    labels: ['tests']
+
+Safety:
+  - any: ['tools/safety/**', 'markdown/docs/safety_case/**']
+    labels: ['safety']
+
+Build:
+  - any: ['CMakeLists.txt', 'Makefile', '*.cmake']
+    labels: ['build']
+
+Configuration:
+  - any: ['.clang-format', '.clang-tidy', '.cppcheck-suppressions', '.gitignore']
+    labels: ['configuration']
+
+Scripts:
+  - any: ['*.sh', 'tools/**']
+    labels: ['scripts']
