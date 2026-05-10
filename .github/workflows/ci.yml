@@ -45,12 +45,6 @@ jobs:
       (contains(github.event.head_commit.message, '[skip-format]') == false &&
        contains(github.event.head_commit.message, '[ci skip]') == false &&
        contains(github.event.head_commit.message, '[skip ci]') == false)
-    paths:
-      - 'include/**'
-      - 'src/**'
-      - 'tests/**'
-      - 'ros2/src/**'
-      - '.github/workflows/ci.yml'
     steps:
       - uses: actions/checkout@v4
       - name: Run clang-format --dry-run --Werror
@@ -72,12 +66,6 @@ jobs:
       (contains(github.event.head_commit.message, '[skip-tidy]') == false &&
        contains(github.event.head_commit.message, '[ci skip]') == false &&
        contains(github.event.head_commit.message, '[skip ci]') == false)
-    paths:
-      - 'include/**'
-      - 'src/**'
-      - 'tests/**'
-      - '.github/workflows/ci.yml'
-      - '.cppcheck-suppressions'
     steps:
       - uses: actions/checkout@v4
       - name: Cache ccache
@@ -207,12 +195,6 @@ jobs:
     name: build_and_test (sanitizers + ctest)
     runs-on: ubuntu-24.04
     timeout-minutes: 25
-    paths:
-      - 'include/**'
-      - 'src/**'
-      - 'tests/**'
-      - 'CMakeLists.txt'
-      - '.github/workflows/ci.yml'
     steps:
       - uses: actions/checkout@v4
       - name: Cache ccache
@@ -285,12 +267,6 @@ jobs:
     env:
       CC: gcc
       CXX: g++
-    paths:
-      - 'include/**'
-      - 'src/**'
-      - 'tests/**'
-      - 'CMakeLists.txt'
-      - '.github/workflows/ci.yml'
     steps:
       - uses: actions/checkout@v4
       - name: Cache ccache
@@ -354,12 +330,6 @@ jobs:
     name: docker_build (ROS 2 via Docker Compose with BuildKit)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    paths:
-      - 'ros2/**'
-      - 'Dockerfile'
-      - 'docker-compose.yml'
-      - '.dockerignore'
-      - '.github/workflows/ci.yml'
     steps:
       - uses: actions/checkout@v4
       - name: Set up Docker Buildx
