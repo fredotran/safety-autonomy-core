@@ -72,7 +72,7 @@ launch_safety_stack() {
     
     # Wait for safety stack to initialize
     echo -e "${YELLOW}Waiting for safety stack to initialize...${NC}"
-    sleep 15
+    sleep 12
     
     # Check if launch process is still running
     if ps -p $launch_pid > /dev/null; then
@@ -127,7 +127,7 @@ validate_safety_nodes() {
     echo -e "${YELLOW}Checking safety nodes...${NC}"
     
     # Give extra time for nodes to fully initialize
-    sleep 5
+    sleep 3
     
     local nodes_found=0
     local nodes_total=0
@@ -205,7 +205,7 @@ validate_quick_demo() {
     launch_safety_stack "true"
     
     # Wait a bit more for system to be fully ready
-    sleep 10
+    sleep 7
     
     # Validate infrastructure
     validate_safety_nodes || { stop_safety_stack; return 1; }
@@ -243,7 +243,7 @@ validate_comprehensive_demo() {
     launch_safety_stack "true"
     
     # Wait a bit more for system to be fully ready
-    sleep 10
+    sleep 7
     
     # Validate infrastructure
     validate_safety_nodes || { stop_safety_stack; return 1; }
@@ -302,11 +302,11 @@ validate_launch_file() {
     fi
     
     # Launch in background with logging
-    timeout 30s ros2 launch $package $launch_file > /tmp/launch_validation.log 2>&1 &
+    timeout 25s ros2 launch $package $launch_file > /tmp/launch_validation.log 2>&1 &
     local launch_pid=$!
     
     # Wait for launch to start
-    sleep 20
+    sleep 15
     
     # Check if launch process is still running
     if ps -p $launch_pid > /dev/null; then
@@ -346,7 +346,7 @@ test_localization_stack() {
     launch_safety_stack "true"
     
     # Wait for system to be fully ready
-    sleep 5
+    sleep 3
     
     # Run localization stack test
     echo -e "${YELLOW}Starting localization stack test...${NC}"
@@ -379,7 +379,7 @@ test_odometry_stack() {
     launch_safety_stack "true"
     
     # Wait for system to be fully ready
-    sleep 5
+    sleep 3
     
     # Run odometry stack test
     echo -e "${YELLOW}Starting odometry stack test...${NC}"

@@ -224,7 +224,10 @@ class QuickDemo(Node):
             self.get_logger().info('For comprehensive edge cases, run comprehensive_demo.py')
             
             # Shutdown
-            self.stop_robot()
+            try:
+                self.stop_robot()
+            except:
+                pass
             time.sleep(0.5)
             
             # Trigger shutdown
@@ -234,7 +237,10 @@ class QuickDemo(Node):
             
         except Exception as e:
             self.get_logger().error(f'Demo failed with exception: {e}')
-            self.stop_robot()
+            try:
+                self.stop_robot()
+            except:
+                pass
             self.destroy_node()
             rclpy.shutdown()
     
