@@ -17,6 +17,15 @@ on:
       - "fix/**"
       - "ci/**"
   workflow_dispatch:
+    inputs:
+      run_all_jobs:
+        description: 'Force run all CI jobs regardless of path filters'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -26,6 +35,8 @@ permissions:
   contents: read
   checks: write
   pull-requests: write
+  security-events: write
+  packages: write
 
 env:
   BUILD_DIR: build
@@ -34,14 +45,71 @@ env:
   COVERAGE_MIN_BRANCH: "55"
   CCACHE_DIR: /tmp/ccache
   APT_CACHE_DIR: /var/cache/apt
+  # Improved cache keys for better hit rates
+  CACHE_VERSION: "v3"
 
 jobs:
+  # Stage 1: Detect changes and determine which jobs to run
+  detect_changes:
+    name: Detect changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    outputs:
+      cpp: ${{ steps.changes.outputs.cpp }}
+      docker: ${{ steps.changes.outputs.docker }}
+      docs: ${{ steps.changes.outputs.docs }}
+      ci: ${{ steps.changes.outputs.ci }}
+      run_all: ${{ steps.force.outputs.run_all }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Detect changed files
+        id: changes
+        uses: dorny/paths-filter@v2
+        with:
+          filters: |
+            cpp:
+              - 'include/**'
+              - 'src/**'
+              - 'tests/**'
+              - 'ros2/src/**'
+              - 'CMakeLists.txt'
+              - '*.cmake'
+            docker:
+              - 'Dockerfile'
+              - 'docker-compose.yml'
+              - '.dockerignore'
+              - 'ros2/**'
+            docs:
+              - '**.md'
+              - 'docs/**'
+              - 'markdown/**'
+            ci:
+              - '.github/workflows/**'
+              - '.githooks/**'
+      - name: Force run all jobs if requested
+        id: force
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.run_all_jobs }}" = "true" ]; then
+            echo "run_all=true" >> $GITHUB_OUTPUT
+          else
+            echo "run_all=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Summary of changes
+        run: |
+          echo "C++ changes: ${{ steps.changes.outputs.cpp }}"
+          echo "Docker changes: ${{ steps.changes.outputs.docker }}"
+          echo "Docs changes: ${{ steps.changes.outputs.docs }}"
+          echo "CI changes: ${{ steps.changes.outputs.ci }}"
+          echo "Force run all: ${{ steps.force.outputs.run_all }}"
+
+  # Stage 2: Quality checks (always run if CI changed or forced)
   format_check:
     name: format_check (clang-format)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    needs: detect_changes
     if: |
-      (github.event_name == 'push' || github.event_name == 'pull_request') &&
+      (needs.detect_changes.outputs.cpp == 'true' || needs.detect_changes.outputs.ci == 'true' || needs.detect_changes.outputs.run_all == 'true') &&
       (contains(github.event.head_commit.message, '[skip-format]') == false &&
        contains(github.event.head_commit.message, '[ci skip]') == false &&
        contains(github.event.head_commit.message, '[skip ci]') == false)
@@ -58,11 +126,12 @@ jobs:
     name: clang_tidy (static analysis + cppcheck)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    needs: detect_changes
     # Pre-existing readability/bugprone findings in the core C++ library; tracked as known
     # debt and intentionally non-blocking until a dedicated cleanup pass lands.
     continue-on-error: true
     if: |
-      (github.event_name == 'push' || github.event_name == 'pull_request') &&
+      (needs.detect_changes.outputs.cpp == 'true' || needs.detect_changes.outputs.ci == 'true' || needs.detect_changes.outputs.run_all == 'true') &&
       (contains(github.event.head_commit.message, '[skip-tidy]') == false &&
        contains(github.event.head_commit.message, '[ci skip]') == false &&
        contains(github.event.head_commit.message, '[skip ci]') == false)
@@ -72,16 +141,16 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/ccache
-          key: ccache-${{ runner.os }}-clang-tidy-${{ github.sha }}
+          key: ccache-${{ env.CACHE_VERSION }}-${{ runner.os }}-clang-tidy-${{ hashFiles('**/CMakeLists.txt', '**/*.cmake') }}
           restore-keys: |
-            ccache-${{ runner.os }}-clang-tidy-
+            ccache-${{ env.CACHE_VERSION }}-${{ runner.os }}-clang-tidy-
       - name: Cache apt packages
         uses: actions/cache@v4
         with:
           path: ${{ env.APT_CACHE_DIR }}
-          key: apt-${{ runner.os }}-${{ hashFiles('**/lockfiles') }}
+          key: apt-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ hashFiles('**/package-lock.json', '**/Cargo.lock', '**/go.sum') }}
           restore-keys: |
-            apt-${{ runner.os }}-
+            apt-${{ env.CACHE_VERSION }}-${{ runner.os }}-
       - name: Install build deps
         run: |
           sudo apt-get update -qq
@@ -118,8 +187,9 @@ jobs:
     name: hook_smoke (pre-commit hook)
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    needs: detect_changes
     if: |
-      (github.event_name == 'push' || github.event_name == 'pull_request') &&
+      (needs.detect_changes.outputs.cpp == 'true' || needs.detect_changes.outputs.ci == 'true' || needs.detect_changes.outputs.run_all == 'true') &&
       (contains(github.event.head_commit.message, '[skip-hook]') == false &&
        contains(github.event.head_commit.message, '[ci skip]') == false &&
        contains(github.event.head_commit.message, '[skip ci]') == false)
@@ -129,16 +199,16 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/ccache
-          key: ccache-${{ runner.os }}-hook-smoke-${{ github.sha }}
+          key: ccache-${{ env.CACHE_VERSION }}-${{ runner.os }}-hook-smoke-${{ hashFiles('**/CMakeLists.txt', '**/*.cmake') }}
           restore-keys: |
-            ccache-${{ runner.os }}-hook-smoke-
+            ccache-${{ env.CACHE_VERSION }}-${{ runner.os }}-hook-smoke-
       - name: Cache apt packages
         uses: actions/cache@v4
         with:
           path: ${{ env.APT_CACHE_DIR }}
-          key: apt-${{ runner.os }}-${{ hashFiles('**/lockfiles') }}
+          key: apt-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ hashFiles('**/package-lock.json', '**/Cargo.lock', '**/go.sum') }}
           restore-keys: |
-            apt-${{ runner.os }}-
+            apt-${{ env.CACHE_VERSION }}-${{ runner.os }}-
       - name: Install build deps
         run: |
           sudo apt-get update -qq
@@ -169,10 +239,13 @@ jobs:
           git checkout -- tests/pid_controller_tests.cpp
           git reset tests/pid_controller_tests.cpp
 
+  # Stage 2: Safety guards (always run for safety-critical project)
   policy_guard:
     name: policy_guard (banned API check)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    needs: detect_changes
+    if: always() && needs.detect_changes.result == 'success'
     steps:
       - uses: actions/checkout@v4
       - name: Run policy verifier
@@ -184,6 +257,8 @@ jobs:
     name: safety_case_guard (artifact presence)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    needs: detect_changes
+    if: always() && needs.detect_changes.result == 'success'
     steps:
       - uses: actions/checkout@v4
       - name: Run safety case verifier
@@ -191,35 +266,42 @@ jobs:
           chmod +x tools/safety/verify_safety_case.sh
           tools/safety/verify_safety_case.sh
 
+  # Stage 3: Build and test C++ library
   build_and_test:
     name: build_and_test (sanitizers + ctest)
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    needs: detect_changes
+    if: |
+      (needs.detect_changes.outputs.cpp == 'true' || needs.detect_changes.outputs.ci == 'true' || needs.detect_changes.outputs.run_all == 'true') &&
+      (contains(github.event.head_commit.message, '[skip-build]') == false &&
+       contains(github.event.head_commit.message, '[ci skip]') == false &&
+       contains(github.event.head_commit.message, '[skip ci]') == false)
     steps:
       - uses: actions/checkout@v4
       - name: Cache ccache
         uses: actions/cache@v4
         with:
           path: /tmp/ccache
-          key: ccache-${{ runner.os }}-build-and-test-${{ github.sha }}
+          key: ccache-${{ env.CACHE_VERSION }}-${{ runner.os }}-build-${{ hashFiles('**/CMakeLists.txt', '**/*.cmake') }}
           restore-keys: |
-            ccache-${{ runner.os }}-build-and-test-
+            ccache-${{ env.CACHE_VERSION }}-${{ runner.os }}-build-
       - name: Cache CMake build directory
         uses: actions/cache@v4
         with:
           path: |
             ${{ env.BUILD_DIR }}
             build-coverage
-          key: cmake-${{ runner.os }}-build-${{ github.sha }}
+          key: cmake-${{ env.CACHE_VERSION }}-${{ runner.os }}-build-${{ hashFiles('**/CMakeLists.txt', '**/*.cmake', 'src/**', 'include/**') }}
           restore-keys: |
-            cmake-${{ runner.os }}-build-
+            cmake-${{ env.CACHE_VERSION }}-${{ runner.os }}-build-
       - name: Cache apt packages
         uses: actions/cache@v4
         with:
           path: ${{ env.APT_CACHE_DIR }}
-          key: apt-${{ runner.os }}-${{ hashFiles('**/lockfiles') }}
+          key: apt-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ hashFiles('**/package-lock.json', '**/Cargo.lock', '**/go.sum') }}
           restore-keys: |
-            apt-${{ runner.os }}-
+            apt-${{ env.CACHE_VERSION }}-${{ runner.os }}-
       - name: Install build deps
         run: |
           sudo apt-get update -qq
@@ -264,32 +346,38 @@ jobs:
     name: coverage (gcovr gate)
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    needs: detect_changes
     env:
       CC: gcc
       CXX: g++
+    if: |
+      (needs.detect_changes.outputs.cpp == 'true' || needs.detect_changes.outputs.ci == 'true' || needs.detect_changes.outputs.run_all == 'true') &&
+      (contains(github.event.head_commit.message, '[skip-coverage]') == false &&
+       contains(github.event.head_commit.message, '[ci skip]') == false &&
+       contains(github.event.head_commit.message, '[skip ci]') == false)
     steps:
       - uses: actions/checkout@v4
       - name: Cache ccache
         uses: actions/cache@v4
         with:
           path: /tmp/ccache
-          key: ccache-${{ runner.os }}-coverage-${{ github.sha }}
+          key: ccache-${{ env.CACHE_VERSION }}-${{ runner.os }}-coverage-${{ hashFiles('**/CMakeLists.txt', '**/*.cmake') }}
           restore-keys: |
-            ccache-${{ runner.os }}-coverage-
+            ccache-${{ env.CACHE_VERSION }}-${{ runner.os }}-coverage-
       - name: Cache CMake build directory
         uses: actions/cache@v4
         with:
           path: build-coverage
-          key: cmake-${{ runner.os }}-coverage-${{ github.sha }}
+          key: cmake-${{ env.CACHE_VERSION }}-${{ runner.os }}-coverage-${{ hashFiles('**/CMakeLists.txt', '**/*.cmake', 'src/**', 'include/**') }}
           restore-keys: |
-            cmake-${{ runner.os }}-coverage-
+            cmake-${{ env.CACHE_VERSION }}-${{ runner.os }}-coverage-
       - name: Cache apt packages
         uses: actions/cache@v4
         with:
           path: ${{ env.APT_CACHE_DIR }}
-          key: apt-${{ runner.os }}-${{ hashFiles('**/lockfiles') }}
+          key: apt-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ hashFiles('**/package-lock.json', '**/Cargo.lock', '**/go.sum') }}
           restore-keys: |
-            apt-${{ runner.os }}-
+            apt-${{ env.CACHE_VERSION }}-${{ runner.os }}-
       - name: Install build deps
         run: |
           sudo apt-get update -qq
@@ -326,10 +414,17 @@ jobs:
             build-coverage/coverage.info
             build-coverage/coverage.xml
 
+  # Stage 4: Docker build and security scanning
   docker_build:
     name: docker_build (ROS 2 via Docker Compose with BuildKit)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    needs: detect_changes
+    if: |
+      (needs.detect_changes.outputs.docker == 'true' || needs.detect_changes.outputs.cpp == 'true' || needs.detect_changes.outputs.ci == 'true' || needs.detect_changes.outputs.run_all == 'true') &&
+      (contains(github.event.head_commit.message, '[skip-docker]') == false &&
+       contains(github.event.head_commit.message, '[ci skip]') == false &&
+       contains(github.event.head_commit.message, '[skip ci]') == false)
     steps:
       - uses: actions/checkout@v4
       - name: Set up Docker Buildx
@@ -342,16 +437,16 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/.buildx-cache-base
-          key: ${{ runner.os }}-buildx-base-${{ github.sha }}
+          key: ${{ env.CACHE_VERSION }}-${{ runner.os }}-buildx-base-${{ hashFiles('Dockerfile', 'ros2/**/package.xml') }}
           restore-keys: |
-            ${{ runner.os }}-buildx-base-
+            ${{ env.CACHE_VERSION }}-${{ runner.os }}-buildx-base-
       - name: Cache Docker layers (development)
         uses: actions/cache@v4
         with:
           path: /tmp/.buildx-cache-dev
-          key: ${{ runner.os }}-buildx-dev-${{ github.sha }}
+          key: ${{ env.CACHE_VERSION }}-${{ runner.os }}-buildx-dev-${{ hashFiles('Dockerfile', 'ros2/**/package.xml', 'ros2/**/CMakeLists.txt') }}
           restore-keys: |
-            ${{ runner.os }}-buildx-dev-
+            ${{ env.CACHE_VERSION }}-${{ runner.os }}-buildx-dev-
       - name: Build Docker base image (cached separately)
         run: |
           echo "Building Docker base image with dependencies..."
@@ -399,6 +494,29 @@ jobs:
             colcon list | wc -l &&
             echo 'ROS2 packages built and verified successfully'
           "
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: safety-autonomy-core:latest
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+      - name: Upload Trivy scan results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+      - name: Generate SBOM
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy image --format spdx-json --output sbom.json \
+            safety-autonomy-core:latest
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.json
+          retention-days: 90
       - name: Save Docker image
         run: docker save safety-autonomy-core:latest | gzip > docker-image.tar.gz
       - name: Upload Docker image artifact
@@ -406,16 +524,40 @@ jobs:
         with:
           name: docker-image
           path: docker-image.tar.gz
-          retention-days: 1
+          retention-days: 7
+      - name: Generate build metadata
+        run: |
+          echo "BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_ENV
+          echo "GIT_SHA=${{ github.sha }}" >> $GITHUB_ENV
+          echo "GIT_REF=${{ github.ref }}" >> $GITHUB_ENV
+      - name: Create build info artifact
+        run: |
+          cat > build-info.json << EOF
+          {
+            "build_date": "${{ env.BUILD_DATE }}",
+            "git_sha": "${{ github.sha }}",
+            "git_ref": "${{ github.ref }}",
+            "docker_image": "safety-autonomy-core:latest",
+            "cache_version": "${{ env.CACHE_VERSION }}"
+          }
+          EOF
+      - name: Upload build info artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-info
+          path: build-info.json
+          retention-days: 90
 
+  # Stage 5: Integration tests
   demo_tests:
     name: demo_tests (${{ matrix.test }})
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     needs: docker_build
     if: |
-      contains(github.event.head_commit.message, '[skip-demo]') == false &&
-      (contains(github.event.head_commit.message, '[ci skip]') == false ||
+      needs.docker_build.result == 'success' &&
+      (contains(github.event.head_commit.message, '[skip-demo]') == false &&
+       contains(github.event.head_commit.message, '[ci skip]') == false &&
        contains(github.event.head_commit.message, '[skip ci]') == false)
     strategy:
       matrix:
@@ -451,3 +593,54 @@ jobs:
             $HOME/.ros/log/
             /tmp/*.log
           if-no-files-found: ignore
+
+  # Stage 6: CI summary and reporting
+  ci_summary:
+    name: CI Summary
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    needs: [detect_changes, format_check, clang_tidy, hook_smoke, policy_guard, safety_case_guard, build_and_test, coverage, docker_build]
+    if: always()
+    steps:
+      - name: Check job results
+        run: |
+          echo "### CI Job Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Detect Changes | ${{ needs.detect_changes.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Format Check | ${{ needs.format_check.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Clang Tidy | ${{ needs.clang_tidy.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Hook Smoke | ${{ needs.hook_smoke.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Policy Guard | ${{ needs.policy_guard.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Safety Case Guard | ${{ needs.safety_case_guard.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build and Test | ${{ needs.build_and_test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Coverage | ${{ needs.coverage.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Docker Build | ${{ needs.docker_build.result }} |" >> $GITHUB_STEP_SUMMARY
+      - name: Changes detected
+        run: |
+          echo "### Changes Detected" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- C++ changes: ${{ needs.detect_changes.outputs.cpp }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Docker changes: ${{ needs.detect_changes.outputs.docker }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Docs changes: ${{ needs.detect_changes.outputs.docs }}" >> $GITHUB_STEP_SUMMARY
+          echo "- CI changes: ${{ needs.detect_changes.outputs.ci }}" >> $GITHUB_STEP_SUMMARY
+      - name: Overall CI status
+        run: |
+          if [ "${{ needs.detect_changes.result }}" != "success" ]; then
+            echo "❌ CI failed at change detection stage" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          elif [ "${{ needs.format_check.result }}" != "success" ] && [ "${{ needs.format_check.result }}" != "skipped" ]; then
+            echo "❌ CI failed at format check" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          elif [ "${{ needs.clang_tidy.result }}" != "success" ] && [ "${{ needs.clang_tidy.result }}" != "skipped" ]; then
+            echo "⚠️ CI warnings at clang-tidy (non-blocking)" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.build_and_test.result }}" != "success" ] && [ "${{ needs.build_and_test.result }}" != "skipped" ]; then
+            echo "❌ CI failed at build and test" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          elif [ "${{ needs.docker_build.result }}" != "success" ] && [ "${{ needs.docker_build.result }}" != "skipped" ]; then
+            echo "❌ CI failed at docker build" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "✅ CI passed successfully" >> $GITHUB_STEP_SUMMARY
+          fi
