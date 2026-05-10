@@ -18,8 +18,6 @@ Designed for AGV/AMR platforms operating in dynamic industrial environments with
 - [Installation](#installation)
 - [Usage](#usage)
 - [Architecture](#architecture)
-- [Testing](#testing)
-- [CI/CD](#cicd)
 - [Documentation](#documentation)
 
 ---
@@ -245,84 +243,11 @@ Monitors:
 
 ---
 
-## 🧪 Testing
-
-### Test Coverage
-
-19 test executables covering:
-
-- State machine transitions and fault latching
-- PID controller boundaries and anti-windup
-- Executor watchdog and deadline detection
-- Filter invariants and timestamped updates
-- Safety envelope zones and evaluation
-- Fault injection (backward clock, NaN bursts)
-- No-allocation policy verification
-
-### Running Tests
-
-```bash
-# Run all tests
-ctest --test-dir build --output-on-failure
-
-# Run specific test
-ctest --test-dir build -R <test_name>
-
-# Run with verbose output
-ctest --test-dir build --output-on-failure --verbose
-```
-
-### Quality Gate
-
-```bash
-# Run complete quality gate
-tools/dev/run_quality_gate.sh
-
-# Include coverage gate
-tools/dev/run_quality_gate.sh --coverage
-```
-
----
-
-## 🔄 CI/CD
-
-### Pipeline Overview
-
-| Stage | Job | Description |
-|-------|-----|-------------|
-| Detection | `detect_changes` | Smart change detection |
-| Quality | `format_check` | Code formatting check |
-| Quality | `clang_tidy` | Static analysis |
-| Safety | `policy_guard` | Banned API checks (always runs) |
-| Safety | `safety_case_guard` | Safety artifact verification (always runs) |
-| Build | `build_and_test` | Compile and test library |
-| Build | `coverage` | Coverage verification |
-| Docker | `docker_build` | Docker image + security scan |
-| Integration | `demo_tests` | ROS2 integration tests |
-| Reporting | `ci_summary` | Comprehensive status report |
-
-### Key Features
-
-- **Smart Job Orchestration**: Jobs run only when relevant files change
-- **Security Scanning**: Trivy vulnerability detection + SBOM generation
-- **Performance**: Content-based caching (30-50% better hit rates)
-- **Safety-Critical**: Safety guards always run regardless of changes
-
-### Skip Flags
-
-Control CI execution via commit messages:
-- `[skip-format]`, `[skip-tidy]`, `[skip-hook]`, `[skip-build]`
-- `[skip-coverage]`, `[skip-docker]`, `[skip-demo]`, `[ci skip]`
-
-**Documentation:** See [CI_DOCUMENTATION.md](CI_DOCUMENTATION.md) for complete details
-
----
-
 ## 📚 Documentation
 
 ### Core Documentation
 
-- **[OVERVIEW.md](OVERVIEW.md)** - Comprehensive project overview
+- **[OVERVIEW.md](OVERVIEW.md)** - Comprehensive project overview including testing and quality assurance
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contribution guidelines
 - **[CI_DOCUMENTATION.md](CI_DOCUMENTATION.md)** - CI/CD pipeline documentation
