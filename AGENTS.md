@@ -4,7 +4,7 @@
 
 ---
 
-## 📑 Table of Contents
+## Table of Contents
 
 - [Development Workflow](#development-workflow)
 - [Repository-Specific Information](#repository-specific-information)
@@ -13,7 +13,7 @@
 
 ---
 
-## 🚀 Development Workflow
+## Development Workflow
 
 ### Always Build and Test Before Committing
 
@@ -44,7 +44,7 @@ docker exec safety-autonomy-demo bash -c "source install/setup.bash && ros2 laun
 
 ---
 
-## 📋 Repository-Specific Information
+## Repository-Specific Information
 
 ### Docker Container
 
@@ -103,7 +103,7 @@ git commit -m "feat: Add comprehensive localization improvements"
 
 ---
 
-## 🚨 Common Issues
+## Common Issues
 
 ### Launch File Not Found
 
@@ -135,7 +135,7 @@ If a package fails to build in the container:
 
 ---
 
-## ⚡ Agent Parallelization Guidelines
+## Agent Parallelization Guidelines
 
 ### When to Use Parallel Subagents
 

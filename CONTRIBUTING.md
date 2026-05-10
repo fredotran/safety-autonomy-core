@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing to Safety Autonomy Core! This document provides guidelines for contributing to this safety-critical robotics library.
 
-## 🎯 Project Philosophy
+## Project Philosophy
 
 This repository targets safety-minded, deterministic C++ behavior. We prioritize:
 - **Minimal changes** over broad refactors
@@ -13,7 +13,7 @@ This repository targets safety-minded, deterministic C++ behavior. We prioritize
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### 1. Fork and Clone
 
@@ -47,7 +47,7 @@ git checkout -b feature/your-feature-name
 
 ---
 
-## 📝 Development Guidelines
+## Development Guidelines
 
 ### Code Quality Standards
 
@@ -76,7 +76,7 @@ When modifying safety behavior:
 
 ---
 
-## 🧪 Testing Requirements
+## Testing Requirements
 
 ### Before Submitting
 
@@ -105,7 +105,7 @@ tools/dev/run_quality_gate.sh --coverage
 
 ---
 
-## ✅ Pull Request Checklist
+## Pull Request Checklist
 
 Before submitting a PR, ensure:
 
@@ -119,7 +119,7 @@ Before submitting a PR, ensure:
 
 ---
 
-## 📋 Commit Guidelines
+## Commit Guidelines
 
 ### Commit Message Format
 
@@ -145,7 +145,7 @@ Examples:
 
 ---
 
-## 🔒 Safety Case Documentation
+## Safety Case Documentation
 
 When adding or modifying safety behavior, update relevant documentation in `markdown/docs/safety_case/`:
 
@@ -156,7 +156,7 @@ When adding or modifying safety behavior, update relevant documentation in `mark
 
 ---
 
-## 🤝 Code Review Process
+## Code Review Process
 
 ### Review Expectations
 
@@ -173,7 +173,7 @@ When adding or modifying safety behavior, update relevant documentation in `mark
 
 ---
 
-## 🚨 Common Issues
+## Common Issues
 
 ### Build Failures
 
@@ -195,7 +195,7 @@ When adding or modifying safety behavior, update relevant documentation in `mark
 
 ---
 
-## 📞 Getting Help
+## Getting Help
 
 ### Resources
 
@@ -213,7 +213,7 @@ When adding or modifying safety behavior, update relevant documentation in `mark
 
 ---
 
-## 🎉 Recognition
+## Recognition
 
 Contributors are recognized in:
 - **CHANGELOG.md** for significant contributions

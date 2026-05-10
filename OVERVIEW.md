@@ -4,7 +4,7 @@
 
 ---
 
-## 📑 Table of Contents
+## Table of Contents
 
 - [Project Summary](#project-summary)
 - [Key Features](#key-features)
@@ -22,7 +22,7 @@
 
 ---
 
-## 🎯 Project Summary
+## Project Summary
 
 **Safety Autonomy Core** is a high-assurance C++20 library designed for safety-critical robotics and autonomous vehicles. It provides deterministic state machines, bounded executors, sensor fusion filters, motion primitives, and multi-zone safety envelopes with MISRA/AUTOSAR-inspired coding rules.
 
@@ -36,7 +36,7 @@ AGV/AMR platforms operating in dynamic warehouses with:
 
 ---
 
-## ✨ Key Features
+## Key Features
 
 ### Core Safety Components
 
@@ -61,7 +61,7 @@ AGV/AMR platforms operating in dynamic warehouses with:
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ### Design Principles
 
@@ -101,7 +101,7 @@ AGV/AMR platforms operating in dynamic warehouses with:
 
 ---
 
-## 🔄 CI/CD Pipeline
+## CI/CD Pipeline
 
 ### Enterprise-Grade DevOps
 
@@ -124,7 +124,7 @@ AGV/AMR platforms operating in dynamic warehouses with:
 
 ---
 
-## 🎮 Demo System
+## Demo System
 
 ### ROS 2 Integration
 
@@ -153,7 +153,7 @@ Complete ROS 2 Jazzy + Gazebo Harmonic + Nav2 wrapper with AGV warehouse simulat
 
 ---
 
-## 📚 Documentation Structure
+## Documentation Structure
 
 ### Core Documentation
 
@@ -188,7 +188,7 @@ Complete ROS 2 Jazzy + Gazebo Harmonic + Nav2 wrapper with AGV warehouse simulat
 
 ---
 
-## ✅ Quality Assurance
+## Quality Assurance
 
 ### Testing Infrastructure
 
@@ -207,7 +207,7 @@ Complete ROS 2 Jazzy + Gazebo Harmonic + Nav2 wrapper with AGV warehouse simulat
 
 ---
 
-## 🔧 Build and Deployment
+## Build and Deployment
 
 ### Build Options
 
@@ -235,7 +235,7 @@ cmake --preset coverage # Debug + gcov instrumentation
 
 ---
 
-## 🔒 Safety-Critical Considerations
+## Safety-Critical Considerations
 
 ### Compliance
 
@@ -254,7 +254,7 @@ cmake --preset coverage # Debug + gcov instrumentation
 
 ---
 
-## 💻 Development Workflow
+## Development Workflow
 
 ### Getting Started
 
@@ -274,7 +274,7 @@ cmake --preset coverage # Debug + gcov instrumentation
 
 ---
 
-## ⚡ Performance Characteristics
+## Performance Characteristics
 
 ### Deterministic Operation
 
@@ -292,7 +292,7 @@ cmake --preset coverage # Debug + gcov instrumentation
 
 ---
 
-## 🚀 Future Roadmap
+## Future Roadmap
 
 ### Short Term
 
@@ -317,7 +317,7 @@ cmake --preset coverage # Debug + gcov instrumentation
 
 ---
 
-## 📞 Support and Resources
+## Support and Resources
 
 ### Documentation
 
@@ -341,13 +341,13 @@ cmake --preset coverage # Debug + gcov instrumentation
 
 ---
 
-## 📄 License
+## License
 
 MIT License - See [LICENSE](LICENSE) file for details
 
 ---
 
-## 🎉 Conclusion
+## Conclusion
 
 Safety Autonomy Core provides a comprehensive, safety-critical foundation for autonomous robotics systems. With enterprise-grade CI/CD, extensive testing infrastructure, and compliance-ready safety documentation, it's designed for production deployment in safety-critical environments.
 

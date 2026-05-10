@@ -4,7 +4,7 @@
 
 ---
 
-## 📑 Table of Contents
+## Table of Contents
 
 - [Overview](#overview)
 - [Architecture](#architecture)
@@ -21,7 +21,7 @@
 
 ---
 
-## 🎯 Overview
+## Overview
 
 The safety-autonomy-core project uses a comprehensive CI/CD pipeline with intelligent job orchestration, security scanning, and performance optimization designed for safety-critical robotics systems.
 
@@ -35,7 +35,7 @@ The safety-autonomy-core project uses a comprehensive CI/CD pipeline with intell
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ### Pipeline Stages
 
@@ -70,7 +70,7 @@ The pipeline uses `dorny/paths-filter@v2` to run jobs only when relevant files c
 
 ---
 
-## 🔒 Security Features
+## Security Features
 
 ### Vulnerability Scanning
 
@@ -86,7 +86,7 @@ The pipeline uses `dorny/paths-filter@v2` to run jobs only when relevant files c
 
 ---
 
-## 💾 Caching Strategy
+## Caching Strategy
 
 ### Cache Improvements
 
@@ -106,7 +106,7 @@ The pipeline uses `dorny/paths-filter@v2` to run jobs only when relevant files c
 
 ---
 
-## 🛡️ Safety-Critical Features
+## Safety-Critical Features
 
 ### Mandatory Safety Checks
 
@@ -123,7 +123,7 @@ The pipeline uses `dorny/paths-filter@v2` to run jobs only when relevant files c
 
 ---
 
-## 🎮 Manual Control
+## Manual Control
 
 ### Skip Flags
 
@@ -148,7 +148,7 @@ Control CI execution via commit messages:
 
 ---
 
-## 📋 CI Jobs
+## CI Jobs
 
 | Stage | Job | Description | Triggers |
 |-------|-----|-------------|----------|
@@ -165,7 +165,7 @@ Control CI execution via commit messages:
 
 ---
 
-## 🧪 Testing Infrastructure
+## Testing Infrastructure
 
 ### Automated Validation
 
@@ -191,7 +191,7 @@ The project includes a comprehensive test script (`test_ci_workflow.sh`) with 47
 
 ---
 
-## ⚡ Performance Optimization
+## Performance Optimization
 
 ### Build System
 
@@ -209,7 +209,7 @@ The project includes a comprehensive test script (`test_ci_workflow.sh`) with 47
 
 ---
 
-## 📊 Monitoring and Observability
+## Monitoring and Observability
 
 ### CI Summary
 
@@ -227,7 +227,7 @@ The project includes a comprehensive test script (`test_ci_workflow.sh`) with 47
 
 ---
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
@@ -256,7 +256,7 @@ git push
 
 ---
 
-## 🚀 Future Enhancements
+## Future Enhancements
 
 ### Recommended Next Steps
 
@@ -273,7 +273,7 @@ git push
 
 ---
 
-## 📚 Documentation
+## Documentation
 
 - **[CI_IMPROVEMENTS.md](CI_IMPROVEMENTS.md)**: Detailed architecture changes and improvements
 - **[CI_TESTING_REPORT.md](CI_TESTING_REPORT.md)**: Comprehensive testing documentation and validation
@@ -282,7 +282,7 @@ git push
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 When modifying the CI workflow:
 1. Test changes locally using `test_ci_workflow.sh`
@@ -293,7 +293,7 @@ When modifying the CI workflow:
 
 ---
 
-## 📞 Support
+## Support
 
 For CI/CD issues:
 - Check CI summary in GitHub Actions for job status
