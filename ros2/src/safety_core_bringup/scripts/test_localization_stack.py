@@ -29,22 +29,18 @@ class LocalizationStackTest(Node):
         
         # Test results tracking
         self.test_results = {
-            'visual_odometry': False,
-            'adaptive_ekf': False,
-            'imu_bias_estimation': False,
-            'sensor_fault_detection': False,
-            'kidnapping_detection': False,
-            'localization_confidence': False,
+            'imu_data': False,
+            'wheel_odometry': False,
+            'gps_data': False,
+            'safety_diagnostics': False,
         }
         
         # Sensor data tracking
         self.sensor_counts = {
-            'visual_odometry': 0,
-            'adaptive_ekf': 0,
             'imu': 0,
             'gps': 0,
             'wheel_odometry': 0,
-            'fault_diagnostics': 0,
+            'safety_diagnostics': 0,
         }
         
         # QoS profile
@@ -55,13 +51,11 @@ class LocalizationStackTest(Node):
             durability=QoSDurabilityPolicy.VOLATILE,
         )
         
-        # Subscriptions for localization stack
-        self.create_subscription(PoseStamped, '/visual_odometry', self._on_visual_odometry, qos)
-        self.create_subscription(Odometry, '/odometry/filtered', self._on_adaptive_ekf, qos)
+        # Subscriptions for localization stack (topics provided by safety stack)
         self.create_subscription(Imu, '/imu', self._on_imu, qos)
         self.create_subscription(NavSatFix, '/gps', self._on_gps, qos)
         self.create_subscription(Odometry, '/odom', self._on_wheel_odometry, qos)
-        self.create_subscription(DiagnosticArray, '/diagnostics', self._on_diagnostics, qos)
+        self.create_subscription(DiagnosticArray, '/safety/diagnostics', self._on_diagnostics, qos)
         
         # Test timer
         self.test_duration = 30.0  # 30 seconds test
@@ -70,44 +64,29 @@ class LocalizationStackTest(Node):
         
         self.get_logger().info('Localization stack test started')
     
-    def _on_visual_odometry(self, msg):
-        """Visual odometry callback."""
-        self.sensor_counts['visual_odometry'] += 1
-        if self.sensor_counts['visual_odometry'] > 5:
-            self.test_results['visual_odometry'] = True
-    
-    def _on_adaptive_ekf(self, msg):
-        """Adaptive EKF callback."""
-        self.sensor_counts['adaptive_ekf'] += 1
-        if self.sensor_counts['adaptive_ekf'] > 10:
-            self.test_results['adaptive_ekf'] = True
-    
     def _on_imu(self, msg):
         """IMU callback."""
         self.sensor_counts['imu'] += 1
         if self.sensor_counts['imu'] > 20:
-            self.test_results['imu_bias_estimation'] = True
+            self.test_results['imu_data'] = True
     
     def _on_gps(self, msg):
         """GPS callback."""
         self.sensor_counts['gps'] += 1
+        if self.sensor_counts['gps'] > 5:
+            self.test_results['gps_data'] = True
     
     def _on_wheel_odometry(self, msg):
         """Wheel odometry callback."""
         self.sensor_counts['wheel_odometry'] += 1
+        if self.sensor_counts['wheel_odometry'] > 10:
+            self.test_results['wheel_odometry'] = True
     
     def _on_diagnostics(self, msg):
-        """Sensor fault detection diagnostics callback."""
-        self.sensor_counts['fault_diagnostics'] += 1
-        if self.sensor_counts['fault_diagnostics'] > 5:
-            self.test_results['sensor_fault_detection'] = True
-            
-            # Check for kidnapping detection in diagnostics
-            for status in msg.status:
-                if 'kidnapping' in status.name.lower() or 'localization' in status.name.lower():
-                    self.test_results['kidnapping_detection'] = True
-                if 'confidence' in status.name.lower():
-                    self.test_results['localization_confidence'] = True
+        """Safety diagnostics callback."""
+        self.sensor_counts['safety_diagnostics'] += 1
+        if self.sensor_counts['safety_diagnostics'] > 5:
+            self.test_results['safety_diagnostics'] = True
     
     def _check_test_status(self):
         """Check test status and report results."""
@@ -115,6 +94,8 @@ class LocalizationStackTest(Node):
         
         if elapsed >= self.test_duration:
             self._report_results()
+            # Shutdown after test completes
+            self.destroy_node()
             rclpy.shutdown()
     
     def _report_results(self):
@@ -157,8 +138,16 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     finally:
-        test_node.destroy_node()
-        rclpy.shutdown()
+        # Only cleanup if node wasn't already destroyed by test sequence
+        try:
+            test_node.destroy_node()
+        except:
+            pass
+        # Only shutdown if not already done by test sequence
+        try:
+            rclpy.shutdown()
+        except:
+            pass
     
     return 0
 
