@@ -39,6 +39,19 @@
         "SAFETY_CORE_ENABLE_WERROR": "ON",
         "SAFETY_CORE_ENABLE_COVERAGE": "ON"
       }
+    },
+    {
+      "name": "minimal",
+      "displayName": "Minimal Resource (Size-optimized, no sanitizers)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/minimal",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "MinSizeRel",
+        "SAFETY_CORE_ENABLE_SANITIZERS": "OFF",
+        "SAFETY_CORE_ENABLE_WERROR": "ON",
+        "SAFETY_CORE_ENABLE_SIZE_OPTIMIZATIONS": "ON",
+        "SAFETY_CORE_ENABLE_LTO": "OFF"
+      }
     }
   ],
   "buildPresets": [
@@ -53,6 +66,10 @@
     {
       "name": "coverage",
       "configurePreset": "coverage"
+    },
+    {
+      "name": "minimal",
+      "configurePreset": "minimal"
     }
   ],
   "testPresets": [
@@ -73,6 +90,13 @@
     {
       "name": "coverage",
       "configurePreset": "coverage",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "minimal",
+      "configurePreset": "minimal",
       "output": {
         "outputOnFailure": true
       }

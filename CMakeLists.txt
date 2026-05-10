@@ -1,10 +1,12 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(safety_autonomy_core VERSION 0.1.0 LANGUAGES CXX)
+project(safety_autonomy_core VERSION 1.0.0 LANGUAGES CXX)
 
 option(SAFETY_CORE_ENABLE_SANITIZERS "Enable runtime sanitizers for non-safety builds" ON)
 option(SAFETY_CORE_ENABLE_WERROR "Treat compiler warnings as errors" ON)
 option(SAFETY_CORE_ENABLE_COVERAGE "Enable coverage instrumentation" OFF)
+option(SAFETY_CORE_ENABLE_SIZE_OPTIMIZATIONS "Enable size optimizations for low-resource systems" OFF)
+option(SAFETY_CORE_ENABLE_LTO "Enable Link Time Optimization" OFF)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -95,6 +97,32 @@ if(SAFETY_CORE_ENABLE_COVERAGE)
         target_link_options(safety_core PUBLIC --coverage)
     else()
         message(WARNING "Coverage requested but compiler does not support --coverage")
+    endif()
+endif()
+
+# Size optimizations for low-resource systems
+if(SAFETY_CORE_ENABLE_SIZE_OPTIMIZATIONS)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(safety_core PRIVATE -Os)
+        # Enable function and data sections for dead code elimination
+        target_compile_options(safety_core PRIVATE -ffunction-sections -fdata-sections)
+        if(NOT APPLE)
+            target_link_options(safety_core PRIVATE -Wl,--gc-sections)
+        endif()
+        message(STATUS "Size optimizations enabled for low-resource systems")
+    else()
+        message(WARNING "Size optimizations requested but compiler is not GNU or Clang")
+    endif()
+endif()
+
+# Link Time Optimization
+if(SAFETY_CORE_ENABLE_LTO)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(safety_core PRIVATE -flto)
+        target_link_options(safety_core PRIVATE -flto)
+        message(STATUS "Link Time Optimization enabled")
+    else()
+        message(WARNING "LTO requested but compiler is not GNU or Clang")
     endif()
 endif()
 
