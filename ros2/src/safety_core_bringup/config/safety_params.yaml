@@ -22,11 +22,26 @@ safety_envelope_node:
     scan_ignore_min_range_m: 0.5  # Ignore obstacles closer than 0.5m (workers on robot)
     startup_grace_period_s: 2.0  # Grace period to allow sensor stabilization on startup
     base_frame: "base_link"
+    envelope.dynamic_buffer_enabled: true
+    envelope.velocity_factor: 0.3
+    envelope.min_buffer_m: 0.5
+
+sensor_monitor_node:
+  ros__parameters:
+    lidar_expected_rate: 10.0
+    imu_expected_rate: 100.0
+    gps_expected_rate: 10.0
+    odometry_expected_rate: 50.0
+    publish_period_s: 1.0
+    healthy_threshold: 0.8
+    degraded_threshold: 0.5
 
 safety_supervisor_node:
   ros__parameters:
     localization_timeout_s: 0.5
     auto_recover_from_obstacle: true
+    sensor_timeout_s: 1.0
+    degraded_recovery_s: 5.0
 
 safety_drive_bridge_node:
   ros__parameters:

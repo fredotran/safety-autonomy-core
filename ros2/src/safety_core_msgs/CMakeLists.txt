@@ -17,6 +17,7 @@ set(msg_files
   msg/EnvelopeStatus.msg
   msg/DiagnosticEvent.msg
   msg/MonitorEvent.msg
+  msg/SensorHealth.msg
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}

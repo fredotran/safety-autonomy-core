@@ -132,6 +132,32 @@ ament_target_dependencies(teleop_node
   rclcpp geometry_msgs std_msgs)
 
 # ----------------------------------------------------------------------------
+# Node 5: sensor_monitor_node
+# ----------------------------------------------------------------------------
+add_executable(sensor_monitor_node
+  src/sensor_monitor_node.cpp
+  src/sensor_monitor_main.cpp)
+target_include_directories(sensor_monitor_node PRIVATE include)
+target_link_libraries(sensor_monitor_node
+  safety_core_ros_bridges
+  ${SAFETY_CORE_TARGET})
+ament_target_dependencies(sensor_monitor_node
+  rclcpp sensor_msgs nav_msgs safety_core_msgs)
+
+# ----------------------------------------------------------------------------
+# Node 6: gps_covariance_adapter_node
+# ----------------------------------------------------------------------------
+add_executable(gps_covariance_adapter_node
+  src/gps_covariance_adapter.cpp
+  src/gps_covariance_adapter_main.cpp)
+target_include_directories(gps_covariance_adapter_node PRIVATE include)
+target_link_libraries(gps_covariance_adapter_node
+  safety_core_ros_bridges
+  ${SAFETY_CORE_TARGET})
+ament_target_dependencies(gps_covariance_adapter_node
+  rclcpp sensor_msgs)
+
+# ----------------------------------------------------------------------------
 # Install
 # ----------------------------------------------------------------------------
 install(TARGETS
@@ -147,6 +173,8 @@ install(TARGETS
     safety_supervisor_node
     safety_drive_bridge_node
     teleop_node
+    sensor_monitor_node
+    gps_covariance_adapter_node
   RUNTIME DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY include/

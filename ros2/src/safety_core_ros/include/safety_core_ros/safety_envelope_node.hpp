@@ -56,7 +56,7 @@ namespace safety_core_ros
 
         // Publishing
         void publish_envelope(double distance_m, double speed_mps, const std_msgs::msg::Header& header);
-        void publish_zone_markers(const safety_core::safety::EnvelopeEvaluation& eval,
+        void publish_zone_markers(const safety_core::safety::EnvelopeEvaluation& eval, double dynamic_buffer,
                                   const std_msgs::msg::Header& header);
 
         // Marker creation helpers
@@ -79,6 +79,11 @@ namespace safety_core_ros
             double startup_grace_period_s{2.0};  // Grace period to allow sensor stabilization
             std::string base_frame{"base_link"};
         } params_;
+
+        // Dynamic buffer parameters
+        bool dynamic_buffer_enabled_{false};
+        double velocity_factor_{0.3};
+        double min_buffer_m_{0.5};
 
         // State
         std::atomic<double> latest_speed_mps_{0.0};

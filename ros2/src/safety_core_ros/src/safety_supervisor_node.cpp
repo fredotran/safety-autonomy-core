@@ -3,7 +3,10 @@
 
 #include "safety_core_ros/safety_supervisor_node.hpp"
 
+#include "safety_core/config/validation.hpp"
+
 #include <chrono>
+#include <stdexcept>
 
 using namespace std::chrono_literals;
 using safety_core::safety::SafetyZone;
@@ -20,7 +23,31 @@ namespace safety_core_ros
         // Load parameters
         params_.localization_timeout_s     = ParamLoader::load_double(this, "localization_timeout_s", 0.5);
         params_.auto_recover_from_obstacle = ParamLoader::load_bool(this, "auto_recover_from_obstacle", true);
+        params_.sensor_timeout_s           = ParamLoader::load_double(this, "sensor_timeout_s", 1.0);
+        params_.degraded_recovery_s        = ParamLoader::load_double(this, "degraded_recovery_s", 5.0);
         localization_timeout_ns_           = TimeUtils::seconds_to_nanoseconds(params_.localization_timeout_s);
+        sensor_timeout_ns_                 = TimeUtils::seconds_to_nanoseconds(params_.sensor_timeout_s);
+        degraded_recovery_ns_              = TimeUtils::seconds_to_nanoseconds(params_.degraded_recovery_s);
+
+        // Validate localization_timeout_s parameter
+        if (params_.localization_timeout_s <= 0.0)
+        {
+            RCLCPP_ERROR(get_logger(), "Invalid localization_timeout_s: %.3f (must be positive)",
+                         params_.localization_timeout_s);
+            throw std::runtime_error("localization_timeout_s must be positive");
+        }
+
+        if (params_.localization_timeout_s >= 10.0)
+        {
+            RCLCPP_WARN(get_logger(), "Unusually high localization_timeout_s: %.3fs (recommended < 10s)",
+                        params_.localization_timeout_s);
+        }
+
+        if (params_.sensor_timeout_s <= 0.0)
+        {
+            RCLCPP_ERROR(get_logger(), "Invalid sensor_timeout_s: %.3f (must be positive)", params_.sensor_timeout_s);
+            throw std::runtime_error("sensor_timeout_s must be positive");
+        }
 
         // Create ROS interfaces with standardized QoS
         diag_pub_ =
@@ -30,8 +57,11 @@ namespace safety_core_ros
 
         envelope_sub_ = create_subscription<safety_core_msgs::msg::EnvelopeStatus>(
             "safety/envelope_status", QosConfig::sensor_qos(), std::bind(&SafetySupervisorNode::on_envelope, this, _1));
-        odom_sub_ = create_subscription<nav_msgs::msg::Odometry>("odom", QosConfig::sensor_qos(),
-                                                                 std::bind(&SafetySupervisorNode::on_odom, this, _1));
+        odom_sub_          = create_subscription<nav_msgs::msg::Odometry>("odom", QosConfig::sensor_qos(),
+                                                                          std::bind(&SafetySupervisorNode::on_odom, this, _1));
+        sensor_health_sub_ = create_subscription<safety_core_msgs::msg::SensorHealth>(
+            "safety/sensor_health", QosConfig::sensor_qos(),
+            std::bind(&SafetySupervisorNode::on_sensor_health, this, _1));
 
         // Create clear fault service for simulation/testing
         clear_fault_srv_ = create_service<std_srvs::srv::Trigger>(
@@ -69,8 +99,10 @@ namespace safety_core_ros
         // Initialize in Idle state
         (void)machine_->transition_to(Mode::Idle);
 
-        RCLCPP_INFO(get_logger(), "safety_supervisor_node initialized | localization_timeout=%.3fs",
-                    params_.localization_timeout_s);
+        RCLCPP_INFO(get_logger(),
+                    "safety_supervisor_node initialized | localization_timeout=%.3fs sensor_timeout=%.3fs "
+                    "degraded_recovery=%.3fs",
+                    params_.localization_timeout_s, params_.sensor_timeout_s, params_.degraded_recovery_s);
     }
 
     std::uint64_t SafetySupervisorNode::now_ns() const noexcept
@@ -145,11 +177,84 @@ namespace safety_core_ros
         // Check localization staleness
         check_localization_staleness();
 
+        // Check sensor health
+        check_sensor_health();
+
         // Observe clock sample
         (void)supervisor_->observe_clock_sample(current_time_ns);
 
         // Publish current state
         publish_state(current_mode);
+    }
+
+    void SafetySupervisorNode::on_sensor_health(const safety_core_msgs::msg::SensorHealth::ConstSharedPtr msg)
+    {
+        // Only track the "all" summary message for overall system health
+        if (msg->sensor_name == "all")
+        {
+            worst_sensor_status_        = msg->status;
+            last_sensor_health_time_ns_ = now_ns();
+        }
+    }
+
+    void SafetySupervisorNode::check_sensor_health()
+    {
+        const Mode current_mode = machine_->mode();
+        if (current_mode == Mode::SafeStop)
+        {
+            return; // Do not transition out of SafeStop based on sensor health
+        }
+
+        // Check if sensor health data is stale
+        if (last_sensor_health_time_ns_.has_value())
+        {
+            const std::uint64_t current_time_ns = now_ns();
+            if (TimeUtils::is_stale(last_sensor_health_time_ns_.value(), current_time_ns, sensor_timeout_ns_))
+            {
+                // Sensor monitor not running or not publishing - ignore
+                return;
+            }
+        }
+        else
+        {
+            // No sensor health received yet - ignore until we have data
+            return;
+        }
+
+        // React to sensor health status
+        if (worst_sensor_status_ == safety_core_msgs::msg::SensorHealth::FAULT)
+        {
+            // Critical sensor fault - transition to SafeStop
+            if (current_mode != Mode::SafeStop)
+            {
+                RCLCPP_ERROR(get_logger(), "Sensor fault detected - transitioning to SafeStop");
+                (void)machine_->latch_fault(0xE002U); // Fault code for sensor fault
+                (void)machine_->transition_to(Mode::SafeStop);
+                safe_stop_requested_ = true;
+                in_degraded_mode_    = false;
+            }
+        }
+        else if (worst_sensor_status_ == safety_core_msgs::msg::SensorHealth::DEGRADED)
+        {
+            if (current_mode == Mode::Moving && !in_degraded_mode_)
+            {
+                RCLCPP_WARN(get_logger(), "Sensor health degraded - transitioning to Degraded mode");
+                (void)machine_->transition_to(Mode::Degraded);
+                in_degraded_mode_ = true;
+            }
+        }
+        else if (worst_sensor_status_ == safety_core_msgs::msg::SensorHealth::HEALTHY && in_degraded_mode_)
+        {
+            // Check if we've been in degraded mode long enough to recover
+            // For simplicity, recover immediately when health returns
+            // (The degraded_recovery_s parameter can be used for a timer-based approach in future)
+            if (current_mode == Mode::Degraded)
+            {
+                RCLCPP_INFO(get_logger(), "Sensor health recovered - transitioning back to Moving");
+                (void)machine_->transition_to(Mode::Moving);
+                in_degraded_mode_ = false;
+            }
+        }
     }
 
     void SafetySupervisorNode::check_localization_staleness()

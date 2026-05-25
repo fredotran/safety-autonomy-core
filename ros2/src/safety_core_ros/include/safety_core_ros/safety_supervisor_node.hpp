@@ -20,6 +20,7 @@
 #include <safety_core_msgs/msg/diagnostic_event.hpp>
 #include <safety_core_msgs/msg/envelope_status.hpp>
 #include <safety_core_msgs/msg/safety_state.hpp>
+#include <safety_core_msgs/msg/sensor_health.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <std_srvs/srv/trigger.hpp>
 
@@ -49,6 +50,7 @@ namespace safety_core_ros
         // Callbacks
         void on_envelope(const safety_core_msgs::msg::EnvelopeStatus::ConstSharedPtr msg);
         void on_odom(const nav_msgs::msg::Odometry::ConstSharedPtr msg);
+        void on_sensor_health(const safety_core_msgs::msg::SensorHealth::ConstSharedPtr msg);
         void on_clear_fault(const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
                             std::shared_ptr<std_srvs::srv::Trigger::Response> response);
         void timer_tick();
@@ -56,6 +58,7 @@ namespace safety_core_ros
         // State management
         void handle_zone_transition(safety_core::safety::SafetyZone new_zone);
         void check_localization_staleness();
+        void check_sensor_health();
         void publish_state(safety_core::sm::Mode current_mode);
 
         // State message building
@@ -76,6 +79,8 @@ namespace safety_core_ros
         {
             double localization_timeout_s{0.5};
             bool auto_recover_from_obstacle{true};
+            double sensor_timeout_s{1.0};
+            double degraded_recovery_s{5.0};
         } params_;
 
         // State
@@ -84,9 +89,17 @@ namespace safety_core_ros
         std::uint64_t localization_timeout_ns_{500'000'000ULL};
         bool safe_stop_requested_{false};
 
+        // Sensor health tracking
+        uint8_t worst_sensor_status_{safety_core_msgs::msg::SensorHealth::UNKNOWN};
+        std::optional<std::uint64_t> last_sensor_health_time_ns_;
+        std::uint64_t sensor_timeout_ns_{1'000'000'000ULL};
+        std::uint64_t degraded_recovery_ns_{5'000'000'000ULL};
+        bool in_degraded_mode_{false};
+
         // ROS interfaces
         rclcpp::Subscription<safety_core_msgs::msg::EnvelopeStatus>::SharedPtr envelope_sub_;
         rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
+        rclcpp::Subscription<safety_core_msgs::msg::SensorHealth>::SharedPtr sensor_health_sub_;
         rclcpp::Publisher<safety_core_msgs::msg::SafetyState>::SharedPtr state_pub_;
         rclcpp::Publisher<safety_core_msgs::msg::DiagnosticEvent>::SharedPtr diag_pub_;
         rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr safe_stop_pub_;

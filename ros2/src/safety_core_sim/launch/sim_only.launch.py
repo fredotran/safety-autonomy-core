@@ -30,13 +30,13 @@ def generate_launch_description():
         default_value=os.path.join(pkg_sim, "worlds", "industrial_warehouse.sdf"),
         description="Path to the SDF world file.",
     )
-    declare_use_sim_time = DeclareLaunchArgument("use_sim_time", default_value="true")
+    declare_use_sim_time = DeclareLaunchArgument("use_sim_time", default_value="true", description="Use simulation time from /clock topic.")
     declare_gui = DeclareLaunchArgument(
         "gui", default_value="true", description="Run gz sim with GUI."
     )
-    declare_x = DeclareLaunchArgument("x", default_value="-9.0")
-    declare_y = DeclareLaunchArgument("y", default_value="0.0")
-    declare_yaw = DeclareLaunchArgument("yaw", default_value="0.0")
+    declare_x = DeclareLaunchArgument("x", default_value="-9.0", description="Initial X position of the robot.")
+    declare_y = DeclareLaunchArgument("y", default_value="0.0", description="Initial Y position of the robot.")
+    declare_yaw = DeclareLaunchArgument("yaw", default_value="0.0", description="Initial yaw orientation of the robot (radians).")
 
     # Make our /models path discoverable so gz can find local meshes if any.
     set_resource_path = SetEnvironmentVariable(

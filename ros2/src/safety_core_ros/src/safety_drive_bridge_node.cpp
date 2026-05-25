@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <stdexcept>
 
 using std::placeholders::_1;
 
@@ -25,6 +26,49 @@ namespace safety_core_ros
         params_.control_period_s  = ParamLoader::load_double(this, "control_period_s", 0.05);
 
         cmd_freshness_timeout_ns_ = TimeUtils::seconds_to_nanoseconds(params_.cmd_freshness_s);
+
+        // Validate motion parameters
+        if (params_.max_linear_mps <= 0.0)
+        {
+            RCLCPP_ERROR(get_logger(), "Invalid max_linear_mps: %.3f (must be positive)", params_.max_linear_mps);
+            throw std::runtime_error("max_linear_mps must be positive");
+        }
+
+        if (params_.max_angular_radps <= 0.0)
+        {
+            RCLCPP_ERROR(get_logger(), "Invalid max_angular_radps: %.3f (must be positive)", params_.max_angular_radps);
+            throw std::runtime_error("max_angular_radps must be positive");
+        }
+
+        if (params_.max_decel_mps2 <= 0.0)
+        {
+            RCLCPP_ERROR(get_logger(), "Invalid max_decel_mps2: %.3f (must be positive)", params_.max_decel_mps2);
+            throw std::runtime_error("max_decel_mps2 must be positive");
+        }
+
+        if (params_.max_jerk_mps3 <= 0.0)
+        {
+            RCLCPP_ERROR(get_logger(), "Invalid max_jerk_mps3: %.3f (must be positive)", params_.max_jerk_mps3);
+            throw std::runtime_error("max_jerk_mps3 must be positive");
+        }
+
+        if (params_.cmd_freshness_s <= 0.0)
+        {
+            RCLCPP_ERROR(get_logger(), "Invalid cmd_freshness_s: %.3f (must be positive)", params_.cmd_freshness_s);
+            throw std::runtime_error("cmd_freshness_s must be positive");
+        }
+
+        if (params_.control_period_s <= 0.0)
+        {
+            RCLCPP_ERROR(get_logger(), "Invalid control_period_s: %.3f (must be positive)", params_.control_period_s);
+            throw std::runtime_error("control_period_s must be positive");
+        }
+
+        if (params_.control_period_s >= 1.0)
+        {
+            RCLCPP_WARN(get_logger(), "Unusually high control_period_s: %.3fs (recommended < 1s)",
+                        params_.control_period_s);
+        }
 
         // Create ROS interfaces with standardized QoS
         cmd_vel_nav_sub_ = create_subscription<geometry_msgs::msg::Twist>(

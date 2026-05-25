@@ -37,8 +37,8 @@ def generate_launch_description():
     rviz_config = os.path.join(pkg_bringup, "rviz", "safety_simple.rviz")
     sim_launch = os.path.join(pkg_sim, "launch", "sim_only.launch.py")
 
-    declare_use_sim_time = DeclareLaunchArgument("use_sim_time", default_value="true")
-    declare_rviz = DeclareLaunchArgument("rviz", default_value="true")
+    declare_use_sim_time = DeclareLaunchArgument("use_sim_time", default_value="true", description="Use simulation time from /clock topic.")
+    declare_rviz = DeclareLaunchArgument("rviz", default_value="true", description="Launch RViz with the demo configuration.")
 
     sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(sim_launch),

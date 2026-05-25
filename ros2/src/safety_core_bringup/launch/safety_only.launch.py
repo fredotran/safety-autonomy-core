@@ -5,66 +5,64 @@ Useful for:
   * Bench testing on a physical AGV that already publishes its own sensor stack.
   * Replaying ROS bags through the safety_core gating layer.
   * Safety stack testing with simulation (without Nav2/SLAM)
+
+This launch file now uses the modular safety_stack.launch.py component for
+reusability and maintainability.
 """
 
 import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, TimerAction
-from launch.conditions import IfCondition
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    pkg_bringup = get_package_share_directory("safety_core_bringup")
-    safety_params = os.path.join(pkg_bringup, "config", "safety_params.yaml")
-    rviz_config = os.path.join(pkg_bringup, "rviz", "safety_simple.rviz")  # Use simpler config
+    pkg_bringup = get_package_share_directory('safety_core_bringup')
+    safety_params = os.path.join(pkg_bringup, 'config', 'safety_params.yaml')
+    rviz_config = os.path.join(pkg_bringup, 'rviz', 'safety_simple.rviz')
 
-    use_sim_time = LaunchConfiguration("use_sim_time")
-    use_rviz = LaunchConfiguration("rviz")
-    declare_use_sim_time = DeclareLaunchArgument("use_sim_time", default_value="false")
-    declare_rviz = DeclareLaunchArgument("rviz", default_value="true")
+    use_sim_time = LaunchConfiguration('use_sim_time')
+    use_rviz = LaunchConfiguration('rviz')
 
-    return LaunchDescription(
-        [
-            declare_use_sim_time,
-            declare_rviz,
-            Node(
-                package="safety_core_ros",
-                executable="safety_envelope_node",
-                name="safety_envelope_node",
-                output="screen",
-                parameters=[safety_params, {"use_sim_time": use_sim_time}],
-            ),
-            Node(
-                package="safety_core_ros",
-                executable="safety_supervisor_node",
-                name="safety_supervisor_node",
-                output="screen",
-                parameters=[safety_params, {"use_sim_time": use_sim_time}],
-            ),
-            Node(
-                package="safety_core_ros",
-                executable="safety_drive_bridge_node",
-                name="safety_drive_bridge_node",
-                output="screen",
-                parameters=[safety_params, {"use_sim_time": use_sim_time}],
-                remappings=[
-                    ("cmd_vel_nav", "/cmd_vel_nav"),
-                    ("cmd_vel", "/cmd_vel"),
-                ],
-            ),
-            TimerAction(period=2.0, actions=[  # Delay RViz by 2 seconds
-                Node(
-                    package="rviz2",
-                    executable="rviz2",
-                    arguments=["-d", rviz_config],
-                    output="screen",
-                    parameters=[{"use_sim_time": use_sim_time}],
-                    condition=IfCondition(use_rviz),
-                ),
-            ]),
-        ]
+    # Declare launch arguments
+    declare_use_sim_time = DeclareLaunchArgument(
+        'use_sim_time',
+        default_value='false',
+        description='Use simulation clock from /clock topic.'
     )
+    declare_rviz = DeclareLaunchArgument(
+        'rviz',
+        default_value='true',
+        description='Launch RViz with the demo configuration.'
+    )
+
+    # Include the modular safety stack component with Nav2 remappings
+    safety_stack = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(os.path.join(pkg_bringup, 'launch', 'safety_stack.launch.py')),
+        launch_arguments={
+            'safety_params': safety_params,
+            'use_sim_time': use_sim_time,
+            'include_remappings': 'true',  # Enable Nav2 cmd_vel remappings
+        }.items()
+    )
+
+    # Include the modular RViz component
+    rviz = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(os.path.join(pkg_bringup, 'launch', 'rviz_component.launch.py')),
+        launch_arguments={
+            'rviz_config': rviz_config,
+            'use_sim_time': use_sim_time,
+            'enable_rviz': use_rviz,
+            'delay_s': '2.0',
+        }.items()
+    )
+
+    return LaunchDescription([
+        declare_use_sim_time,
+        declare_rviz,
+        safety_stack,
+        rviz,
+    ])
