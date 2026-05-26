@@ -6,8 +6,8 @@ ROS 2 Jazzy + Gazebo Harmonic + Nav2 integration for the [`safety_autonomy_core`
 
 | Package                  | Type        | Purpose                                                                                |
 |--------------------------|-------------|----------------------------------------------------------------------------------------|
-| `safety_core_msgs`       | rosidl      | Custom messages (`SafetyState`, `SafetyZone`, `EnvelopeStatus`, `DiagnosticEvent`, `MonitorEvent`, `SensorHealth`) |
-| `safety_core_ros`        | C++ nodes   | Wrapper nodes integrating safety_core into rclcpp (sensor_monitor, gps_covariance_adapter, safety_envelope, safety_supervisor, drive_bridge)                                      |
+| `safety_core_msgs`       | rosidl      | Custom messages (`SafetyState`, `SafetyZone`, `EnvelopeStatus`, `DiagnosticEvent`, `MonitorEvent`, `SensorHealth`, `SlipDetected`, `SensorHealthMetrics`) |
+| `safety_core_ros`        | C++ nodes   | Wrapper nodes integrating safety_core into rclcpp (sensor_monitor, slip_detector, gps_covariance_adapter, safety_envelope, safety_supervisor, drive_bridge)                                      |
 | `safety_core_nav2`       | C++ plugin  | Nav2 behavior-tree plugin (`IsSafe` condition node)                                    |
 | `safety_core_sim`        | resources   | AGV URDF (xacro), industrial warehouse SDF, `ros_gz_bridge` config, sim launch         |
 | `safety_core_bringup`    | resources   | Top-level launch files, Nav2 params, SLAM Toolbox params, RViz config, EKF localization  |
@@ -141,6 +141,62 @@ buffer = min_buffer + velocity_factor * speed
 - Larger safety margins at higher speeds
 - Optimized safety envelope for dynamic operation
 - Capped at 2x static buffer to prevent excessive growth
+
+### Wheel Slip Detection
+
+The `slip_detector_node` detects wheel slip by comparing wheel odometry with IMU estimates:
+
+**Detection Method:**
+- Integrates IMU forward acceleration with exponential decay to estimate velocity
+- Compares wheel odometry linear x with IMU-estimated velocity
+- Compares wheel odometry angular z with IMU gyroscope z
+- Linear slip: `|wheel_vel_x - imu_vel_x| > slip_threshold_mps` (default 0.1 m/s)
+- Angular slip: `|wheel_angular_z - imu_angular_z| > angular_slip_threshold_radps` (default 0.3 rad/s)
+
+**Outputs:**
+- `/safety/slip_detected` (SlipDetected message with magnitude, ratio, detail)
+- `/safety/slip_status` (SensorHealth for integration with safety_supervisor)
+
+**Benefits:**
+- Early detection of wheel slip on slippery surfaces
+- Integration with safety system for automatic response
+- Detailed diagnostics for maintenance
+
+### Sensor Recovery Strategies
+
+The `safety_supervisor_node` implements graceful recovery for degraded sensors:
+
+**Degradation Response:**
+- Reduces max speed to 50% when any sensor is DEGRADED
+- Logs degradation event with diagnostic details
+
+**Recovery Process:**
+- If sensor recovers to HEALTHY within `recovery_timeout_s` (default 10s):
+  - Gradually restores max speed over `recovery_speed_ramp_s` (default 5s)
+  - Logs recovery event
+- If sensor stays DEGRADED past timeout:
+  - Treats as FAULT (code 0xE003) and transitions to SafeStop
+
+**Speed Limit Enforcement:**
+- Publishes `/safety/recovery_speed_limit` (Float64)
+- `safety_drive_bridge_node` applies minimum of max_linear_mps, envelope_limit, and recovery_limit
+
+### Performance Monitoring
+
+The `sensor_monitor_node` provides historical trend tracking:
+
+**Metrics (60-second rolling window):**
+- Average and minimum update rate per sensor
+- Percentage of time in each status (HEALTHY/DEGRADED/FAULT)
+- Number of status transitions
+
+**Topic:**
+- `/safety/sensor_health_metrics` (SensorHealthMetrics, published at 0.1 Hz)
+
+**Benefits:**
+- Identify chronic sensor issues before they cause faults
+- Track sensor degradation trends over time
+- Optimize maintenance schedules
 
 ## System requirements
 
@@ -288,7 +344,7 @@ ros2 topic list | grep safety
 ros2 topic echo /safety/state --once
 ```
 
-Expected: topics include `/safety/{envelope_status,zone_markers,state,safe_stop,diagnostics}` and the state shows `mode: 1` (Idle), `zone.zone: 0` (Clear), `fault_latched: false`.
+Expected: topics include `/safety/{envelope_status,zone_markers,state,safe_stop,diagnostics,sensor_health,sensor_health_metrics,slip_detected,slip_status,recovery_speed_limit}` and the state shows `mode: 1` (Idle), `zone.zone: 0` (Clear), `fault_latched: false`.
 
 ## Substituting the AWS RoboMaker warehouse
 
