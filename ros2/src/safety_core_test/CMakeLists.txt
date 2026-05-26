@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.20)
 project(safety_core_test)
 
+# Coverage options
+option(ENABLE_COVERAGE "Enable coverage reporting" OFF)
+if(ENABLE_COVERAGE AND CMAKE_COMPILER_IS_GNUCXX)
+  add_compile_options(--coverage -O0)
+  add_link_options(--coverage)
+endif()
+
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 20)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -55,5 +62,20 @@ target_include_directories(test_sensor_monitor PRIVATE
 target_link_libraries(test_sensor_monitor test_fixtures)
 ament_target_dependencies(test_sensor_monitor
   rclcpp sensor_msgs nav_msgs safety_core_msgs)
+
+# Coverage target
+if(ENABLE_COVERAGE AND CMAKE_COMPILER_IS_GNUCXX)
+  find_program(LCOV_EXECUTABLE lcov)
+  find_program(GENHTML_EXECUTABLE genhtml)
+  if(LCOV_EXECUTABLE AND GENHTML_EXECUTABLE)
+    add_custom_target(coverage
+      COMMAND ${LCOV_EXECUTABLE} --capture --directory . --output-file coverage.info
+      COMMAND ${LCOV_EXECUTABLE} --remove coverage.info '/opt/*' '/usr/*' --output-file coverage.info.cleaned
+      COMMAND ${GENHTML_EXECUTABLE} coverage.info.cleaned --output-directory coverage_report
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+      COMMENT "Generating coverage report"
+    )
+  endif()
+endif()
 
 ament_package()
