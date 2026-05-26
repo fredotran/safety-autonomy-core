@@ -36,15 +36,14 @@ target_link_libraries(test_time_utils test_fixtures)
 ament_target_dependencies(test_time_utils rclcpp)
 
 # Unit Tests: math_utils
-# TODO: Enable when test files are added
-# ament_add_gtest(test_math_utils
-#   test/test_main.cpp
-#   test/unit/test_math_utils.cpp
-#   SKIP_LINKING_MAIN_LIBRARIES)
-# target_include_directories(test_math_utils PRIVATE
-#   ${CMAKE_SOURCE_DIR}/../safety_core_ros/include)
-# target_link_libraries(test_math_utils test_fixtures)
-# ament_target_dependencies(test_math_utils rclcpp)
+ament_add_gtest(test_math_utils
+  test/test_main.cpp
+  test/unit/test_math_utils.cpp
+  SKIP_LINKING_MAIN_LIBRARIES)
+target_include_directories(test_math_utils PRIVATE
+  ${CMAKE_SOURCE_DIR}/../safety_core_ros/include)
+target_link_libraries(test_math_utils test_fixtures)
+ament_target_dependencies(test_math_utils rclcpp)
 
 # Component Tests: sensor_monitor_node
 # TODO: Enable when test files are added

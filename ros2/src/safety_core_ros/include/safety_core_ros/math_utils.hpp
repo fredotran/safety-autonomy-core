@@ -142,4 +142,49 @@ namespace safety_core_ros
         }
     };
 
+    /**
+     * @brief Math utility free functions namespace
+     */
+    namespace math
+    {
+        /**
+         * @brief Clamp a value to a range
+         * @param value Value to clamp
+         * @param min Minimum value
+         * @param max Maximum value
+         * @return Clamped value
+         */
+        inline double clamp(double value, double min, double max) noexcept
+        {
+            return std::clamp(value, min, max);
+        }
+
+        /**
+         * @brief Apply a deadband to a value
+         * @param value Input value
+         * @param band Deadband half-width
+         * @return 0.0 if |value| <= band, otherwise value
+         */
+        inline double deadband(double value, double band) noexcept
+        {
+            return (std::fabs(value) <= band) ? 0.0 : value;
+        }
+
+        /**
+         * @brief Calculate exponential decay
+         * @param initial Initial value
+         * @param dt Time elapsed
+         * @param tau Time constant
+         * @return Decayed value: initial * exp(-dt / tau)
+         */
+        inline double exponential_decay(double initial, double dt, double tau) noexcept
+        {
+            if (tau <= 0.0)
+            {
+                return initial;
+            }
+            return initial * std::exp(-dt / tau);
+        }
+    } // namespace math
+
 } // namespace safety_core_ros
