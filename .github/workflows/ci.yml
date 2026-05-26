@@ -58,6 +58,7 @@ jobs:
       cpp: ${{ steps.changes.outputs.cpp }}
       docker: ${{ steps.changes.outputs.docker }}
       docs: ${{ steps.changes.outputs.docs }}
+      ros2: ${{ steps.changes.outputs.ros2 }}
       ci: ${{ steps.changes.outputs.ci }}
       run_all: ${{ steps.force.outputs.run_all }}
     steps:
@@ -86,6 +87,8 @@ jobs:
             ci:
               - '.github/workflows/**'
               - '.githooks/**'
+            ros2:
+              - 'ros2/**'
       - name: Force run all jobs if requested
         id: force
         run: |
@@ -99,6 +102,7 @@ jobs:
           echo "C++ changes: ${{ steps.changes.outputs.cpp }}"
           echo "Docker changes: ${{ steps.changes.outputs.docker }}"
           echo "Docs changes: ${{ steps.changes.outputs.docs }}"
+          echo "ROS2 changes: ${{ steps.changes.outputs.ros2 }}"
           echo "CI changes: ${{ steps.changes.outputs.ci }}"
           echo "Force run all: ${{ steps.force.outputs.run_all }}"
 
@@ -561,7 +565,61 @@ jobs:
           path: build-info.json
           retention-days: 90
 
-  # Stage 5: Integration tests
+  # Stage 5: ROS 2 test execution
+  ros2_test:
+    name: ros2_test (ament test execution)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    needs: docker_build
+    if: |
+      (needs.detect_changes.outputs.ros2 == 'true' || needs.detect_changes.outputs.cpp == 'true' || needs.detect_changes.outputs.ci == 'true' || needs.detect_changes.outputs.run_all == 'true') &&
+      (contains(github.event.head_commit.message, '[skip-ros2-test]') == false &&
+       contains(github.event.head_commit.message, '[ci skip]') == false &&
+       contains(github.event.head_commit.message, '[skip ci]') == false)
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+      - name: Load Docker image
+        run: docker load < docker-image.tar.gz
+      - name: Create test results directory
+        run: mkdir -p ros2/test_results
+      - name: Build ROS2 test package
+        run: |
+          docker run --rm -v $(pwd):/workspace/safety-autonomy-core safety-autonomy-core:latest bash -c "
+            source /opt/ros/jazzy/setup.bash &&
+            cd /workspace/ros2_ws &&
+            cp -r /workspace/safety-autonomy-core/ros2/src/safety_core_test src/ &&
+            colcon build --packages-select safety_core_test
+          "
+      - name: Run unit tests
+        run: |
+          docker run --rm -v $(pwd):/workspace/safety-autonomy-core safety-autonomy-core:latest bash -c "
+            source /opt/ros/jazzy/setup.bash &&
+            cd /workspace/ros2_ws &&
+            source install/setup.bash &&
+            ./build/safety_core_test/test_time_utils --gtest_output=xml:/workspace/safety-autonomy-core/ros2/test_results/time_utils.xml &&
+            ./build/safety_core_test/test_math_utils --gtest_output=xml:/workspace/safety-autonomy-core/ros2/test_results/math_utils.xml
+          "
+      - name: Run component tests
+        run: |
+          docker run --rm -v $(pwd):/workspace/safety-autonomy-core safety-autonomy-core:latest bash -c "
+            source /opt/ros/jazzy/setup.bash &&
+            cd /workspace/ros2_ws &&
+            source install/setup.bash &&
+            ./build/safety_core_test/test_sensor_monitor --gtest_output=xml:/workspace/safety-autonomy-core/ros2/test_results/sensor_monitor.xml || true
+          "
+        continue-on-error: true
+      - name: Upload ROS2 test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ros2-test-results
+          path: ros2/test_results/
+
+  # Stage 6: Integration tests
   demo_tests:
     name: demo_tests (${{ matrix.test }})
     runs-on: ubuntu-24.04
@@ -607,12 +665,12 @@ jobs:
             /tmp/*.log
           if-no-files-found: ignore
 
-  # Stage 6: CI summary and reporting
+  # Stage 7: CI summary and reporting
   ci_summary:
     name: CI Summary
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [detect_changes, format_check, clang_tidy, hook_smoke, policy_guard, safety_case_guard, build_and_test, coverage, docker_build]
+    needs: [detect_changes, format_check, clang_tidy, hook_smoke, policy_guard, safety_case_guard, build_and_test, coverage, docker_build, ros2_test]
     if: always() && needs.detect_changes.result == 'success'
     steps:
       - name: Check job results
@@ -651,6 +709,7 @@ jobs:
           show_job_status "Build and Test" "${{ needs.build_and_test.result }}"
           show_job_status "Coverage" "${{ needs.coverage.result }}"
           show_job_status "Docker Build" "${{ needs.docker_build.result }}"
+          show_job_status "ROS2 Test" "${{ needs.ros2_test.result }}"
 
       - name: Changes detected
         run: |
@@ -659,6 +718,7 @@ jobs:
           echo "- C++ changes: ${{ needs.detect_changes.outputs.cpp }}" >> $GITHUB_STEP_SUMMARY
           echo "- Docker changes: ${{ needs.detect_changes.outputs.docker }}" >> $GITHUB_STEP_SUMMARY
           echo "- Docs changes: ${{ needs.detect_changes.outputs.docs }}" >> $GITHUB_STEP_SUMMARY
+          echo "- ROS2 changes: ${{ needs.detect_changes.outputs.ros2 }}" >> $GITHUB_STEP_SUMMARY
           echo "- CI changes: ${{ needs.detect_changes.outputs.ci }}" >> $GITHUB_STEP_SUMMARY
           echo "- Force run all: ${{ needs.detect_changes.outputs.run_all }}" >> $GITHUB_STEP_SUMMARY
 
@@ -698,6 +758,11 @@ jobs:
 
           if [ "${{ needs.docker_build.result }}" != "success" ] && [ "${{ needs.docker_build.result }}" != "skipped" ]; then
             echo "❌ CI failed at docker build" >> $GITHUB_STEP_SUMMARY
+            critical_failure=1
+          fi
+
+          if [ "${{ needs.ros2_test.result }}" != "success" ] && [ "${{ needs.ros2_test.result }}" != "skipped" ]; then
+            echo "❌ CI failed at ROS2 test" >> $GITHUB_STEP_SUMMARY
             critical_failure=1
           fi
 
