@@ -63,6 +63,14 @@ target_link_libraries(test_sensor_monitor test_fixtures)
 ament_target_dependencies(test_sensor_monitor
   rclcpp sensor_msgs nav_msgs safety_core_msgs)
 
+# Integration Tests: safety stack
+ament_add_gtest(test_safety_stack
+  test/integration/test_safety_stack.cpp)
+target_include_directories(test_safety_stack PRIVATE
+  ${CMAKE_SOURCE_DIR}/../safety_core_ros/include)
+target_link_libraries(test_safety_stack test_fixtures)
+ament_target_dependencies(test_safety_stack rclcpp safety_core_msgs)
+
 # Coverage target
 if(ENABLE_COVERAGE AND CMAKE_COMPILER_IS_GNUCXX)
   find_program(LCOV_EXECUTABLE lcov)
