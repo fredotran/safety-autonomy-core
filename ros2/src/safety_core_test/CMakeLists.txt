@@ -46,15 +46,14 @@ target_link_libraries(test_math_utils test_fixtures)
 ament_target_dependencies(test_math_utils rclcpp)
 
 # Component Tests: sensor_monitor_node
-# TODO: Enable when test files are added
-# ament_add_gtest(test_sensor_monitor
-#   test/test_main.cpp
-#   test/component/test_sensor_monitor.cpp
-#   SKIP_LINKING_MAIN_LIBRARIES)
-# target_include_directories(test_sensor_monitor PRIVATE
-#   ${CMAKE_SOURCE_DIR}/../safety_core_ros/include)
-# target_link_libraries(test_sensor_monitor safety_core_ros::safety_core_ros_bridges)
-# ament_target_dependencies(test_sensor_monitor
-#   rclcpp sensor_msgs nav_msgs safety_core_msgs safety_core_ros)
+ament_add_gtest(test_sensor_monitor
+  test/test_main.cpp
+  test/component/test_sensor_monitor.cpp
+  SKIP_LINKING_MAIN_LIBRARIES)
+target_include_directories(test_sensor_monitor PRIVATE
+  ${CMAKE_SOURCE_DIR}/../safety_core_ros/include)
+target_link_libraries(test_sensor_monitor test_fixtures)
+ament_target_dependencies(test_sensor_monitor
+  rclcpp sensor_msgs nav_msgs safety_core_msgs)
 
 ament_package()
