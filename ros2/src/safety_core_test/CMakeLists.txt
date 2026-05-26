@@ -27,27 +27,35 @@ target_include_directories(test_fixtures INTERFACE
 
 # Unit Tests: time_utils
 ament_add_gtest(test_time_utils
-  test/unit/test_time_utils.cpp)
+  test/test_main.cpp
+  test/unit/test_time_utils.cpp
+  SKIP_LINKING_MAIN_LIBRARIES)
 target_include_directories(test_time_utils PRIVATE
   ${CMAKE_SOURCE_DIR}/../safety_core_ros/include)
 target_link_libraries(test_time_utils test_fixtures)
 ament_target_dependencies(test_time_utils rclcpp)
 
 # Unit Tests: math_utils
-ament_add_gtest(test_math_utils
-  test/unit/test_math_utils.cpp)
-target_include_directories(test_math_utils PRIVATE
-  ${CMAKE_SOURCE_DIR}/../safety_core_ros/include)
-target_link_libraries(test_math_utils test_fixtures)
-ament_target_dependencies(test_math_utils rclcpp)
+# TODO: Enable when test files are added
+# ament_add_gtest(test_math_utils
+#   test/test_main.cpp
+#   test/unit/test_math_utils.cpp
+#   SKIP_LINKING_MAIN_LIBRARIES)
+# target_include_directories(test_math_utils PRIVATE
+#   ${CMAKE_SOURCE_DIR}/../safety_core_ros/include)
+# target_link_libraries(test_math_utils test_fixtures)
+# ament_target_dependencies(test_math_utils rclcpp)
 
 # Component Tests: sensor_monitor_node
-ament_add_gtest(test_sensor_monitor
-  test/component/test_sensor_monitor.cpp)
-target_include_directories(test_sensor_monitor PRIVATE
-  ${CMAKE_SOURCE_DIR}/../safety_core_ros/include)
-target_link_libraries(test_sensor_monitor safety_core_ros::safety_core_ros_bridges)
-ament_target_dependencies(test_sensor_monitor
-  rclcpp sensor_msgs nav_msgs safety_core_msgs safety_core_ros)
+# TODO: Enable when test files are added
+# ament_add_gtest(test_sensor_monitor
+#   test/test_main.cpp
+#   test/component/test_sensor_monitor.cpp
+#   SKIP_LINKING_MAIN_LIBRARIES)
+# target_include_directories(test_sensor_monitor PRIVATE
+#   ${CMAKE_SOURCE_DIR}/../safety_core_ros/include)
+# target_link_libraries(test_sensor_monitor safety_core_ros::safety_core_ros_bridges)
+# ament_target_dependencies(test_sensor_monitor
+#   rclcpp sensor_msgs nav_msgs safety_core_msgs safety_core_ros)
 
 ament_package()
