@@ -79,8 +79,11 @@ namespace safety_core_ros
             "safety/safe_stop", QosConfig::state_qos(), std::bind(&SafetyDriveBridgeNode::on_safe_stop, this, _1));
         state_sub_ = create_subscription<safety_core_msgs::msg::SafetyState>(
             "safety/state", QosConfig::state_qos(), std::bind(&SafetyDriveBridgeNode::on_state, this, _1));
-        odom_sub_ = create_subscription<nav_msgs::msg::Odometry>("odom", QosConfig::sensor_qos(),
-                                                                 std::bind(&SafetyDriveBridgeNode::on_odom, this, _1));
+        odom_sub_                 = create_subscription<nav_msgs::msg::Odometry>("odom", QosConfig::sensor_qos(),
+                                                                                 std::bind(&SafetyDriveBridgeNode::on_odom, this, _1));
+        recovery_speed_limit_sub_ = create_subscription<std_msgs::msg::Float64>(
+            "safety/recovery_speed_limit", QosConfig::state_qos(),
+            std::bind(&SafetyDriveBridgeNode::on_recovery_speed_limit, this, _1));
 
         cmd_vel_pub_ = create_publisher<geometry_msgs::msg::Twist>("cmd_vel", QosConfig::state_qos());
 
@@ -143,6 +146,11 @@ namespace safety_core_ros
         measured_forward_speed_mps_.store(msg->twist.twist.linear.x, std::memory_order_relaxed);
     }
 
+    void SafetyDriveBridgeNode::on_recovery_speed_limit(const std_msgs::msg::Float64::ConstSharedPtr msg)
+    {
+        recovery_speed_limit_mps_.store(std::max(0.0, msg->data), std::memory_order_relaxed);
+    }
+
     void SafetyDriveBridgeNode::start_jerk_limited_stop()
     {
         const double speed = std::max(0.0, measured_forward_speed_mps_.load(std::memory_order_relaxed));
@@ -176,9 +184,10 @@ namespace safety_core_ros
                                                                    double speed_limit)
     {
         geometry_msgs::msg::Twist clamped_cmd;
-        const double v_limit  = std::min(params_.max_linear_mps, speed_limit);
-        clamped_cmd.linear.x  = std::clamp(cmd.linear.x, -v_limit, v_limit);
-        clamped_cmd.angular.z = std::clamp(cmd.angular.z, -params_.max_angular_radps, params_.max_angular_radps);
+        const double recovery_limit = recovery_speed_limit_mps_.load(std::memory_order_relaxed);
+        const double v_limit        = std::min({params_.max_linear_mps, speed_limit, recovery_limit});
+        clamped_cmd.linear.x        = std::clamp(cmd.linear.x, -v_limit, v_limit);
+        clamped_cmd.angular.z       = std::clamp(cmd.angular.z, -params_.max_angular_radps, params_.max_angular_radps);
         return clamped_cmd;
     }
 

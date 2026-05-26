@@ -158,6 +158,19 @@ ament_target_dependencies(gps_covariance_adapter_node
   rclcpp sensor_msgs)
 
 # ----------------------------------------------------------------------------
+# Node 7: slip_detector_node
+# ----------------------------------------------------------------------------
+add_executable(slip_detector_node
+  src/slip_detector_node.cpp
+  src/slip_detector_main.cpp)
+target_include_directories(slip_detector_node PRIVATE include)
+target_link_libraries(slip_detector_node
+  safety_core_ros_bridges
+  ${SAFETY_CORE_TARGET})
+ament_target_dependencies(slip_detector_node
+  rclcpp sensor_msgs nav_msgs safety_core_msgs)
+
+# ----------------------------------------------------------------------------
 # Install
 # ----------------------------------------------------------------------------
 install(TARGETS
@@ -175,6 +188,7 @@ install(TARGETS
     teleop_node
     sensor_monitor_node
     gps_covariance_adapter_node
+    slip_detector_node
   RUNTIME DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY include/

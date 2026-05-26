@@ -25,9 +25,16 @@ namespace safety_core_ros
         params_.auto_recover_from_obstacle = ParamLoader::load_bool(this, "auto_recover_from_obstacle", true);
         params_.sensor_timeout_s           = ParamLoader::load_double(this, "sensor_timeout_s", 1.0);
         params_.degraded_recovery_s        = ParamLoader::load_double(this, "degraded_recovery_s", 5.0);
+        params_.recovery_timeout_s         = ParamLoader::load_double(this, "recovery_timeout_s", 10.0);
+        params_.recovery_speed_ramp_s      = ParamLoader::load_double(this, "recovery_speed_ramp_s", 5.0);
+        params_.max_speed_mps              = ParamLoader::load_double(this, "max_speed_mps", 1.5);
         localization_timeout_ns_           = TimeUtils::seconds_to_nanoseconds(params_.localization_timeout_s);
         sensor_timeout_ns_                 = TimeUtils::seconds_to_nanoseconds(params_.sensor_timeout_s);
         degraded_recovery_ns_              = TimeUtils::seconds_to_nanoseconds(params_.degraded_recovery_s);
+        recovery_timeout_ns_               = TimeUtils::seconds_to_nanoseconds(params_.recovery_timeout_s);
+        recovery_speed_ramp_ns_            = TimeUtils::seconds_to_nanoseconds(params_.recovery_speed_ramp_s);
+        current_speed_limit_mps_           = params_.max_speed_mps;
+        target_speed_limit_mps_            = params_.max_speed_mps;
 
         // Validate localization_timeout_s parameter
         if (params_.localization_timeout_s <= 0.0)
@@ -49,11 +56,33 @@ namespace safety_core_ros
             throw std::runtime_error("sensor_timeout_s must be positive");
         }
 
+        if (params_.recovery_timeout_s <= 0.0)
+        {
+            RCLCPP_ERROR(get_logger(), "Invalid recovery_timeout_s: %.3f (must be positive)",
+                         params_.recovery_timeout_s);
+            throw std::runtime_error("recovery_timeout_s must be positive");
+        }
+
+        if (params_.recovery_speed_ramp_s <= 0.0)
+        {
+            RCLCPP_ERROR(get_logger(), "Invalid recovery_speed_ramp_s: %.3f (must be positive)",
+                         params_.recovery_speed_ramp_s);
+            throw std::runtime_error("recovery_speed_ramp_s must be positive");
+        }
+
+        if (params_.max_speed_mps <= 0.0)
+        {
+            RCLCPP_ERROR(get_logger(), "Invalid max_speed_mps: %.3f (must be positive)", params_.max_speed_mps);
+            throw std::runtime_error("max_speed_mps must be positive");
+        }
+
         // Create ROS interfaces with standardized QoS
         diag_pub_ =
             create_publisher<safety_core_msgs::msg::DiagnosticEvent>("safety/diagnostics", QosConfig::state_qos());
         state_pub_     = create_publisher<safety_core_msgs::msg::SafetyState>("safety/state", QosConfig::state_qos());
         safe_stop_pub_ = create_publisher<std_msgs::msg::Bool>("safety/safe_stop", QosConfig::state_qos());
+        recovery_speed_limit_pub_ =
+            create_publisher<std_msgs::msg::Float64>("safety/recovery_speed_limit", QosConfig::state_qos());
 
         envelope_sub_ = create_subscription<safety_core_msgs::msg::EnvelopeStatus>(
             "safety/envelope_status", QosConfig::sensor_qos(), std::bind(&SafetySupervisorNode::on_envelope, this, _1));
@@ -101,8 +130,9 @@ namespace safety_core_ros
 
         RCLCPP_INFO(get_logger(),
                     "safety_supervisor_node initialized | localization_timeout=%.3fs sensor_timeout=%.3fs "
-                    "degraded_recovery=%.3fs",
-                    params_.localization_timeout_s, params_.sensor_timeout_s, params_.degraded_recovery_s);
+                    "degraded_recovery=%.3fs recovery_timeout=%.3fs recovery_speed_ramp=%.3fs max_speed=%.2f",
+                    params_.localization_timeout_s, params_.sensor_timeout_s, params_.degraded_recovery_s,
+                    params_.recovery_timeout_s, params_.recovery_speed_ramp_s, params_.max_speed_mps);
     }
 
     std::uint64_t SafetySupervisorNode::now_ns() const noexcept
@@ -177,8 +207,15 @@ namespace safety_core_ros
         // Check localization staleness
         check_localization_staleness();
 
-        // Check sensor health
+        // Check sensor health (summary-based transitions)
         check_sensor_health();
+
+        // Check per-sensor recovery timeouts
+        check_sensor_recovery_timeouts(current_time_ns);
+
+        // Update ramped speed limit and publish
+        update_speed_limit(current_time_ns);
+        publish_recovery_speed_limit();
 
         // Observe clock sample
         (void)supervisor_->observe_clock_sample(current_time_ns);
@@ -189,11 +226,63 @@ namespace safety_core_ros
 
     void SafetySupervisorNode::on_sensor_health(const safety_core_msgs::msg::SensorHealth::ConstSharedPtr msg)
     {
-        // Only track the "all" summary message for overall system health
-        if (msg->sensor_name == "all")
+        const std::string& name = msg->sensor_name;
+        const uint8_t status    = msg->status;
+        const std::uint64_t now = now_ns();
+
+        if (name == "all")
         {
-            worst_sensor_status_        = msg->status;
-            last_sensor_health_time_ns_ = now_ns();
+            worst_sensor_status_        = status;
+            last_sensor_health_time_ns_ = now;
+            return;
+        }
+
+        auto it = sensor_states_.find(name);
+        if (it == sensor_states_.end())
+        {
+            SensorRecoveryInfo info;
+            info.status = status;
+            if (status == safety_core_msgs::msg::SensorHealth::DEGRADED)
+            {
+                info.degradation_start_ns = now;
+            }
+            sensor_states_.emplace(name, info);
+            if (status == safety_core_msgs::msg::SensorHealth::DEGRADED)
+            {
+                handle_sensor_degraded(name);
+            }
+            return;
+        }
+
+        SensorRecoveryInfo& info = it->second;
+        if (info.timed_out && status == safety_core_msgs::msg::SensorHealth::DEGRADED)
+        {
+            // Already timed out; ignore further degraded messages until sensor recovers
+            return;
+        }
+
+        const uint8_t prev_status = info.status;
+        if (prev_status == status)
+        {
+            return;
+        }
+
+        info.status = status;
+
+        if (status == safety_core_msgs::msg::SensorHealth::DEGRADED)
+        {
+            info.degradation_start_ns = now;
+            handle_sensor_degraded(name);
+        }
+        else if (prev_status == safety_core_msgs::msg::SensorHealth::DEGRADED &&
+                 status == safety_core_msgs::msg::SensorHealth::HEALTHY)
+        {
+            info.degradation_start_ns = std::nullopt;
+            handle_sensor_recovered(name);
+        }
+        else if (status == safety_core_msgs::msg::SensorHealth::FAULT)
+        {
+            info.degradation_start_ns = std::nullopt;
         }
     }
 
@@ -275,6 +364,147 @@ namespace safety_core_ros
         {
             (void)machine_->report_localization_lost();
         }
+    }
+
+    void SafetySupervisorNode::handle_sensor_degraded(const std::string& sensor_name)
+    {
+        RCLCPP_WARN(get_logger(), "Sensor '%s' degraded - reducing max speed to 50%%", sensor_name.c_str());
+        publish_diagnostic_event("safety/sensor_recovery", "Sensor " + sensor_name + " degraded");
+
+        const Mode current_mode = machine_->mode();
+        if (current_mode == Mode::Moving)
+        {
+            (void)machine_->transition_to(Mode::Degraded);
+        }
+        in_degraded_mode_        = true;
+        target_speed_limit_mps_  = params_.max_speed_mps * 0.5;
+        speed_ramp_start_ns_     = std::nullopt;
+        current_speed_limit_mps_ = target_speed_limit_mps_;
+    }
+
+    void SafetySupervisorNode::handle_sensor_recovered(const std::string& sensor_name)
+    {
+        if (!is_any_sensor_degraded())
+        {
+            RCLCPP_INFO(get_logger(), "Sensor '%s' recovered - starting speed ramp", sensor_name.c_str());
+            publish_diagnostic_event("safety/sensor_recovery", "Sensor " + sensor_name + " recovered, ramping speed");
+
+            const Mode current_mode = machine_->mode();
+            if (current_mode == Mode::Degraded)
+            {
+                (void)machine_->transition_to(Mode::Moving);
+            }
+            in_degraded_mode_       = false;
+            target_speed_limit_mps_ = params_.max_speed_mps;
+            speed_ramp_start_ns_    = now_ns();
+        }
+        else
+        {
+            RCLCPP_INFO(get_logger(), "Sensor '%s' recovered but other sensors still degraded", sensor_name.c_str());
+            publish_diagnostic_event("safety/sensor_recovery",
+                                     "Sensor " + sensor_name + " recovered but others degraded");
+        }
+    }
+
+    bool SafetySupervisorNode::is_any_sensor_degraded() const noexcept
+    {
+        for (const auto& pair : sensor_states_)
+        {
+            if (pair.second.status == safety_core_msgs::msg::SensorHealth::DEGRADED)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void SafetySupervisorNode::check_sensor_recovery_timeouts(std::uint64_t now_ns)
+    {
+        const Mode current_mode = machine_->mode();
+        if (current_mode == Mode::SafeStop)
+        {
+            return;
+        }
+
+        for (auto& pair : sensor_states_)
+        {
+            SensorRecoveryInfo& info = pair.second;
+            if (info.status != safety_core_msgs::msg::SensorHealth::DEGRADED || !info.degradation_start_ns.has_value())
+            {
+                continue;
+            }
+
+            const std::uint64_t elapsed_ns = now_ns - info.degradation_start_ns.value();
+            if (elapsed_ns > recovery_timeout_ns_)
+            {
+                RCLCPP_ERROR(get_logger(), "Sensor '%s' recovery timeout exceeded (%.1fs) - treating as FAULT",
+                             pair.first.c_str(), TimeUtils::nanoseconds_to_seconds(elapsed_ns));
+                publish_diagnostic_event("safety/sensor_recovery",
+                                         "Sensor " + pair.first + " recovery timeout, treating as FAULT");
+
+                info.timed_out            = true;
+                info.degradation_start_ns = std::nullopt;
+
+                if (current_mode != Mode::SafeStop)
+                {
+                    (void)machine_->latch_fault(0xE003U); // Fault code for recovery timeout
+                    (void)machine_->transition_to(Mode::SafeStop);
+                    safe_stop_requested_ = true;
+                    in_degraded_mode_    = false;
+                }
+            }
+        }
+    }
+
+    void SafetySupervisorNode::update_speed_limit(std::uint64_t now_ns)
+    {
+        if (machine_->mode() == Mode::SafeStop)
+        {
+            current_speed_limit_mps_ = 0.0;
+            target_speed_limit_mps_  = 0.0;
+            speed_ramp_start_ns_     = std::nullopt;
+            return;
+        }
+
+        if (speed_ramp_start_ns_.has_value())
+        {
+            const std::uint64_t elapsed_ns = now_ns - speed_ramp_start_ns_.value();
+            if (elapsed_ns >= recovery_speed_ramp_ns_)
+            {
+                current_speed_limit_mps_ = target_speed_limit_mps_;
+                speed_ramp_start_ns_     = std::nullopt;
+            }
+            else
+            {
+                const double degraded_limit = params_.max_speed_mps * 0.5;
+                const double ramp_range     = params_.max_speed_mps - degraded_limit;
+                const double fraction = static_cast<double>(elapsed_ns) / static_cast<double>(recovery_speed_ramp_ns_);
+                current_speed_limit_mps_ = degraded_limit + (ramp_range * fraction);
+            }
+        }
+        else
+        {
+            current_speed_limit_mps_ = target_speed_limit_mps_;
+        }
+    }
+
+    void SafetySupervisorNode::publish_diagnostic_event(const std::string& topic, const std::string& payload)
+    {
+        safety_core_msgs::msg::DiagnosticEvent event;
+        event.header.stamp        = get_clock()->now();
+        event.topic               = topic;
+        event.payload             = payload;
+        event.topic_truncated     = (topic.size() > 255);
+        event.payload_truncated   = (payload.size() > 1024);
+        event.source_timestamp_ns = now_ns();
+        diag_pub_->publish(std::move(event));
+    }
+
+    void SafetySupervisorNode::publish_recovery_speed_limit()
+    {
+        std_msgs::msg::Float64 msg;
+        msg.data = current_speed_limit_mps_;
+        recovery_speed_limit_pub_->publish(std::move(msg));
     }
 
     safety_core_msgs::msg::SafetyState SafetySupervisorNode::build_state_msg(Mode current_mode) const

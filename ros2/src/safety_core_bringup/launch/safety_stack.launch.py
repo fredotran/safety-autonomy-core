@@ -106,11 +106,21 @@ def generate_launch_description():
         parameters=[safety_params, {'use_sim_time': use_sim_time}],
     )
 
+    # Slip detector node
+    slip_detector = Node(
+        package='safety_core_ros',
+        executable='slip_detector_node',
+        name='slip_detector_node',
+        output='screen',
+        parameters=[safety_params, {'use_sim_time': use_sim_time}],
+    )
+
     # Group the safety nodes
     safety_stack = GroupAction(
         actions=[
             LogInfo(msg='Starting safety_core wrapper stack...'),
             sensor_monitor,
+            slip_detector,
             safety_envelope,
             safety_supervisor,
             safety_drive_bridge_with_remappings,

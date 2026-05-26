@@ -18,6 +18,8 @@ set(msg_files
   msg/DiagnosticEvent.msg
   msg/MonitorEvent.msg
   msg/SensorHealth.msg
+  msg/SensorHealthMetrics.msg
+  msg/SlipDetected.msg
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}

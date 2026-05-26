@@ -18,6 +18,7 @@
 #include <safety_core_msgs/msg/envelope_status.hpp>
 #include <safety_core_msgs/msg/safety_state.hpp>
 #include <std_msgs/msg/bool.hpp>
+#include <std_msgs/msg/float64.hpp>
 
 namespace safety_core_ros
 {
@@ -47,6 +48,7 @@ namespace safety_core_ros
         void on_safe_stop(const std_msgs::msg::Bool::ConstSharedPtr msg);
         void on_state(const safety_core_msgs::msg::SafetyState::ConstSharedPtr msg);
         void on_odom(const nav_msgs::msg::Odometry::ConstSharedPtr msg);
+        void on_recovery_speed_limit(const std_msgs::msg::Float64::ConstSharedPtr msg);
 
         // Control loop
         void control_tick();
@@ -78,6 +80,7 @@ namespace safety_core_ros
         std::atomic<bool> safe_stop_active_{false};
         std::atomic<bool> fault_latched_{false};
         std::atomic<double> recommended_speed_limit_mps_{1e9}; // unrestricted by default
+        std::atomic<double> recovery_speed_limit_mps_{1e9};    // unrestricted by default
         std::atomic<double> measured_forward_speed_mps_{0.0};
 
         // Latest Nav2 command + arrival timestamp
@@ -99,6 +102,7 @@ namespace safety_core_ros
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr safe_stop_sub_;
         rclcpp::Subscription<safety_core_msgs::msg::SafetyState>::SharedPtr state_sub_;
         rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
+        rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr recovery_speed_limit_sub_;
         rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_pub_;
         rclcpp::TimerBase::SharedPtr timer_;
     };

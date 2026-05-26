@@ -25,6 +25,7 @@ namespace safety_core_ros
         params_.publish_period_s       = ParamLoader::load_double(this, "publish_period_s", 1.0);
         params_.healthy_threshold      = ParamLoader::load_double(this, "healthy_threshold", 0.8);
         params_.degraded_threshold     = ParamLoader::load_double(this, "degraded_threshold", 0.5);
+        params_.metrics_window_s       = ParamLoader::load_double(this, "metrics_window_s", 60.0);
 
         // Validate parameters
         if (params_.publish_period_s <= 0.0)
@@ -54,6 +55,12 @@ namespace safety_core_ros
                         params_.degraded_threshold, params_.healthy_threshold);
         }
 
+        if (params_.metrics_window_s <= 0.0)
+        {
+            RCLCPP_ERROR(get_logger(), "Invalid metrics_window_s: %.3f (must be positive)", params_.metrics_window_s);
+            throw std::runtime_error("metrics_window_s must be positive");
+        }
+
         // Initialize trackers
         lidar_tracker_.sensor_name      = "lidar";
         lidar_tracker_.expected_rate_hz = params_.lidar_expected_rate;
@@ -76,18 +83,25 @@ namespace safety_core_ros
 
         health_pub_ =
             create_publisher<safety_core_msgs::msg::SensorHealth>("safety/sensor_health", QosConfig::state_qos());
+        metrics_pub_ = create_publisher<safety_core_msgs::msg::SensorHealthMetrics>("safety/sensor_health_metrics",
+                                                                                    QosConfig::state_qos());
 
         // Create timer for periodic publishing
         timer_ = create_wall_timer(std::chrono::duration<double>(params_.publish_period_s),
                                    std::bind(&SensorMonitorNode::timer_tick, this));
 
+        // Create timer for metrics publishing at 0.1 Hz (every 10 seconds)
+        metrics_timer_ =
+            create_wall_timer(std::chrono::seconds(10), std::bind(&SensorMonitorNode::publish_metrics, this));
+
         // Record startup time for grace period
         startup_time_ = get_clock()->now();
 
-        RCLCPP_INFO(get_logger(),
-                    "sensor_monitor_node initialized | publish_period=%.3fs healthy_threshold=%.2f "
-                    "degraded_threshold=%.2f startup_grace=2.0s",
-                    params_.publish_period_s, params_.healthy_threshold, params_.degraded_threshold);
+        RCLCPP_INFO(
+            get_logger(),
+            "sensor_monitor_node initialized | publish_period=%.3fs metrics_window=%.1fs healthy_threshold=%.2f "
+            "degraded_threshold=%.2f startup_grace=2.0s",
+            params_.publish_period_s, params_.metrics_window_s, params_.healthy_threshold, params_.degraded_threshold);
     }
 
     std::uint64_t SensorMonitorNode::now_ns() const noexcept
@@ -218,7 +232,150 @@ namespace safety_core_ros
 
     void SensorMonitorNode::publish_sensor_health(SensorTracker& tracker, std::uint64_t now_ns)
     {
-        health_pub_->publish(build_sensor_msg(tracker, now_ns));
+        auto msg = build_sensor_msg(tracker, now_ns);
+        health_pub_->publish(msg);
+        record_status_sample(tracker, now_ns, msg.status, msg.update_rate_hz);
+    }
+
+    void SensorMonitorNode::record_status_sample(SensorTracker& tracker, std::uint64_t now_ns, uint8_t status,
+                                                 double update_rate_hz)
+    {
+        std::lock_guard<std::mutex> lock(tracker.mutex);
+        tracker.status_history.push_back({now_ns, status, update_rate_hz});
+    }
+
+    void SensorMonitorNode::prune_status_history(SensorTracker& tracker, std::uint64_t now_ns)
+    {
+        const std::uint64_t window_ns = TimeUtils::seconds_to_nanoseconds(params_.metrics_window_s);
+        const std::uint64_t cutoff_ns = (now_ns >= window_ns) ? (now_ns - window_ns) : 0ULL;
+
+        std::lock_guard<std::mutex> lock(tracker.mutex);
+        while (!tracker.status_history.empty() && tracker.status_history.front().timestamp_ns < cutoff_ns)
+        {
+            tracker.status_history.pop_front();
+        }
+    }
+
+    safety_core_msgs::msg::SensorHealthMetrics SensorMonitorNode::build_metrics_msg(SensorTracker& tracker,
+                                                                                    std::uint64_t now_ns)
+    {
+        safety_core_msgs::msg::SensorHealthMetrics msg;
+        msg.sensor_name = tracker.sensor_name;
+
+        std::lock_guard<std::mutex> lock(tracker.mutex);
+
+        if (tracker.status_history.empty())
+        {
+            msg.avg_update_rate_hz      = 0.0f;
+            msg.min_update_rate_hz      = 0.0f;
+            msg.healthy_percentage      = 0.0f;
+            msg.degraded_percentage     = 0.0f;
+            msg.fault_percentage        = 0.0f;
+            msg.transition_count        = 0u;
+            msg.window_duration.sec     = 0;
+            msg.window_duration.nanosec = 0u;
+            return msg;
+        }
+
+        // Average and minimum update rate
+        double total_rate = 0.0;
+        double min_rate   = std::numeric_limits<double>::max();
+        for (const auto& sample : tracker.status_history)
+        {
+            total_rate += sample.update_rate_hz;
+            if (sample.update_rate_hz < min_rate)
+            {
+                min_rate = sample.update_rate_hz;
+            }
+        }
+        msg.avg_update_rate_hz = static_cast<float>(total_rate / static_cast<double>(tracker.status_history.size()));
+        msg.min_update_rate_hz = static_cast<float>(min_rate);
+
+        // Time-weighted status percentages and transitions
+        double healthy_time_s     = 0.0;
+        double degraded_time_s    = 0.0;
+        double fault_time_s       = 0.0;
+        std::uint32_t transitions = 0u;
+
+        for (size_t i = 0; i < tracker.status_history.size(); ++i)
+        {
+            const auto& sample        = tracker.status_history[i];
+            std::uint64_t duration_ns = 0;
+            if (i + 1 < tracker.status_history.size())
+            {
+                duration_ns = tracker.status_history[i + 1].timestamp_ns - sample.timestamp_ns;
+            }
+            else
+            {
+                duration_ns = now_ns - sample.timestamp_ns;
+            }
+
+            const double duration_s = TimeUtils::nanoseconds_to_seconds(duration_ns);
+            switch (sample.status)
+            {
+            case safety_core_msgs::msg::SensorHealth::HEALTHY:
+                healthy_time_s += duration_s;
+                break;
+            case safety_core_msgs::msg::SensorHealth::DEGRADED:
+                degraded_time_s += duration_s;
+                break;
+            case safety_core_msgs::msg::SensorHealth::FAULT:
+                fault_time_s += duration_s;
+                break;
+            default:
+                break;
+            }
+
+            if (i > 0 && sample.status != tracker.status_history[i - 1].status)
+            {
+                ++transitions;
+            }
+        }
+
+        const std::uint64_t total_window_ns = now_ns - tracker.status_history.front().timestamp_ns;
+        const double total_window_s         = TimeUtils::nanoseconds_to_seconds(total_window_ns);
+
+        if (total_window_s > 0.0)
+        {
+            msg.healthy_percentage  = static_cast<float>((healthy_time_s / total_window_s) * 100.0);
+            msg.degraded_percentage = static_cast<float>((degraded_time_s / total_window_s) * 100.0);
+            msg.fault_percentage    = static_cast<float>((fault_time_s / total_window_s) * 100.0);
+        }
+        else
+        {
+            // Single sample - attribute 100% to its status
+            const uint8_t status    = tracker.status_history.front().status;
+            msg.healthy_percentage  = (status == safety_core_msgs::msg::SensorHealth::HEALTHY) ? 100.0f : 0.0f;
+            msg.degraded_percentage = (status == safety_core_msgs::msg::SensorHealth::DEGRADED) ? 100.0f : 0.0f;
+            msg.fault_percentage    = (status == safety_core_msgs::msg::SensorHealth::FAULT) ? 100.0f : 0.0f;
+        }
+
+        msg.transition_count = transitions;
+
+        // Actual window duration (capped by metrics_window_s parameter)
+        const std::uint64_t actual_window_ns =
+            std::min(total_window_ns, TimeUtils::seconds_to_nanoseconds(params_.metrics_window_s));
+        const int64_t window_sec    = static_cast<int64_t>(actual_window_ns / 1'000'000'000ULL);
+        const uint32_t window_nsec  = static_cast<uint32_t>(actual_window_ns % 1'000'000'000ULL);
+        msg.window_duration.sec     = static_cast<int32_t>(window_sec);
+        msg.window_duration.nanosec = window_nsec;
+
+        return msg;
+    }
+
+    void SensorMonitorNode::publish_metrics()
+    {
+        const std::uint64_t current_time_ns = now_ns();
+
+        prune_status_history(lidar_tracker_, current_time_ns);
+        prune_status_history(imu_tracker_, current_time_ns);
+        prune_status_history(gps_tracker_, current_time_ns);
+        prune_status_history(odom_tracker_, current_time_ns);
+
+        metrics_pub_->publish(build_metrics_msg(lidar_tracker_, current_time_ns));
+        metrics_pub_->publish(build_metrics_msg(imu_tracker_, current_time_ns));
+        metrics_pub_->publish(build_metrics_msg(gps_tracker_, current_time_ns));
+        metrics_pub_->publish(build_metrics_msg(odom_tracker_, current_time_ns));
     }
 
     void SensorMonitorNode::timer_tick()
@@ -237,6 +394,12 @@ namespace safety_core_ros
         prune_window(imu_tracker_, current_time_ns, params_.publish_period_s);
         prune_window(gps_tracker_, current_time_ns, params_.publish_period_s);
         prune_window(odom_tracker_, current_time_ns, params_.publish_period_s);
+
+        // Prune old status history for each tracker
+        prune_status_history(lidar_tracker_, current_time_ns);
+        prune_status_history(imu_tracker_, current_time_ns);
+        prune_status_history(gps_tracker_, current_time_ns);
+        prune_status_history(odom_tracker_, current_time_ns);
 
         // Publish individual sensor health
         publish_sensor_health(lidar_tracker_, current_time_ns);
