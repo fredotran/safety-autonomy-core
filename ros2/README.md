@@ -6,8 +6,8 @@ ROS 2 Jazzy + Gazebo Harmonic + Nav2 integration for the [`safety_autonomy_core`
 
 | Package                  | Type        | Purpose                                                                                |
 |--------------------------|-------------|----------------------------------------------------------------------------------------|
-| `safety_core_msgs`       | rosidl      | Custom messages (`SafetyState`, `SafetyZone`, `EnvelopeStatus`, `DiagnosticEvent`, `MonitorEvent`) |
-| `safety_core_ros`        | C++ nodes   | Wrapper nodes integrating safety_core into rclcpp                                      |
+| `safety_core_msgs`       | rosidl      | Custom messages (`SafetyState`, `SafetyZone`, `EnvelopeStatus`, `DiagnosticEvent`, `MonitorEvent`, `SensorHealth`) |
+| `safety_core_ros`        | C++ nodes   | Wrapper nodes integrating safety_core into rclcpp (sensor_monitor, gps_covariance_adapter, safety_envelope, safety_supervisor, drive_bridge)                                      |
 | `safety_core_nav2`       | C++ plugin  | Nav2 behavior-tree plugin (`IsSafe` condition node)                                    |
 | `safety_core_sim`        | resources   | AGV URDF (xacro), industrial warehouse SDF, `ros_gz_bridge` config, sim launch         |
 | `safety_core_bringup`    | resources   | Top-level launch files, Nav2 params, SLAM Toolbox params, RViz config, EKF localization  |
@@ -72,6 +72,75 @@ ROS 2 Jazzy + Gazebo Harmonic + Nav2 integration for the [`safety_autonomy_core`
 │  Publishes /cmd_vel → Gazebo                                        │
 └────────────────────────────────────────────────────────────────────┘
 ```
+
+## New Safety Features
+
+### Sensor Health Monitoring
+
+The `sensor_monitor_node` provides comprehensive health monitoring for all safety-critical sensors:
+
+**Monitored Sensors:**
+- `/scan` (LiDAR)
+- `/imu` (Inertial Measurement Unit)
+- `/gps` (GPS/NavSat)
+- `/odom` (Odometry)
+
+**Health Metrics:**
+- Update rate vs expected rate
+- Data age (staleness detection)
+- Error rate calculation
+
+**Status Levels:**
+- `HEALTHY` (≥80% of expected rate)
+- `DEGRADED` (≥50% of expected rate)
+- `FAULT` (<50% of expected rate or stale data)
+
+**Integration:**
+- Publishes to `/safety/sensor_health` (SensorHealth message)
+- Safety supervisor subscribes and triggers mode transitions:
+  - `FAULT` → SafeStop with fault 0xE002
+  - `DEGRADED` → Degraded mode (reduced capability)
+  - `HEALTHY` → Recovery from Degraded
+- 2-second startup grace period prevents false fault reports during initialization
+
+### GPS Covariance Adaptation
+
+The `gps_covariance_adapter_node` improves EKF fusion by adapting GPS covariance based on signal quality:
+
+**Covariance Scaling:**
+- `GBAS_FIX`: 1.0x multiplier (excellent quality)
+- `SBAS_FIX`: 2.0x multiplier (good quality)
+- `FIX`: 5.0x multiplier (fair quality)
+- `NO_FIX`: 10.0x multiplier (poor quality)
+
+**Benefits:**
+- Adaptive EKF fusion based on GPS signal quality
+- Better localization accuracy in challenging environments
+- Graceful degradation when GPS signal degrades
+
+**Integration:**
+- Subscribes to `/gps`
+- Publishes to `/gps_adapted`
+- EKF uses `/gps_adapted` when `ekf:=true`
+
+### Dynamic Safety Buffer
+
+The `safety_envelope_node` now supports velocity-dependent safety buffers:
+
+**Buffer Formula:**
+```
+buffer = min_buffer + velocity_factor * speed
+```
+
+**Parameters:**
+- `envelope.dynamic_buffer_enabled` (bool)
+- `envelope.velocity_factor` (default 0.3)
+- `envelope.min_buffer_m` (default 0.5)
+
+**Benefits:**
+- Larger safety margins at higher speeds
+- Optimized safety envelope for dynamic operation
+- Capped at 2x static buffer to prevent excessive growth
 
 ## System requirements
 
@@ -198,34 +267,18 @@ ros2 launch safety_core_bringup safety_only.launch.py
 
 ### Outbound (published by safety stack)
 
-| Topic                       | Type                                      | Publisher                  |
-|-----------------------------|-------------------------------------------|----------------------------|
-| `/safety/envelope_status`   | `safety_core_msgs/EnvelopeStatus`         | `safety_envelope_node`     |
-| `/safety/zone_markers`      | `visualization_msgs/MarkerArray`          | `safety_envelope_node`     |
-| `/safety/state`             | `safety_core_msgs/SafetyState`            | `safety_supervisor_node`   |
-| `/safety/safe_stop`         | `std_msgs/Bool`                           | `safety_supervisor_node`   |
-| `/safety/diagnostics`       | `safety_core_msgs/DiagnosticEvent`        | `safety_supervisor_node`   |
-| `/cmd_vel`                  | `geometry_msgs/Twist`                     | `safety_drive_bridge_node` |
-
-## Parameters
-
-All wrapper-node parameters live in [`safety_core_bringup/config/safety_params.yaml`](src/safety_core_bringup/config/safety_params.yaml). The defaults match the AGV demo profile in `examples/agv_safety_demo.cpp`:
-
-| Parameter                              | Default | Description                                                |
-|----------------------------------------|---------|------------------------------------------------------------|
-| `envelope.max_speed_mps`               | 1.5     | Maximum forward speed                                      |
-| `envelope.max_comfort_decel_mps2`      | 1.0     | Comfort braking deceleration                               |
-| `envelope.safety_buffer_m`             | 0.30    | Minimum clearance to obstacle (defines Emergency boundary) |
-| `footprint.length_m` / `width_m`       | 0.80 / 0.60 | Robot bounding box                                     |
-| `footprint.front_overhang_m`           | 0.10    | Forward overhang beyond `base_link`                        |
-| `corridor_half_width_m`                | 0.40    | Lateral filter for forward-cone scan check                 |
-| `localization_timeout_s`               | 0.5     | Threshold for `LocalizationLost` mode                      |
-| `cmd_freshness_s`                      | 0.25    | Stale-Nav2-command watchdog                                |
-| `max_jerk_mps3`                        | 2.0     | Jerk limit for emergency stop profile                      |
+|| Topic                       | Type                                      | Publisher                  |
+||-----------------------------|-------------------------------------------|----------------------------|
+|| `/safety/envelope_status`   | `safety_core_msgs/EnvelopeStatus`         | `safety_envelope_node`     |
+|| `/safety/zone_markers`      | `visualization_msgs/MarkerArray`          | `safety_envelope_node`     |
+|| `/safety/state`             | `safety_core_msgs/SafetyState`            | `safety_supervisor_node`   |
+|| `/safety/safe_stop`         | `std_msgs/Bool`                           | `safety_supervisor_node`   |
+|| `/safety/diagnostics`       | `safety_core_msgs/DiagnosticEvent`        | `safety_supervisor_node`   |
+|| `/safety/sensor_health`     | `safety_core_msgs/SensorHealth`           | `sensor_monitor_node`      |
+|| `/gps_adapted`              | `sensor_msgs/NavSatFix`                   | `gps_covariance_adapter_node` (when ekf:=true) |
+|| `/cmd_vel`                  | `geometry_msgs/Twist`                     | `safety_drive_bridge_node` |
 
 ## Verification (without Gazebo)
-
-A quick sanity check that the safety nodes build and launch correctly:
 
 ```bash
 source install/setup.bash
@@ -262,7 +315,6 @@ ros2 launch safety_core_bringup agv_warehouse.launch.py \
 | `safety_core::sm::ModeStateMachine`                | Owned by `safety_supervisor_node`                           |
 | `safety_core::safety::SafetySupervisor`            | Owned by `safety_supervisor_node`                           |
 | `safety_core::safety::evaluate_stop_distance(...)` | Called per `/scan` in `safety_envelope_node`                |
-| `safety_core::motion::generate_jerk_limited_stop_profile()` | Called on `/safety/safe_stop=true` in drive bridge |
 
 The boundary contract: ROS callbacks copy data into safety_core types, run noexcept safety logic, copy results into ROS messages. Diagnostic events are emitted via the pluggable transport so the safety_core core stays decoupled from rclcpp.
 

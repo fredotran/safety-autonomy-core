@@ -63,9 +63,12 @@ ctest --test-dir build --output-on-failure
 ### Advanced Capabilities
 
 - **Visual Odometry**: ORB feature tracking for camera-based pose estimation
-- **Adaptive EKF**: Dynamic process noise adjustment for wheel slip detection  
+- **Adaptive EKF**: Dynamic process noise adjustment for wheel slip detection
 - **IMU Bias Estimation**: Online gyro/accel bias calibration
 - **Sensor Fault Detection**: Comprehensive monitoring for all sensors
+- **Sensor Health Monitoring**: Real-time health tracking with graceful degradation
+- **GPS Covariance Adaptation**: Quality-based covariance scaling for adaptive EKF fusion
+- **Dynamic Safety Buffer**: Velocity-dependent safety margins for adaptive protection
 - **Kidnapping Detection**: Pose jump analysis for unexpected repositioning
 - **Localization Confidence**: Real-time uncertainty assessment
 
