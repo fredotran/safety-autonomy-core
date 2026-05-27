@@ -22,6 +22,7 @@ find_package(ament_cmake_gtest REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(safety_core_msgs REQUIRED)
 find_package(safety_core_ros REQUIRED)
@@ -51,6 +52,18 @@ target_include_directories(test_math_utils PRIVATE
   ${CMAKE_SOURCE_DIR}/../safety_core_ros/include)
 target_link_libraries(test_math_utils test_fixtures)
 ament_target_dependencies(test_math_utils rclcpp)
+
+# Unit Tests: ROS bridge adapters
+ament_add_gtest(test_ros_bridges
+  test/test_main.cpp
+  test/unit/test_ros_bridges.cpp
+  SKIP_LINKING_MAIN_LIBRARIES)
+target_include_directories(test_ros_bridges PRIVATE
+  ${CMAKE_SOURCE_DIR}/../safety_core_ros/include
+  ${safety_autonomy_core_INCLUDE_DIRS})
+target_link_libraries(test_ros_bridges test_fixtures)
+ament_target_dependencies(test_ros_bridges
+  rclcpp sensor_msgs nav_msgs geometry_msgs safety_core_msgs safety_core_ros)
 
 # Component Tests: sensor_monitor_node
 ament_add_gtest(test_sensor_monitor

@@ -69,6 +69,9 @@ add_library(safety_core_ros_bridges
   src/ros_clock.cpp
   src/ros_diagnostic_transport.cpp
   src/ros_health_monitor.cpp
+  src/ros_imu_bridge.cpp
+  src/ros_odometry_bridge.cpp
+  src/ros_drive_actuator_bridge.cpp
 )
 target_include_directories(safety_core_ros_bridges PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -79,7 +82,8 @@ target_include_directories(safety_core_ros_bridges SYSTEM PUBLIC
   ${safety_autonomy_core_INCLUDE_DIRS})
 target_link_libraries(safety_core_ros_bridges PUBLIC ${SAFETY_CORE_TARGET})
 ament_target_dependencies(safety_core_ros_bridges PUBLIC
-  rclcpp safety_core_msgs builtin_interfaces std_msgs)
+  rclcpp safety_core_msgs builtin_interfaces std_msgs
+  sensor_msgs nav_msgs geometry_msgs)
 
 # ----------------------------------------------------------------------------
 # Node 1: safety_envelope_node
