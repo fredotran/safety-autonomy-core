@@ -131,9 +131,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     needs: detect_changes
-    # Pre-existing readability/bugprone findings in the core C++ library; tracked as known
-    # debt and intentionally non-blocking until a dedicated cleanup pass lands.
-    continue-on-error: true
+    # Static analysis is fully blocking: both cppcheck and clang-tidy must produce zero findings.
     if: |
       (needs.detect_changes.outputs.cpp == 'true' || needs.detect_changes.outputs.ci == 'true' || needs.detect_changes.outputs.run_all == 'true') &&
       (contains(github.event.head_commit.message, '[skip-tidy]') == false &&
@@ -183,9 +181,9 @@ jobs:
                    --suppressions-list=.cppcheck-suppressions \
                    -I include \
                    -I /usr/include/eigen3 \
-                   src/ include/ || true
+                   src/ include/
       - name: clang-tidy
-        run: clang-tidy -p ${BUILD_DIR} $(find src include -name '*.cpp') || true
+        run: clang-tidy -p ${BUILD_DIR} $(find src include -name '*.cpp')
 
   hook_smoke:
     name: hook_smoke (pre-commit hook)

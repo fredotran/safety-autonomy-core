@@ -11,6 +11,8 @@
 #include "safety_core_ros/ros_clock.hpp"
 #include "safety_core_ros/ros_diagnostic_transport.hpp"
 #include "safety_core_ros/ros_health_monitor.hpp"
+#include "safety_core_ros/sensor_recovery_manager.hpp"
+#include "safety_core_ros/speed_limit_controller.hpp"
 #include "safety_core_ros/time_utils.hpp"
 
 #include <memory>
@@ -81,6 +83,16 @@ namespace safety_core_ros
         // Time utilities
         [[nodiscard]] std::uint64_t now_ns() const noexcept;
 
+        // Result logging helper — logs a WARN if a state-machine call fails
+        inline void log_result(const safety_core::Result& r, const char* ctx) const noexcept
+        {
+            if (!r.ok())
+            {
+                RCLCPP_WARN(get_logger(), "[%s] state-machine call failed: %s (code=%d)", ctx, r.message.data(),
+                            static_cast<int>(r.code));
+            }
+        }
+
         // Supervisor + state machine ownership
         std::unique_ptr<RosClock> clock_;
         std::unique_ptr<RosHealthMonitor> health_monitor_;
@@ -106,28 +118,14 @@ namespace safety_core_ros
         std::uint64_t localization_timeout_ns_{500'000'000ULL};
         bool safe_stop_requested_{false};
 
-        // Sensor health tracking
-        uint8_t worst_sensor_status_{safety_core_msgs::msg::SensorHealth::UNKNOWN};
-        std::optional<std::uint64_t> last_sensor_health_time_ns_;
-        std::uint64_t sensor_timeout_ns_{1'000'000'000ULL};
-        std::uint64_t degraded_recovery_ns_{5'000'000'000ULL};
-        bool in_degraded_mode_{false};
-
-        // Per-sensor recovery state
-        struct SensorRecoveryInfo
-        {
-            uint8_t status{safety_core_msgs::msg::SensorHealth::UNKNOWN};
-            std::optional<std::uint64_t> degradation_start_ns;
-            bool timed_out{false};
-        };
-        std::unordered_map<std::string, SensorRecoveryInfo> sensor_states_;
+        // Sensor recovery management
+        SensorRecoveryManager recovery_mgr_;
+        std::uint64_t sensor_timeout_ns_{1'000'000'000ULL};    // keep: used in check_sensor_health
+        std::uint64_t degraded_recovery_ns_{5'000'000'000ULL}; // keep: parameter config
 
         // Speed limit recovery
-        double current_speed_limit_mps_{1.5};
-        double target_speed_limit_mps_{1.5};
-        std::optional<std::uint64_t> speed_ramp_start_ns_;
         std::uint64_t recovery_timeout_ns_{10'000'000'000ULL};
-        std::uint64_t recovery_speed_ramp_ns_{5'000'000'000ULL};
+        SpeedLimitController speed_ctrl_{1.5, 5'000'000'000ULL}; // defaults; overwritten in ctor
 
         // ROS interfaces
         rclcpp::Subscription<safety_core_msgs::msg::EnvelopeStatus>::SharedPtr envelope_sub_;
@@ -139,6 +137,12 @@ namespace safety_core_ros
         rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr recovery_speed_limit_pub_;
         rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr clear_fault_srv_;
         rclcpp::TimerBase::SharedPtr timer_;
+
+        // Tick duration telemetry
+        std::uint64_t tick_count_{0U};
+        double tick_sum_ms_{0.0};
+        double tick_max_ms_{0.0};
+        static constexpr std::uint64_t kTelemetryInterval{200U}; // ~10s at 20 Hz
     };
 
 } // namespace safety_core_ros

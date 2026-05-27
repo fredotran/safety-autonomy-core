@@ -193,8 +193,8 @@ namespace safety_core::safety
     void SafetySupervisor::publish_monitor_event(std::string_view topic, const MonitorEvent& event) const noexcept
     {
         // Cache pointers to prevent race conditions
-        auto* transport = transport_;
-        auto* clock     = clock_;
+        auto* transport   = transport_;
+        const auto* clock = clock_;
         if (transport == nullptr)
         {
             return;

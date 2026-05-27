@@ -21,7 +21,7 @@ namespace safety_core::system
         static_assert(96U < diag::kDiagnosticPayloadCapacity);
 
         void publish_startup_event(diag::DiagnosticTransport* transport, std::string_view topic,
-                                   std::string_view payload, platform::Clock* clock) noexcept
+                                   std::string_view payload, const platform::Clock* clock) noexcept
         {
             if (transport == nullptr)
             {

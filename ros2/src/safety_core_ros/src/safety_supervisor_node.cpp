@@ -32,9 +32,8 @@ namespace safety_core_ros
         sensor_timeout_ns_                 = TimeUtils::seconds_to_nanoseconds(params_.sensor_timeout_s);
         degraded_recovery_ns_              = TimeUtils::seconds_to_nanoseconds(params_.degraded_recovery_s);
         recovery_timeout_ns_               = TimeUtils::seconds_to_nanoseconds(params_.recovery_timeout_s);
-        recovery_speed_ramp_ns_            = TimeUtils::seconds_to_nanoseconds(params_.recovery_speed_ramp_s);
-        current_speed_limit_mps_           = params_.max_speed_mps;
-        target_speed_limit_mps_            = params_.max_speed_mps;
+        const std::uint64_t ramp_ns        = TimeUtils::seconds_to_nanoseconds(params_.recovery_speed_ramp_s);
+        speed_ctrl_                        = SpeedLimitController(params_.max_speed_mps, ramp_ns);
 
         // Validate localization_timeout_s parameter
         if (params_.localization_timeout_s <= 0.0)
@@ -126,7 +125,7 @@ namespace safety_core_ros
         }
 
         // Initialize in Idle state
-        (void)machine_->transition_to(Mode::Idle);
+        log_result(machine_->transition_to(Mode::Idle), "init: transition_to(Idle)");
 
         RCLCPP_INFO(get_logger(),
                     "safety_supervisor_node initialized | localization_timeout=%.3fs sensor_timeout=%.3fs "
@@ -156,7 +155,7 @@ namespace safety_core_ros
         // This ensures the transition happens even if the zone doesn't change
         if (current_mode == Mode::Idle && latest_zone_ == SafetyZone::Clear)
         {
-            (void)machine_->transition_to(Mode::Moving);
+            log_result(machine_->transition_to(Mode::Moving), "on_envelope: transition_to(Moving)");
             safe_stop_requested_ = false;
             RCLCPP_INFO(get_logger(), "Auto-transition from Idle to Moving (Clear zone)");
         }
@@ -175,7 +174,7 @@ namespace safety_core_ros
             // Recover from obstacle hold if path is clear enough
             if (current_mode == Mode::AvoidingObstacle && params_.auto_recover_from_obstacle)
             {
-                (void)machine_->transition_to(Mode::Moving);
+                log_result(machine_->transition_to(Mode::Moving), "handle_zone: transition_to(Moving)");
                 safe_stop_requested_ = false;
             }
             break;
@@ -184,15 +183,15 @@ namespace safety_core_ros
             // Request obstacle hold when in Protective zone
             if (current_mode == Mode::Moving)
             {
-                (void)machine_->request_obstacle_hold();
+                log_result(machine_->request_obstacle_hold(), "handle_zone: request_obstacle_hold");
             }
             break;
 
         case SafetyZone::Emergency:
             // Latch fault and transition to SafeStop
             // Fault code 0xE001 == "envelope emergency zone breached"
-            (void)machine_->latch_fault(0xE001U);
-            (void)machine_->transition_to(Mode::SafeStop);
+            log_result(machine_->latch_fault(0xE001U), "handle_zone: latch_fault(E001)");
+            log_result(machine_->transition_to(Mode::SafeStop), "handle_zone: transition_to(SafeStop)");
             safe_stop_requested_ = true;
             break;
         }
@@ -200,6 +199,8 @@ namespace safety_core_ros
 
     void SafetySupervisorNode::timer_tick()
     {
+        const auto tick_start = std::chrono::steady_clock::now();
+
         // Cache current time and mode to avoid repeated calls
         const std::uint64_t current_time_ns = now_ns();
         const Mode current_mode             = machine_->mode();
@@ -218,10 +219,30 @@ namespace safety_core_ros
         publish_recovery_speed_limit();
 
         // Observe clock sample
-        (void)supervisor_->observe_clock_sample(current_time_ns);
+        log_result(supervisor_->observe_clock_sample(current_time_ns), "timer_tick: observe_clock_sample");
 
         // Publish current state
         publish_state(current_mode);
+
+        // Tick-duration telemetry
+        const double tick_ms =
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tick_start).count();
+        tick_sum_ms_ += tick_ms;
+        if (tick_ms > tick_max_ms_)
+        {
+            tick_max_ms_ = tick_ms;
+        }
+        ++tick_count_;
+        if (tick_count_ % kTelemetryInterval == 0U)
+        {
+            const double avg_ms = tick_sum_ms_ / static_cast<double>(kTelemetryInterval);
+            RCLCPP_DEBUG(get_logger(), "tick telemetry | avg=%.3fms max=%.3fms count=%lu", avg_ms, tick_max_ms_,
+                         tick_count_);
+            publish_diagnostic_event("safety/tick_telemetry",
+                                     "avg_ms=" + std::to_string(avg_ms) + " max_ms=" + std::to_string(tick_max_ms_));
+            tick_sum_ms_ = 0.0;
+            tick_max_ms_ = 0.0;
+        }
     }
 
     void SafetySupervisorNode::on_sensor_health(const safety_core_msgs::msg::SensorHealth::ConstSharedPtr msg)
@@ -232,57 +253,18 @@ namespace safety_core_ros
 
         if (name == "all")
         {
-            worst_sensor_status_        = status;
-            last_sensor_health_time_ns_ = now;
+            recovery_mgr_.update_summary(status, now);
             return;
         }
 
-        auto it = sensor_states_.find(name);
-        if (it == sensor_states_.end())
+        const auto result = recovery_mgr_.process_health_msg(name, status, now);
+        if (result.transition == SensorRecoveryManager::HealthTransition::kDegraded)
         {
-            SensorRecoveryInfo info;
-            info.status = status;
-            if (status == safety_core_msgs::msg::SensorHealth::DEGRADED)
-            {
-                info.degradation_start_ns = now;
-            }
-            sensor_states_.emplace(name, info);
-            if (status == safety_core_msgs::msg::SensorHealth::DEGRADED)
-            {
-                handle_sensor_degraded(name);
-            }
-            return;
+            handle_sensor_degraded(result.sensor_name);
         }
-
-        SensorRecoveryInfo& info = it->second;
-        if (info.timed_out && status == safety_core_msgs::msg::SensorHealth::DEGRADED)
+        else if (result.transition == SensorRecoveryManager::HealthTransition::kRecovered)
         {
-            // Already timed out; ignore further degraded messages until sensor recovers
-            return;
-        }
-
-        const uint8_t prev_status = info.status;
-        if (prev_status == status)
-        {
-            return;
-        }
-
-        info.status = status;
-
-        if (status == safety_core_msgs::msg::SensorHealth::DEGRADED)
-        {
-            info.degradation_start_ns = now;
-            handle_sensor_degraded(name);
-        }
-        else if (prev_status == safety_core_msgs::msg::SensorHealth::DEGRADED &&
-                 status == safety_core_msgs::msg::SensorHealth::HEALTHY)
-        {
-            info.degradation_start_ns = std::nullopt;
-            handle_sensor_recovered(name);
-        }
-        else if (status == safety_core_msgs::msg::SensorHealth::FAULT)
-        {
-            info.degradation_start_ns = std::nullopt;
+            handle_sensor_recovered(result.sensor_name);
         }
     }
 
@@ -295,10 +277,10 @@ namespace safety_core_ros
         }
 
         // Check if sensor health data is stale
-        if (last_sensor_health_time_ns_.has_value())
+        if (recovery_mgr_.last_health_time_ns().has_value())
         {
             const std::uint64_t current_time_ns = now_ns();
-            if (TimeUtils::is_stale(last_sensor_health_time_ns_.value(), current_time_ns, sensor_timeout_ns_))
+            if (TimeUtils::is_stale(recovery_mgr_.last_health_time_ns().value(), current_time_ns, sensor_timeout_ns_))
             {
                 // Sensor monitor not running or not publishing - ignore
                 return;
@@ -311,28 +293,30 @@ namespace safety_core_ros
         }
 
         // React to sensor health status
-        if (worst_sensor_status_ == safety_core_msgs::msg::SensorHealth::FAULT)
+        if (recovery_mgr_.worst_status() == safety_core_msgs::msg::SensorHealth::FAULT)
         {
             // Critical sensor fault - transition to SafeStop
             if (current_mode != Mode::SafeStop)
             {
                 RCLCPP_ERROR(get_logger(), "Sensor fault detected - transitioning to SafeStop");
-                (void)machine_->latch_fault(0xE002U); // Fault code for sensor fault
-                (void)machine_->transition_to(Mode::SafeStop);
+                log_result(machine_->latch_fault(0xE002U),
+                           "check_sensor_health: latch_fault(E002)"); // Fault code for sensor fault
+                log_result(machine_->transition_to(Mode::SafeStop), "check_sensor_health: transition_to(SafeStop)");
                 safe_stop_requested_ = true;
-                in_degraded_mode_    = false;
+                recovery_mgr_.set_degraded_mode(false);
             }
         }
-        else if (worst_sensor_status_ == safety_core_msgs::msg::SensorHealth::DEGRADED)
+        else if (recovery_mgr_.worst_status() == safety_core_msgs::msg::SensorHealth::DEGRADED)
         {
-            if (current_mode == Mode::Moving && !in_degraded_mode_)
+            if (current_mode == Mode::Moving && !recovery_mgr_.in_degraded_mode())
             {
                 RCLCPP_WARN(get_logger(), "Sensor health degraded - transitioning to Degraded mode");
-                (void)machine_->transition_to(Mode::Degraded);
-                in_degraded_mode_ = true;
+                log_result(machine_->transition_to(Mode::Degraded), "check_sensor_health: transition_to(Degraded)");
+                recovery_mgr_.set_degraded_mode(true);
             }
         }
-        else if (worst_sensor_status_ == safety_core_msgs::msg::SensorHealth::HEALTHY && in_degraded_mode_)
+        else if (recovery_mgr_.worst_status() == safety_core_msgs::msg::SensorHealth::HEALTHY &&
+                 recovery_mgr_.in_degraded_mode())
         {
             // Check if we've been in degraded mode long enough to recover
             // For simplicity, recover immediately when health returns
@@ -340,8 +324,8 @@ namespace safety_core_ros
             if (current_mode == Mode::Degraded)
             {
                 RCLCPP_INFO(get_logger(), "Sensor health recovered - transitioning back to Moving");
-                (void)machine_->transition_to(Mode::Moving);
-                in_degraded_mode_ = false;
+                log_result(machine_->transition_to(Mode::Moving), "check_sensor_health: transition_to(Moving)");
+                recovery_mgr_.set_degraded_mode(false);
             }
         }
     }
@@ -356,13 +340,14 @@ namespace safety_core_ros
         const std::uint64_t current_time_ns = now_ns();
         const std::uint64_t age_ns          = TimeUtils::calculate_age_ns(last_odom_time_ns_.value(), current_time_ns);
 
-        (void)supervisor_->observe_localization_age(age_ns, localization_timeout_ns_);
+        log_result(supervisor_->observe_localization_age(age_ns, localization_timeout_ns_),
+                   "check_localization_staleness: observe_localization_age");
 
         const Mode current_mode = machine_->mode();
         if (TimeUtils::is_stale(last_odom_time_ns_.value(), current_time_ns, localization_timeout_ns_) &&
             current_mode != Mode::LocalizationLost && current_mode != Mode::SafeStop)
         {
-            (void)machine_->report_localization_lost();
+            log_result(machine_->report_localization_lost(), "check_localization_staleness: report_localization_lost");
         }
     }
 
@@ -374,17 +359,15 @@ namespace safety_core_ros
         const Mode current_mode = machine_->mode();
         if (current_mode == Mode::Moving)
         {
-            (void)machine_->transition_to(Mode::Degraded);
+            log_result(machine_->transition_to(Mode::Degraded), "handle_sensor_degraded: transition_to(Degraded)");
         }
-        in_degraded_mode_        = true;
-        target_speed_limit_mps_  = params_.max_speed_mps * 0.5;
-        speed_ramp_start_ns_     = std::nullopt;
-        current_speed_limit_mps_ = target_speed_limit_mps_;
+        recovery_mgr_.set_degraded_mode(true);
+        speed_ctrl_.on_degraded();
     }
 
     void SafetySupervisorNode::handle_sensor_recovered(const std::string& sensor_name)
     {
-        if (!is_any_sensor_degraded())
+        if (!recovery_mgr_.is_any_degraded())
         {
             RCLCPP_INFO(get_logger(), "Sensor '%s' recovered - starting speed ramp", sensor_name.c_str());
             publish_diagnostic_event("safety/sensor_recovery", "Sensor " + sensor_name + " recovered, ramping speed");
@@ -392,11 +375,10 @@ namespace safety_core_ros
             const Mode current_mode = machine_->mode();
             if (current_mode == Mode::Degraded)
             {
-                (void)machine_->transition_to(Mode::Moving);
+                log_result(machine_->transition_to(Mode::Moving), "handle_sensor_recovered: transition_to(Moving)");
             }
-            in_degraded_mode_       = false;
-            target_speed_limit_mps_ = params_.max_speed_mps;
-            speed_ramp_start_ns_    = now_ns();
+            recovery_mgr_.set_degraded_mode(false);
+            speed_ctrl_.on_recovered(now_ns());
         }
         else
         {
@@ -408,17 +390,10 @@ namespace safety_core_ros
 
     bool SafetySupervisorNode::is_any_sensor_degraded() const noexcept
     {
-        for (const auto& pair : sensor_states_)
-        {
-            if (pair.second.status == safety_core_msgs::msg::SensorHealth::DEGRADED)
-            {
-                return true;
-            }
-        }
-        return false;
+        return recovery_mgr_.is_any_degraded();
     }
 
-    void SafetySupervisorNode::check_sensor_recovery_timeouts(std::uint64_t now_ns)
+    void SafetySupervisorNode::check_sensor_recovery_timeouts(std::uint64_t now_ns_val)
     {
         const Mode current_mode = machine_->mode();
         if (current_mode == Mode::SafeStop)
@@ -426,66 +401,23 @@ namespace safety_core_ros
             return;
         }
 
-        for (auto& pair : sensor_states_)
+        const std::string timed_out = recovery_mgr_.check_timeouts(now_ns_val, recovery_timeout_ns_, get_logger());
+        if (!timed_out.empty())
         {
-            SensorRecoveryInfo& info = pair.second;
-            if (info.status != safety_core_msgs::msg::SensorHealth::DEGRADED || !info.degradation_start_ns.has_value())
-            {
-                continue;
-            }
-
-            const std::uint64_t elapsed_ns = now_ns - info.degradation_start_ns.value();
-            if (elapsed_ns > recovery_timeout_ns_)
-            {
-                RCLCPP_ERROR(get_logger(), "Sensor '%s' recovery timeout exceeded (%.1fs) - treating as FAULT",
-                             pair.first.c_str(), TimeUtils::nanoseconds_to_seconds(elapsed_ns));
-                publish_diagnostic_event("safety/sensor_recovery",
-                                         "Sensor " + pair.first + " recovery timeout, treating as FAULT");
-
-                info.timed_out            = true;
-                info.degradation_start_ns = std::nullopt;
-
-                if (current_mode != Mode::SafeStop)
-                {
-                    (void)machine_->latch_fault(0xE003U); // Fault code for recovery timeout
-                    (void)machine_->transition_to(Mode::SafeStop);
-                    safe_stop_requested_ = true;
-                    in_degraded_mode_    = false;
-                }
-            }
+            publish_diagnostic_event("safety/sensor_recovery",
+                                     "Sensor " + timed_out + " recovery timeout, treating as FAULT");
+            log_result(machine_->latch_fault(0xE003U), "check_sensor_recovery_timeouts: latch_fault(E003)");
+            log_result(machine_->transition_to(Mode::SafeStop),
+                       "check_sensor_recovery_timeouts: transition_to(SafeStop)");
+            safe_stop_requested_ = true;
+            recovery_mgr_.set_degraded_mode(false);
         }
     }
 
-    void SafetySupervisorNode::update_speed_limit(std::uint64_t now_ns)
+    void SafetySupervisorNode::update_speed_limit(std::uint64_t now_ns_val)
     {
-        if (machine_->mode() == Mode::SafeStop)
-        {
-            current_speed_limit_mps_ = 0.0;
-            target_speed_limit_mps_  = 0.0;
-            speed_ramp_start_ns_     = std::nullopt;
-            return;
-        }
-
-        if (speed_ramp_start_ns_.has_value())
-        {
-            const std::uint64_t elapsed_ns = now_ns - speed_ramp_start_ns_.value();
-            if (elapsed_ns >= recovery_speed_ramp_ns_)
-            {
-                current_speed_limit_mps_ = target_speed_limit_mps_;
-                speed_ramp_start_ns_     = std::nullopt;
-            }
-            else
-            {
-                const double degraded_limit = params_.max_speed_mps * 0.5;
-                const double ramp_range     = params_.max_speed_mps - degraded_limit;
-                const double fraction = static_cast<double>(elapsed_ns) / static_cast<double>(recovery_speed_ramp_ns_);
-                current_speed_limit_mps_ = degraded_limit + (ramp_range * fraction);
-            }
-        }
-        else
-        {
-            current_speed_limit_mps_ = target_speed_limit_mps_;
-        }
+        const bool safe_stop = (machine_->mode() == Mode::SafeStop);
+        speed_ctrl_.update(now_ns_val, safe_stop);
     }
 
     void SafetySupervisorNode::publish_diagnostic_event(const std::string& topic, const std::string& payload)
@@ -503,7 +435,7 @@ namespace safety_core_ros
     void SafetySupervisorNode::publish_recovery_speed_limit()
     {
         std_msgs::msg::Float64 msg;
-        msg.data = current_speed_limit_mps_;
+        msg.data = speed_ctrl_.current_limit();
         recovery_speed_limit_pub_->publish(std::move(msg));
     }
 

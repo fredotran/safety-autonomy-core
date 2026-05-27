@@ -135,10 +135,11 @@ namespace safety_core::motion
             return false;
         }
 
-        double t    = 0.0;
-        double v    = std::max(0.0, initial_speed_mps);
-        double a    = 0.0;
-        double x    = 0.0;
+        double t = 0.0;
+        double v = std::max(0.0, initial_speed_mps);
+        double a = 0.0;
+        double x = 0.0;
+        // cppcheck-suppress unreadVariable
         double jerk = 0.0;
 
         while ((v > 0.0) && (out_count < capacity))

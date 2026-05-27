@@ -19,7 +19,7 @@ namespace safety_core::diag
 
     namespace
     {
-        std::uint64_t current_timestamp_ns(platform::Clock* clock) noexcept
+        std::uint64_t current_timestamp_ns(const platform::Clock* clock) noexcept
         {
             const auto stamp = (clock != nullptr) ? clock->now() : time::now();
             return static_cast<std::uint64_t>(

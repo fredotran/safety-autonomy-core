@@ -9,6 +9,13 @@ Checks: >
   ,-modernize-use-nodiscard
   ,-cppcoreguidelines-pro-type-vararg
   ,-cppcoreguidelines-pro-type-union-access
+  ,-readability-identifier-length
+  ,-readability-magic-numbers
+  ,-bugprone-easily-swappable-parameters
+  ,-modernize-avoid-c-arrays
+  ,-cppcoreguidelines-pro-bounds-pointer-arithmetic
+  ,-readability-function-cognitive-complexity
+  ,-readability-named-parameter
 WarningsAsErrors: '*'
 HeaderFilterRegex: '^(include|src)/'
 FormatStyle: none

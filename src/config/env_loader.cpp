@@ -59,6 +59,7 @@ namespace safety_core::config
 
     } // namespace
 
+    // cppcheck-suppress passedByValue
     SystemConfig load_from_env(SystemConfig defaults) noexcept
     {
         SystemConfig cfg = defaults;
