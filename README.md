@@ -59,6 +59,7 @@ ctest --test-dir build --output-on-failure
 | **Task Executor** | Allocation-free scheduling with watchdog and deadline detection |
 | **Diagnostics** | Fixed-capacity events with health monitoring and pluggable transports |
 | **Platform HAL** | Clock abstraction, IMU interface, odometry, and actuator control |
+| **ROS Bridge Adapters** | `RosImuBridge`, `RosOdometryBridge`, `RosDriveActuatorBridge` for ROS2 integration |
 
 ### Advanced Capabilities
 

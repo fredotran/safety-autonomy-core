@@ -68,12 +68,30 @@ docker exec safety-autonomy-demo bash -c "source install/setup.bash && ros2 laun
 | `source install/setup.bash` | Source workspace |
 | `ros2 launch <package> <launch_file>` | Launch files |
 | `ros2 run <package> <executable>` | Run nodes |
+| `colcon test --packages-select safety_core_test` | Run unit/integration/component tests |
+| `colcon test-result --verbose` | View detailed test results |
+
+### Test Infrastructure
+
+The `safety_core_test` package provides comprehensive testing:
+- **Unit tests**: `time_utils`, `math_utils`, ROS bridge adapters
+- **Component tests**: `sensor_monitor_node` (ROS2 topic-based)
+- **Integration tests**: `safety_stack` (end-to-end safety system)
+- **Coverage**: `ENABLE_COVERAGE=ON` CMake option for lcov/genhtml reports
+
+All tests run in Docker via CI (Stage 5: `ros2_test` job).
 
 ### Code Style
 
 - C++ files: Must pass `clang-format` (auto-applied by pre-commit hook)
 - Pre-commit hook uses Docker container's clang-format if not available on host
 - Configure git hooks: `git config core.hooksPath .githooks`
+
+### Static Analysis
+
+- **cppcheck**: MISRA-like rules, blocking in CI (`.cppcheck-suppressions` for known issues)
+- **clang-tidy**: Security-critical checks enabled, low-value false-positives disabled in `.clang-tidy`
+- Both tools run in CI Stage 4 (`clang_tidy` job) and fail the build on any finding
 
 ### Commit Hygiene
 
