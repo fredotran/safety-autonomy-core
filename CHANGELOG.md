@@ -5,6 +5,40 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0](https://github.com/fredotran/safety-autonomy-core/compare/v1.0.0...v1.1.0) (2026-05-27)
+
+
+### Features
+
+* Add comprehensive feature improvements for localization, teleoperation, and Docker deployment ([fc6ed36](https://github.com/fredotran/safety-autonomy-core/commit/fc6ed366ffe3add5645b17286157c785edb79e04))
+* Add comprehensive sensor health monitoring and safety stack improvements ([0ff21d4](https://github.com/fredotran/safety-autonomy-core/commit/0ff21d4e411f040f424b0f71b32c20838c61a11f))
+* Add Phase 3 advanced safety features - slip detection, recovery, metrics ([8914d45](https://github.com/fredotran/safety-autonomy-core/commit/8914d45c382f58a4d910614bc07f60bb8fa3111f))
+* Add PR template, automatic labeling, and stale PR cleanup ([8101963](https://github.com/fredotran/safety-autonomy-core/commit/810196356015b82015e5b0314c797aae94b4e2e7))
+* integrate ROS 2 packaging + EKF localization stack into main ([#2](https://github.com/fredotran/safety-autonomy-core/issues/2)) ([c76490c](https://github.com/fredotran/safety-autonomy-core/commit/c76490cc8e6ee772a6f421a004dcc251640a0b9b))
+* **sp3:** Add ROS↔platform sensor/actuator bridge adapters (HAL) ([9e30d44](https://github.com/fredotran/safety-autonomy-core/commit/9e30d44347b0e7858bf785044d5b2d4747b1b05b))
+
+
+### Bug Fixes
+
+* Add headless mode support and comprehensive CI/CD optimizations ([61f0a6f](https://github.com/fredotran/safety-autonomy-core/commit/61f0a6f4202234376551cd7805f80b5c15d9db28))
+* Comprehensive CI/CD pipeline improvements and bug fixes ([cef4aa8](https://github.com/fredotran/safety-autonomy-core/commit/cef4aa84f046d5ef97876cca13aa903c79ffb6f4))
+
+
+### Refactor
+
+* **sp2+sp4:** Code quality improvements to SafetySupervisorNode ([3c6ed41](https://github.com/fredotran/safety-autonomy-core/commit/3c6ed41a851837cd169f149060150b5507eaa680))
+
+
+### Documentation
+
+* Add commit hygiene guideline to AGENTS.md ([ff52c20](https://github.com/fredotran/safety-autonomy-core/commit/ff52c20342bbce4d084706447f8ebb48e1c268ad))
+* Add testing infrastructure design spec for Sub-Project 1 ([8937aa5](https://github.com/fredotran/safety-autonomy-core/commit/8937aa557ac1a72d2ca47efb332f33f9f83b4910))
+* Add testing infrastructure implementation plan ([d0b1c7e](https://github.com/fredotran/safety-autonomy-core/commit/d0b1c7e8e856861ffe91693389760f7cac5a4b4b))
+* Comprehensive documentation cleanup and improvements ([f81f45e](https://github.com/fredotran/safety-autonomy-core/commit/f81f45e9f93626010a85533e2cc3db75e72d275f))
+* Update README and AGENTS.md with recent improvements ([08ae82e](https://github.com/fredotran/safety-autonomy-core/commit/08ae82eaca712f69df83cad4753042cf451c7e74))
+* Update README files with new safety features ([ff038b4](https://github.com/fredotran/safety-autonomy-core/commit/ff038b4fb69447bba200c7e9e282ef7da134afab))
+* Update ROS2 README with Phase 3 features ([df3970a](https://github.com/fredotran/safety-autonomy-core/commit/df3970aa647fc465c2eb2067cb8a30172ee50deb))
+
 ## [1.0.0] (2026-05-10)
 
 ### Added
