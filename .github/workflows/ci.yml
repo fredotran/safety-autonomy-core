@@ -30,7 +30,10 @@ env:
   BUILD_DIR: build
   CMAKE_FLAGS: "-DCMAKE_BUILD_TYPE=RelWithDebInfo -DSAFETY_CORE_ENABLE_SANITIZERS=ON"
   COVERAGE_MIN_LINE: "80"
-  COVERAGE_MIN_BRANCH: "55"
+  # Ratcheted 2026-10-31 from 55 -> 70 after the coverage_gaps/state_machine
+  # test pass (measured 75.0% locally). Residual uncovered branches are CAS
+  # retry loops, defensive dead branches, and multi-TU inline artifacts.
+  COVERAGE_MIN_BRANCH: "70"
 
 jobs:
   format_check:
@@ -47,37 +50,26 @@ jobs:
           clang-format --dry-run --Werror $(find include src tests ros2/src -name '*.hpp' -o -name '*.cpp')
 
   clang_tidy:
-    name: clang_tidy (static analysis + cppcheck)
+    name: clang_tidy (static analysis ratchet)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    # Pre-existing readability/bugprone findings in the core C++ library; tracked as known
-    # debt and intentionally non-blocking until a dedicated cleanup pass lands.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - name: Install build deps
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
-            build-essential cmake ninja-build clang clang-tidy cppcheck libeigen3-dev
+            build-essential cmake ninja-build clang clang-tidy cppcheck
       - name: Configure
         run: |
-          cmake -S . -B ${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug -DSAFETY_CORE_ENABLE_SANITIZERS=OFF
-      - name: Build safety_core
-        run: cmake --build ${BUILD_DIR} --target safety_core
-      - name: Run cppcheck with MISRA-like rules
-        run: |
-          cppcheck --enable=all \
-                   --inline-suppr \
-                   --std=c++20 \
-                   --suppress=missingIncludeSystem \
-                   --suppress=unusedFunction \
-                   --suppressions-list=.cppcheck-suppressions \
-                   -I include \
-                   -I /usr/include/eigen3 \
-                   src/ include/ || true
-      - name: clang-tidy
-        run: clang-tidy -p ${BUILD_DIR} $(find src include -name '*.cpp') || true
+          cmake -S . -B ${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DSAFETY_CORE_ENABLE_SANITIZERS=OFF
+      - name: Static analysis gate
+        # Ratchet: fails on NEW findings vs tools/ci/baselines/static_analysis_baseline.txt.
+        # Pre-existing debt is baselined and tolerated; shrink it with --update
+        # locally after cleanup passes.
+        run: tools/ci/static_analysis_gate.sh --build-dir ${BUILD_DIR}
 
   hook_smoke:
     name: hook_smoke (pre-commit hook)
@@ -89,7 +81,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
-            build-essential cmake ninja-build clang clang-tidy clang-format git libeigen3-dev
+            build-essential cmake ninja-build clang clang-tidy clang-format git
       - name: Configure + build safety_core
         run: |
           cmake -S . -B ${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug -DSAFETY_CORE_ENABLE_SANITIZERS=OFF
@@ -128,6 +120,8 @@ jobs:
         run: |
           chmod +x tools/safety/verify_safety_case.sh
           tools/safety/verify_safety_case.sh
+      - name: Verify hazard->test traceability
+        run: python3 tools/safety/verify_traceability.py
 
   build_and_test:
     name: build_and_test (sanitizers + ctest)
@@ -140,7 +134,7 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
             build-essential cmake ninja-build clang clang-tidy clang-format gcovr ccache \
-            libeigen3-dev
+           
       - name: Configure
         run: cmake -S . -B ${BUILD_DIR} ${CMAKE_FLAGS}
       - name: Build
@@ -180,7 +174,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
-            build-essential cmake ninja-build gcovr libeigen3-dev
+            build-essential cmake ninja-build gcovr
       - name: Configure (coverage)
         run: cmake -S . -B build-coverage -DCMAKE_BUILD_TYPE=Debug -DSAFETY_CORE_ENABLE_SANITIZERS=OFF -DSAFETY_CORE_ENABLE_COVERAGE=ON
       - name: Build (coverage)
@@ -201,6 +195,96 @@ jobs:
           path: |
             build-coverage/coverage.info
             build-coverage/coverage.xml
+
+  fuzz_smoke:
+    name: fuzz_smoke (libFuzzer short campaigns)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build clang
+      - name: Configure (fuzz)
+        env:
+          CC: clang
+          CXX: clang++
+        run: |
+          cmake -S . -B build-fuzz -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DSAFETY_CORE_ENABLE_SANITIZERS=OFF -DSAFETY_CORE_ENABLE_WERROR=OFF \
+            -DSAFETY_CORE_ENABLE_FUZZING=ON
+      - name: Build fuzzers
+        run: cmake --build build-fuzz --target fuzz_env_loader fuzz_filters
+      - name: Short fuzz campaign (env_loader)
+        run: ./build-fuzz/fuzz_env_loader -max_total_time=60 -timeout=10
+      - name: Short fuzz campaign (filters)
+        run: ./build-fuzz/fuzz_filters -max_total_time=60 -timeout=10
+
+  benchmarks:
+    name: benchmarks (timing evidence)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build
+      - name: Configure (release)
+        run: cmake -S . -B build-bench -DCMAKE_BUILD_TYPE=Release -DSAFETY_CORE_ENABLE_SANITIZERS=OFF
+      - name: Build benchmark
+        run: cmake --build build-bench --target safety_core_benchmarks
+      - name: Run benchmarks (budget gate)
+        run: ./build-bench/safety_core_benchmarks --iterations 50000
+      - name: Upload timing evidence
+        if: always()
+        run: ./build-bench/safety_core_benchmarks --iterations 50000 --json > benchmark_results.json
+      - name: Upload artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: benchmark_results.json
+
+  certifiable_build:
+    name: certifiable_build (no-exceptions / no-RTTI partition)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build
+      - name: Build certifiable partition
+        run: |
+          cmake -S . -B build-cert -GNinja
+          cmake --build build-cert --target safety_core_certifiable
+      - name: Verify no dynamic exception/RTTI symbols
+        run: |
+          # A certifiable TU must not reference exception-handling machinery.
+          ! nm -C build-cert/libsafety_core_certifiable.a 2>/dev/null \
+              | grep -E "__cxa_throw|__cxa_begin_catch|typeinfo for" | grep -v " U " | grep -q .
+          echo "partition clean: no exception/RTTI definitions"
+
+  sbom:
+    name: sbom (software bill of materials)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate SBOM / dependency manifest
+        run: ./tools/ci/generate_sbom.sh sbom
+      - name: Upload SBOM
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom/
 
   docker_build:
     name: docker_build (ROS 2 via Docker Compose)
@@ -276,3 +360,24 @@ jobs:
           path: |
             ~/.ros/log/
             /tmp/*.log
+
+  ros2_tests:
+    name: ros2_tests (colcon test in built image)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: docker_build
+    steps:
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+      - name: Load Docker image
+        run: docker load < docker-image.tar.gz
+      - name: Run ROS 2 package tests
+        run: |
+          docker run --rm --network host safety-autonomy-core:latest bash -c "
+            source /opt/ros/jazzy/setup.bash &&
+            cd /workspace/ros2_ws &&
+            colcon test --event-handlers console_direct+ &&
+            colcon test-result --verbose
+          "
