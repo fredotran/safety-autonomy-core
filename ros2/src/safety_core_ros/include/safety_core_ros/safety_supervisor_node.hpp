@@ -66,6 +66,7 @@ namespace safety_core_ros
         void check_sensor_health();
         void check_sensor_recovery_timeouts(std::uint64_t now_ns);
         void update_speed_limit(std::uint64_t now_ns);
+        void check_envelope_staleness();
         void publish_state(safety_core::sm::Mode current_mode);
 
         // Sensor recovery helpers
@@ -104,6 +105,7 @@ namespace safety_core_ros
         struct Params
         {
             double localization_timeout_s{0.5};
+            double envelope_timeout_s{1.0};
             bool auto_recover_from_obstacle{true};
             double sensor_timeout_s{1.0};
             double degraded_recovery_s{5.0};
@@ -115,7 +117,10 @@ namespace safety_core_ros
         // State
         safety_core::safety::SafetyZone latest_zone_{safety_core::safety::SafetyZone::Clear};
         std::optional<std::uint64_t> last_odom_time_ns_;
+        std::optional<std::uint64_t> last_envelope_time_ns_;
         std::uint64_t localization_timeout_ns_{500'000'000ULL};
+        std::uint64_t envelope_timeout_ns_{1'000'000'000ULL};
+        std::uint64_t startup_time_ns_{0ULL};
         bool safe_stop_requested_{false};
 
         // Sensor recovery management

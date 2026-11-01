@@ -58,6 +58,11 @@ namespace safety_core_ros
         void publish_envelope(double distance_m, double speed_mps, const std_msgs::msg::Header& header);
         void publish_zone_markers(const safety_core::safety::EnvelopeEvaluation& eval, double dynamic_buffer,
                                   const std_msgs::msg::Header& header);
+        void publish_stale_status();
+
+        // Scan stream watchdog — a frozen or silent LiDAR must degrade to
+        // EMERGENCY (fail-safe), never pass as fresh data.
+        void check_scan_staleness();
 
         // Marker creation helpers
         visualization_msgs::msg::Marker create_zone_marker(int id, double radius, safety_core::safety::SafetyZone zone,
@@ -77,6 +82,8 @@ namespace safety_core_ros
             double scan_min_valid_range_m{0.05};
             double scan_ignore_min_range_m{0.5}; // Ignore obstacles closer than this (workers on robot)
             double startup_grace_period_s{2.0};  // Grace period to allow sensor stabilization
+            double scan_timeout_s{0.5};          // Max age of a scan before it is treated as stale
+            double odom_timeout_s{0.5};          // Max odom stream age before speed falls back to max (conservative)
             std::string base_frame{"base_link"};
         } params_;
 
@@ -87,13 +94,23 @@ namespace safety_core_ros
 
         // State
         std::atomic<double> latest_speed_mps_{0.0};
+        std::atomic<std::int64_t> last_scan_time_ns_{0};
+        std::atomic<std::int64_t> last_odom_time_ns_{0};
+        std::atomic<bool> has_scan_{false};
+        std::atomic<bool> has_odom_{false};
         rclcpp::Time startup_time_;
+
+        // Speed used by envelope evaluation: last received velocity while the
+        // odom stream is fresh; falls back to max_speed_mps (worst case) when
+        // the stream is stale or never seen past the grace period.
+        [[nodiscard]] double effective_speed_mps(const rclcpp::Time& now) const noexcept;
 
         // ROS interfaces
         rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
         rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
         rclcpp::Publisher<safety_core_msgs::msg::EnvelopeStatus>::SharedPtr envelope_pub_;
         rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr marker_pub_;
+        rclcpp::TimerBase::SharedPtr watchdog_timer_;
     };
 
 } // namespace safety_core_ros

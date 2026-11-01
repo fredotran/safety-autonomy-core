@@ -41,6 +41,21 @@ install(TARGETS is_safe_condition_bt_node
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
 
+# ----------------------------------------------------------------------------
+# Tests
+# ----------------------------------------------------------------------------
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+
+  # BT condition under a real rclcpp context: publishes SafetyState messages
+  # and ticks the node to verify zone/mode/fault gating.
+  ament_add_gtest(test_is_safe_condition test/test_is_safe_condition.cpp)
+  target_include_directories(test_is_safe_condition PRIVATE include)
+  target_link_libraries(test_is_safe_condition is_safe_condition_bt_node)
+  ament_target_dependencies(test_is_safe_condition
+    rclcpp behaviortree_cpp_v3 safety_core_msgs)
+endif()
+
 install(DIRECTORY include/
   DESTINATION include)
 

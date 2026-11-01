@@ -21,6 +21,8 @@ safety_envelope_node:
     scan_min_valid_range_m: 0.05
     scan_ignore_min_range_m: 0.5  # Ignore obstacles closer than 0.5m (workers on robot)
     startup_grace_period_s: 2.0  # Grace period to allow sensor stabilization on startup
+    scan_timeout_s: 0.5          # Max scan age before the stream is treated as stale -> EMERGENCY
+    odom_timeout_s: 0.5          # Max odom stream age before speed falls back to max (conservative)
     base_frame: "base_link"
     envelope.dynamic_buffer_enabled: true
     envelope.velocity_factor: 0.3
@@ -39,6 +41,7 @@ sensor_monitor_node:
 safety_supervisor_node:
   ros__parameters:
     localization_timeout_s: 0.5
+    envelope_timeout_s: 1.0      # Max envelope_status age before fault 0xE004 -> SafeStop
     auto_recover_from_obstacle: true
     sensor_timeout_s: 1.0
     degraded_recovery_s: 5.0
