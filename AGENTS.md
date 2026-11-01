@@ -1,6 +1,17 @@
 # Agent Guidelines
 
-This file contains guidelines and learned information for AI agents working on this repository.
+**This file contains guidelines and learned information for AI agents working on this repository.**
+
+---
+
+## Table of Contents
+
+- [Development Workflow](#development-workflow)
+- [Repository-Specific Information](#repository-specific-information)
+- [Common Issues](#common-issues)
+- [Agent Parallelization Guidelines](#agent-parallelization-guidelines)
+
+---
 
 ## Development Workflow
 
@@ -31,36 +42,96 @@ docker exec safety-autonomy-demo bash -c "cd /workspace/ros2_ws && colcon build 
 docker exec safety-autonomy-demo bash -c "source install/setup.bash && ros2 launch safety_core_bringup my_launch.py"
 ```
 
+---
+
 ## Repository-Specific Information
 
 ### Docker Container
-- Container name: `safety-autonomy-demo`
-- Workspace path: `/workspace/ros2_ws`
-- Source mount: `/workspace/safety-autonomy-core`
+
+| Setting | Value |
+|---------|-------|
+| **Container name** | `safety-autonomy-demo` |
+| **Workspace path** | `/workspace/ros2_ws` |
+| **Source mount** | `/workspace/safety-autonomy-core` |
 
 ### Build Commands
-- Build specific package: `colcon build --packages-select <package>`
-- Build all packages: `colcon build`
+
+| Command | Description |
+|---------|-------------|
+| `colcon build --packages-select <package>` | Build specific package |
+| `colcon build` | Build all packages |
 
 ### Testing Commands
-- Source workspace: `source install/setup.bash`
-- Launch files: `ros2 launch <package> <launch_file>`
-- Run nodes: `ros2 run <package> <executable>`
+
+| Command | Description |
+|---------|-------------|
+| `source install/setup.bash` | Source workspace |
+| `ros2 launch <package> <launch_file>` | Launch files |
+| `ros2 run <package> <executable>` | Run nodes |
+| `colcon test --packages-select safety_core_test` | Run unit/integration/component tests |
+| `colcon test-result --verbose` | View detailed test results |
+
+### Test Infrastructure
+
+The `safety_core_test` package provides comprehensive testing:
+- **Unit tests**: `time_utils`, `math_utils`, ROS bridge adapters
+- **Component tests**: `sensor_monitor_node` (ROS2 topic-based)
+- **Integration tests**: `safety_stack` (end-to-end safety system)
+- **Coverage**: `ENABLE_COVERAGE=ON` CMake option for lcov/genhtml reports
+
+All tests run in Docker via CI (Stage 5: `ros2_test` job).
 
 ### Code Style
+
 - C++ files: Must pass `clang-format` (auto-applied by pre-commit hook)
 - Pre-commit hook uses Docker container's clang-format if not available on host
 - Configure git hooks: `git config core.hooksPath .githooks`
 
+### Static Analysis
+
+- **cppcheck**: MISRA-like rules, blocking in CI (`.cppcheck-suppressions` for known issues)
+- **clang-tidy**: Security-critical checks enabled, low-value false-positives disabled in `.clang-tidy`
+- Both tools run in CI Stage 4 (`clang_tidy` job) and fail the build on any finding
+
+### Commit Hygiene
+
+**CRITICAL**: Always squash related commits to keep the commit tree as clean as possible.
+
+**Before pushing changes:**
+1. Review your commits with `git log --oneline`
+2. Identify groups of related commits (e.g., multiple CI fixes, feature iterations, bug fixes)
+3. Squash related commits into single, meaningful commits using:
+   - Interactive rebase: `git rebase -i <base-commit>`
+   - Or soft reset: `git reset --soft <base-commit>` then `git commit`
+4. Use descriptive commit messages that explain the "why" not just the "what"
+
+**Commit grouping guidelines:**
+- CI/CD improvements → single commit
+- Feature development (localization, teleop, Docker) → single commit per feature
+- Bug fixes for the same issue → single commit
+- Documentation updates → single commit
+- Release commits → keep separate
+
+**Example:**
+```bash
+# Squash the last 5 commits into one
+git reset --soft HEAD~5
+git commit -m "feat: Add comprehensive localization improvements"
+```
+
+---
+
 ## Common Issues
 
 ### Launch File Not Found
+
 If you get "file not found in share directory" errors:
 1. Copy the file to the container: `docker cp local/file container:/workspace/ros2_ws/src/package/path/`
 2. Rebuild the package: `colcon build --packages-select <package>`
 3. Verify installation: `ls install/<package>/share/<package>/`
 
 ### Merge Conflicts
+
 When pulling changes that conflict with local work:
 1. Resolve conflicts by keeping the properly formatted version
 2. Run clang-format on resolved files
@@ -68,6 +139,7 @@ When pulling changes that conflict with local work:
 4. Commit with `SKIP_CLANG_TIDY=1` if clang-tidy is not available
 
 ### Package Build Failures
+
 If a package fails to build in the container:
 1. Check for missing dependencies
 2. Verify CMakeLists.txt is correct
@@ -78,6 +150,8 @@ If a package fails to build in the container:
    docker exec safety-autonomy-demo bash -c "cd /workspace/ros2_ws && source /opt/ros/jazzy/setup.bash && colcon build --packages-select safety_autonomy_core"
    ```
    Then rebuild the package that depends on it.
+
+---
 
 ## Agent Parallelization Guidelines
 

@@ -2,7 +2,7 @@
 
 This guide explains how to run the Safety Autonomy Core ROS2 demo using Docker containers, which allows you to run the demo on systems without a local ROS2 installation.
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 ### Multi-Stage Docker Build
 

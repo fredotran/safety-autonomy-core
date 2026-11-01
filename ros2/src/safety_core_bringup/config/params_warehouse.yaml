@@ -20,10 +20,10 @@ amcl:
   min_particles: 500
   
 sensors:
-  wheel_odom_timeout: 0.15  # Stricter timeout for precision
+  wheel_odom_timeout: 0.15  # Stricter for warehouse
   imu_timeout: 0.15
   gps_timeout: 999.0  # Disabled
-  visual_odom_timeout: 0.2
+  lidar_timeout: 0.2
   
 navigation:
   max_speed: 1.2

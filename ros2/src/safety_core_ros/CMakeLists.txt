@@ -15,8 +15,8 @@ endif()
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 
-  # Performance optimizations
-  add_compile_options(-O3 -march=native -ffast-math)
+  # Performance optimizations (portable)
+  add_compile_options(-O2)
 
   # Link-time optimization
   add_link_options(-flto)
@@ -69,6 +69,9 @@ add_library(safety_core_ros_bridges
   src/ros_clock.cpp
   src/ros_diagnostic_transport.cpp
   src/ros_health_monitor.cpp
+  src/ros_imu_bridge.cpp
+  src/ros_odometry_bridge.cpp
+  src/ros_drive_actuator_bridge.cpp
 )
 target_include_directories(safety_core_ros_bridges PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -79,7 +82,8 @@ target_include_directories(safety_core_ros_bridges SYSTEM PUBLIC
   ${safety_autonomy_core_INCLUDE_DIRS})
 target_link_libraries(safety_core_ros_bridges PUBLIC ${SAFETY_CORE_TARGET})
 ament_target_dependencies(safety_core_ros_bridges PUBLIC
-  rclcpp safety_core_msgs builtin_interfaces std_msgs)
+  rclcpp safety_core_msgs builtin_interfaces std_msgs
+  sensor_msgs nav_msgs geometry_msgs)
 
 # ----------------------------------------------------------------------------
 # Node 1: safety_envelope_node
@@ -132,6 +136,45 @@ ament_target_dependencies(teleop_node
   rclcpp geometry_msgs std_msgs)
 
 # ----------------------------------------------------------------------------
+# Node 5: sensor_monitor_node
+# ----------------------------------------------------------------------------
+add_executable(sensor_monitor_node
+  src/sensor_monitor_node.cpp
+  src/sensor_monitor_main.cpp)
+target_include_directories(sensor_monitor_node PRIVATE include)
+target_link_libraries(sensor_monitor_node
+  safety_core_ros_bridges
+  ${SAFETY_CORE_TARGET})
+ament_target_dependencies(sensor_monitor_node
+  rclcpp sensor_msgs nav_msgs safety_core_msgs)
+
+# ----------------------------------------------------------------------------
+# Node 6: gps_covariance_adapter_node
+# ----------------------------------------------------------------------------
+add_executable(gps_covariance_adapter_node
+  src/gps_covariance_adapter.cpp
+  src/gps_covariance_adapter_main.cpp)
+target_include_directories(gps_covariance_adapter_node PRIVATE include)
+target_link_libraries(gps_covariance_adapter_node
+  safety_core_ros_bridges
+  ${SAFETY_CORE_TARGET})
+ament_target_dependencies(gps_covariance_adapter_node
+  rclcpp sensor_msgs)
+
+# ----------------------------------------------------------------------------
+# Node 7: slip_detector_node
+# ----------------------------------------------------------------------------
+add_executable(slip_detector_node
+  src/slip_detector_node.cpp
+  src/slip_detector_main.cpp)
+target_include_directories(slip_detector_node PRIVATE include)
+target_link_libraries(slip_detector_node
+  safety_core_ros_bridges
+  ${SAFETY_CORE_TARGET})
+ament_target_dependencies(slip_detector_node
+  rclcpp sensor_msgs nav_msgs safety_core_msgs)
+
+# ----------------------------------------------------------------------------
 # Install
 # ----------------------------------------------------------------------------
 install(TARGETS
@@ -147,6 +190,9 @@ install(TARGETS
     safety_supervisor_node
     safety_drive_bridge_node
     teleop_node
+    sensor_monitor_node
+    gps_covariance_adapter_node
+    slip_detector_node
   RUNTIME DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY include/

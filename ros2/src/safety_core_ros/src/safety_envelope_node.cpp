@@ -3,9 +3,13 @@
 
 #include "safety_core_ros/safety_envelope_node.hpp"
 
+#include "safety_core/common/time.hpp"
+#include "safety_core/config/validation.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <stdexcept>
 
 using safety_core::safety::SafetyZone;
 using std::placeholders::_1;
@@ -41,6 +45,9 @@ namespace safety_core_ros
                     footprint_.length_m, footprint_.width_m, footprint_.front_overhang_m,
                     config_.envelope.max_speed_mps, config_.envelope.max_comfort_decel_mps2,
                     config_.envelope.safety_buffer_m);
+
+        RCLCPP_INFO(get_logger(), "Dynamic buffer: %s (factor=%.2f, min=%.2f)",
+                    dynamic_buffer_enabled_ ? "enabled" : "disabled", velocity_factor_, min_buffer_m_);
     }
 
     void SafetyEnvelopeNode::declare_params()
@@ -58,6 +65,18 @@ namespace safety_core_ros
         config_.envelope.control_latency_s = ParamLoader::load_double(this, "envelope.control_latency_s", 0.04);
         config_.envelope.safety_buffer_m   = ParamLoader::load_double(this, "envelope.safety_buffer_m", 0.3);
 
+        // Load dynamic buffer parameters
+        dynamic_buffer_enabled_ = ParamLoader::load_bool(this, "envelope.dynamic_buffer_enabled", false);
+        velocity_factor_        = ParamLoader::load_double(this, "envelope.velocity_factor", 0.3);
+        min_buffer_m_           = ParamLoader::load_double(this, "envelope.min_buffer_m", 0.5);
+
+        // Initialize timing config with safe defaults for validation
+        config_.timing.control_period       = safety_core::time::Duration{50000000};  // 50ms
+        config_.timing.watchdog_period      = safety_core::time::Duration{100000000}; // 100ms
+        config_.timing.localization_timeout = safety_core::time::Duration{500000000}; // 500ms
+        config_.max_tasks                   = 10U;
+        config_.config_version              = safety_core::config::kCurrentSystemConfigVersion;
+
         // Load footprint configuration
         footprint_.length_m         = ParamLoader::load_double(this, "footprint.length_m", 0.8);
         footprint_.width_m          = ParamLoader::load_double(this, "footprint.width_m", 0.6);
@@ -69,6 +88,21 @@ namespace safety_core_ros
         params_.scan_ignore_min_range_m = ParamLoader::load_double(this, "scan_ignore_min_range_m", 0.5);
         params_.startup_grace_period_s  = ParamLoader::load_double(this, "startup_grace_period_s", 2.0);
         params_.base_frame              = ParamLoader::load_string(this, "base_frame", "base_link");
+
+        // Validate configuration against safety limits
+        const safety_core::config::ValidationResult result =
+            safety_core::config::validate(config_, safety_core::config::ValidationPolicy::Strict);
+
+        if (!result.ok)
+        {
+            RCLCPP_ERROR(get_logger(), "Configuration validation failed: %s", result.message.data());
+            throw std::runtime_error(std::string("Invalid configuration: ") + std::string(result.message));
+        }
+
+        if (result.warning)
+        {
+            RCLCPP_WARN(get_logger(), "Configuration validation warning: %s", result.message.data());
+        }
     }
 
     void SafetyEnvelopeNode::on_odom(const nav_msgs::msg::Odometry::ConstSharedPtr msg)
@@ -159,6 +193,16 @@ namespace safety_core_ros
         const double elapsed_s     = (now - startup_time_).seconds();
         const bool in_grace_period = elapsed_s < params_.startup_grace_period_s;
 
+        // Compute dynamic safety buffer based on current speed
+        double dynamic_buffer = config_.envelope.safety_buffer_m;
+        if (dynamic_buffer_enabled_)
+        {
+            const double speed = std::abs(speed_mps);
+            dynamic_buffer     = min_buffer_m_ + velocity_factor_ * speed;
+            // Cap at some reasonable maximum
+            dynamic_buffer = std::min(dynamic_buffer, config_.envelope.safety_buffer_m * 2.0);
+        }
+
         // Handle invalid scan data (no valid obstacles detected)
         if (!MathUtils::is_finite(distance_m) || distance_m < 0.0)
         {
@@ -171,8 +215,8 @@ namespace safety_core_ros
             status.within_envelope        = in_grace_period;
             status.zone.zone = in_grace_period ? static_cast<std::uint8_t>(safety_core::safety::SafetyZone::Clear)
                                                : static_cast<std::uint8_t>(safety_core::safety::SafetyZone::Warning);
-            status.stopping_distance_m         = config_.envelope.safety_buffer_m;
-            status.required_clearance_m        = config_.envelope.safety_buffer_m;
+            status.stopping_distance_m         = dynamic_buffer;
+            status.required_clearance_m        = dynamic_buffer;
             status.recommended_speed_limit_mps = in_grace_period
                                                      ? config_.envelope.max_speed_mps
                                                      : std::min(speed_mps, config_.envelope.max_speed_mps * 0.5);
@@ -184,8 +228,11 @@ namespace safety_core_ros
             return;
         }
 
+        // Evaluate stop distance using dynamic buffer
+        auto envelope_config            = config_.envelope;
+        envelope_config.safety_buffer_m = dynamic_buffer;
         const auto eval =
-            safety_core::safety::evaluate_stop_distance(distance_m, speed_mps, config_.envelope, footprint_);
+            safety_core::safety::evaluate_stop_distance(distance_m, speed_mps, envelope_config, footprint_);
 
         // During grace period, override emergency zone to warning zone
         safety_core::safety::EnvelopeEvaluation modified_eval = eval;
@@ -214,19 +261,19 @@ namespace safety_core_ros
         // Only publish markers if there are subscribers (reduce CPU overhead)
         if (marker_pub_->get_subscription_count() > 0)
         {
-            publish_zone_markers(modified_eval, header);
+            publish_zone_markers(modified_eval, dynamic_buffer, header);
         }
     }
 
     void SafetyEnvelopeNode::publish_zone_markers(const safety_core::safety::EnvelopeEvaluation& eval,
-                                                  const std_msgs::msg::Header& header)
+                                                  double dynamic_buffer, const std_msgs::msg::Header& header)
     {
         // Pre-allocate marker array to avoid dynamic allocations
         visualization_msgs::msg::MarkerArray array;
         array.markers.reserve(4); // Pre-allocate for 4 markers
 
         // Calculate zone radii
-        const double emergency_r  = MathUtils::max(0.05, config_.envelope.safety_buffer_m);
+        const double emergency_r  = MathUtils::max(0.05, dynamic_buffer);
         const double protective_r = MathUtils::max(emergency_r + 0.05, eval.required_clearance);
         const double warning_r    = protective_r * 1.5;
 

@@ -7,6 +7,7 @@
 #include <iostream>
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/string.hpp>
+#include <stdexcept>
 #include <termios.h>
 #include <thread>
 #include <unistd.h>
@@ -25,6 +26,21 @@ class TeleopNode : public rclcpp::Node
         // Parameters
         linear_speed_  = this->declare_parameter("linear_speed", 0.5);
         angular_speed_ = this->declare_parameter("angular_speed", 0.5);
+
+        // Validate teleop speed parameters
+        if (linear_speed_ < 0.0 || linear_speed_ > 10.0)
+        {
+            RCLCPP_ERROR(this->get_logger(), "Invalid linear_speed: %.2f (must be in range [0, 10] m/s)",
+                         linear_speed_);
+            throw std::runtime_error("linear_speed must be in range [0, 10] m/s");
+        }
+
+        if (angular_speed_ < 0.0 || angular_speed_ > 5.0)
+        {
+            RCLCPP_ERROR(this->get_logger(), "Invalid angular_speed: %.2f (must be in range [0, 5] rad/s)",
+                         angular_speed_);
+            throw std::runtime_error("angular_speed must be in range [0, 5] rad/s");
+        }
 
         RCLCPP_INFO(this->get_logger(), "Teleop Node Started");
         RCLCPP_INFO(this->get_logger(), "Controls:");

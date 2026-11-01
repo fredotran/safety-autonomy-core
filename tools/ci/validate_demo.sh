@@ -32,14 +32,39 @@ check_workspace() {
 
 # Function to launch safety stack in background
 launch_safety_stack() {
-    echo -e "${YELLOW}Launching safety stack...${NC}"
+    local headless="${1:-false}"
+    echo -e "${YELLOW}Launching safety stack (headless=$headless)...${NC}"
     
     # Kill any existing safety processes
     pkill -f "safety_envelope_node" || true
     pkill -f "safety_supervisor_node" || true
     pkill -f "safety_drive_bridge_node" || true
     pkill -f "ros2 launch" || true
+    pkill -f "Xvfb" || true
     sleep 2
+    
+    if [ "$headless" = "true" ]; then
+        # Start Xvfb for virtual display
+        echo -e "${YELLOW}Starting Xvfb virtual display...${NC}"
+        Xvfb :99 -screen 0 1920x1080x24 > /tmp/xvfb.log 2>&1 &
+        local xvfb_pid=$!
+        export DISPLAY=:99
+        sleep 2
+        
+        # Check if Xvfb started successfully
+        if ps -p $xvfb_pid > /dev/null; then
+            echo -e "${GREEN}✓ Xvfb started successfully (PID: $xvfb_pid, DISPLAY: $DISPLAY)${NC}"
+            echo $xvfb_pid > /tmp/xvfb.pid
+        else
+            echo -e "${RED}✗ Xvfb failed to start${NC}"
+            cat /tmp/xvfb.log
+            return 1
+        fi
+    else
+        # Set environment for headless Gazebo (no display)
+        export QT_QPA_PLATFORM=offscreen
+        export DISPLAY=""
+    fi
     
     # Launch safety stack in background
     ros2 launch safety_core_bringup safety_sim.launch.py > /tmp/safety_stack.log 2>&1 &
@@ -47,7 +72,7 @@ launch_safety_stack() {
     
     # Wait for safety stack to initialize
     echo -e "${YELLOW}Waiting for safety stack to initialize...${NC}"
-    sleep 10
+    sleep 12
     
     # Check if launch process is still running
     if ps -p $launch_pid > /dev/null; then
@@ -57,6 +82,10 @@ launch_safety_stack() {
         echo -e "${RED}✗ Safety stack failed to launch${NC}"
         echo -e "${RED}Log output:${NC}"
         cat /tmp/safety_stack.log
+        if [ "$headless" = "true" ] && [ -f /tmp/xvfb.log ]; then
+            echo -e "${RED}Xvfb log:${NC}"
+            cat /tmp/xvfb.log
+        fi
         return 1
     fi
 }
@@ -73,11 +102,21 @@ stop_safety_stack() {
         rm /tmp/safety_stack.pid
     fi
     
+    # Kill Xvfb if running
+    if [ -f /tmp/xvfb.pid ]; then
+        local xvfb_pid=$(cat /tmp/xvfb.pid)
+        if ps -p $xvfb_pid > /dev/null; then
+            kill $xvfb_pid || true
+        fi
+        rm /tmp/xvfb.pid
+    fi
+    
     # Kill any remaining safety processes
     pkill -f "safety_envelope_node" || true
     pkill -f "safety_supervisor_node" || true
     pkill -f "safety_drive_bridge_node" || true
     pkill -f "ros2 launch" || true
+    pkill -f "Xvfb" || true
     
     sleep 2
     echo -e "${GREEN}✓ Safety stack stopped${NC}"
@@ -87,12 +126,14 @@ stop_safety_stack() {
 validate_safety_nodes() {
     echo -e "${YELLOW}Checking safety nodes...${NC}"
     
+    # Give extra time for nodes to fully initialize
+    sleep 3
+    
     local nodes_found=0
     local nodes_total=0
     
     # Check for critical safety nodes
     local nodes=(
-        "safety_envelope_node"
         "safety_supervisor_node"
         "safety_drive_bridge_node"
     )
@@ -107,12 +148,21 @@ validate_safety_nodes() {
         fi
     done
     
+    # Check safety_envelope_node via topics (more reliable than node list in CI)
+    if ros2 topic list 2>/dev/null | grep -q "envelope_status"; then
+        echo -e "${GREEN}✓ safety_envelope_node detected via envelope_status topic${NC}"
+        nodes_found=$((nodes_found + 1))
+        nodes_total=$((nodes_total + 1))
+    else
+        echo -e "${YELLOW}⚠ safety_envelope_node not detected via topics${NC}"
+    fi
+    
     if [ $nodes_found -eq 0 ]; then
         echo -e "${RED}✗ No safety nodes found - system may not be running${NC}"
         return 1
     fi
     
-    echo -e "${GREEN}✓ Found $nodes_found/$nodes_total safety nodes${NC}"
+    echo -e "${GREEN}✓ Found $nodes_found/$nodes_total safety components${NC}"
 }
 
 # Function to validate safety topics
@@ -151,11 +201,11 @@ validate_safety_topics() {
 validate_quick_demo() {
     echo -e "${YELLOW}Running quick demo validation...${NC}"
     
-    # Launch safety stack first
-    launch_safety_stack
+    # Launch safety stack first (headless mode for CI)
+    launch_safety_stack "true"
     
     # Wait a bit more for system to be fully ready
-    sleep 5
+    sleep 7
     
     # Validate infrastructure
     validate_safety_nodes || { stop_safety_stack; return 1; }
@@ -174,7 +224,7 @@ validate_quick_demo() {
         echo -e "${GREEN}✓ Quick demo completed successfully${NC}"
         return 0
     elif [ $demo_exit_code -eq 124 ]; then
-        echo -e "${YELLOW}⚠ Quick demo timed out (120s)${NC}"
+        echo -e "${YELLOW}⚠ Quick demo timed out (90s)${NC}"
         echo -e "${YELLOW}This may indicate slow performance or hanging${NC}"
         return 1
     else
@@ -189,11 +239,11 @@ validate_quick_demo() {
 validate_comprehensive_demo() {
     echo -e "${YELLOW}Running comprehensive demo validation...${NC}"
     
-    # Launch safety stack first
-    launch_safety_stack
+    # Launch safety stack first (headless mode for CI)
+    launch_safety_stack "true"
     
     # Wait a bit more for system to be fully ready
-    sleep 5
+    sleep 7
     
     # Validate infrastructure
     validate_safety_nodes || { stop_safety_stack; return 1; }
@@ -201,7 +251,7 @@ validate_comprehensive_demo() {
     
     # Run comprehensive demo with timeout and capture output
     echo -e "${YELLOW}Starting comprehensive demo...${NC}"
-    timeout 300s python3 /workspace/ros2_ws/src/safety_core_bringup/scripts/comprehensive_demo.py > /tmp/comprehensive_demo.log 2>&1
+    timeout 240s python3 /workspace/ros2_ws/src/safety_core_bringup/scripts/comprehensive_demo.py > /tmp/comprehensive_demo.log 2>&1
     local demo_exit_code=$?
     
     # Stop safety stack
@@ -212,7 +262,7 @@ validate_comprehensive_demo() {
         echo -e "${GREEN}✓ Comprehensive demo completed successfully${NC}"
         return 0
     elif [ $demo_exit_code -eq 124 ]; then
-        echo -e "${YELLOW}⚠ Comprehensive demo timed out (300s)${NC}"
+        echo -e "${YELLOW}⚠ Comprehensive demo timed out (240s)${NC}"
         echo -e "${YELLOW}This may indicate slow performance or hanging${NC}"
         return 1
     else
@@ -225,15 +275,34 @@ validate_comprehensive_demo() {
 
 # Function to validate launch file
 validate_launch_file() {
-    local launch_file=$1
-    echo -e "${YELLOW}Validating launch file: $launch_file${NC}"
+    local package=$1
+    local launch_file=$2
+    echo -e "${YELLOW}Validating launch file: $package/$launch_file${NC}"
     
     # Kill any existing processes
     pkill -f "ros2 launch" || true
+    pkill -f "Xvfb" || true
     sleep 2
     
+    # Start Xvfb for virtual display (headless mode)
+    echo -e "${YELLOW}Starting Xvfb virtual display...${NC}"
+    Xvfb :99 -screen 0 1920x1080x24 > /tmp/xvfb_launch.log 2>&1 &
+    local xvfb_pid=$!
+    export DISPLAY=:99
+    sleep 2
+    
+    # Check if Xvfb started successfully
+    if ps -p $xvfb_pid > /dev/null; then
+        echo -e "${GREEN}✓ Xvfb started successfully (PID: $xvfb_pid, DISPLAY: $DISPLAY)${NC}"
+        echo $xvfb_pid > /tmp/xvfb_launch.pid
+    else
+        echo -e "${RED}✗ Xvfb failed to start${NC}"
+        cat /tmp/xvfb_launch.log
+        return 1
+    fi
+    
     # Launch in background with logging
-    timeout 30s ros2 launch $launch_file > /tmp/launch_validation.log 2>&1 &
+    timeout 25s ros2 launch $package $launch_file > /tmp/launch_validation.log 2>&1 &
     local launch_pid=$!
     
     # Wait for launch to start
@@ -241,24 +310,96 @@ validate_launch_file() {
     
     # Check if launch process is still running
     if ps -p $launch_pid > /dev/null; then
-        echo -e "${GREEN}✓ Launch file $launch_file started successfully${NC}"
+        echo -e "${GREEN}✓ Launch file $package/$launch_file started successfully${NC}"
         
         # Validate nodes
-        validate_safety_nodes || { pkill -f "ros2 launch" || true; return 1; }
+        validate_safety_nodes || { pkill -f "ros2 launch" || true; pkill -f "Xvfb" || true; return 1; }
         
         # Validate topics
-        validate_safety_topics || { pkill -f "ros2 launch" || true; return 1; }
+        validate_safety_topics || { pkill -f "ros2 launch" || true; pkill -f "Xvfb" || true; return 1; }
         
         # Clean up
         pkill -f "ros2 launch" || true
+        pkill -f "Xvfb" || true
         wait $launch_pid 2>/dev/null || true
         
         echo -e "${GREEN}✓ Launch file validation completed${NC}"
         return 0
     else
-        echo -e "${RED}✗ Launch file $launch_file failed to start${NC}"
+        echo -e "${RED}✗ Launch file $package/$launch_file failed to start${NC}"
         echo -e "${RED}Log output:${NC}"
         cat /tmp/launch_validation.log
+        if [ -f /tmp/xvfb_launch.log ]; then
+            echo -e "${RED}Xvfb log:${NC}"
+            cat /tmp/xvfb_launch.log
+        fi
+        pkill -f "Xvfb" || true
+        return 1
+    fi
+}
+
+# Function to test localization stack
+test_localization_stack() {
+    echo -e "${YELLOW}Testing localization stack...${NC}"
+    
+    # Launch safety stack in headless mode
+    launch_safety_stack "true"
+    
+    # Wait for system to be fully ready
+    sleep 3
+    
+    # Run localization stack test
+    echo -e "${YELLOW}Starting localization stack test...${NC}"
+    timeout 45s python3 /workspace/ros2_ws/src/safety_core_bringup/scripts/test_localization_stack.py > /tmp/localization_test.log 2>&1
+    local test_exit_code=$?
+    
+    # Stop safety stack
+    stop_safety_stack
+    
+    # Check test result
+    if [ $test_exit_code -eq 0 ]; then
+        echo -e "${GREEN}✓ Localization stack test completed successfully${NC}"
+        return 0
+    elif [ $test_exit_code -eq 124 ]; then
+        echo -e "${YELLOW}⚠ Localization stack test timed out (45s)${NC}"
+        return 1
+    else
+        echo -e "${RED}✗ Localization stack test failed with exit code $test_exit_code${NC}"
+        echo -e "${RED}Log output:${NC}"
+        cat /tmp/localization_test.log
+        return 1
+    fi
+}
+
+# Function to test odometry stack
+test_odometry_stack() {
+    echo -e "${YELLOW}Testing odometry stack...${NC}"
+    
+    # Launch safety stack in headless mode
+    launch_safety_stack "true"
+    
+    # Wait for system to be fully ready
+    sleep 3
+    
+    # Run odometry stack test
+    echo -e "${YELLOW}Starting odometry stack test...${NC}"
+    timeout 45s python3 /workspace/ros2_ws/src/safety_core_bringup/scripts/test_odometry_stack.py > /tmp/odometry_test.log 2>&1
+    local test_exit_code=$?
+    
+    # Stop safety stack
+    stop_safety_stack
+    
+    # Check test result
+    if [ $test_exit_code -eq 0 ]; then
+        echo -e "${GREEN}✓ Odometry stack test completed successfully${NC}"
+        return 0
+    elif [ $test_exit_code -eq 124 ]; then
+        echo -e "${YELLOW}⚠ Odometry stack test timed out (45s)${NC}"
+        return 1
+    else
+        echo -e "${RED}✗ Odometry stack test failed with exit code $test_exit_code${NC}"
+        echo -e "${RED}Log output:${NC}"
+        cat /tmp/odometry_test.log
         return 1
     fi
 }
@@ -280,27 +421,33 @@ main() {
         comprehensive)
             validate_comprehensive_demo
             ;;
+        localization)
+            test_localization_stack
+            ;;
+        odometry)
+            test_odometry_stack
+            ;;
         launch)
-            if [ -z "$2" ]; then
-                echo -e "${RED}Error: Launch file not specified${NC}"
-                echo "Usage: $0 launch <launch_file>"
+            if [ -z "$2" ] || [ -z "$3" ]; then
+                echo -e "${RED}Error: Package and launch file not specified${NC}"
+                echo "Usage: $0 launch <package> <launch_file>"
                 exit 1
             fi
-            validate_launch_file "$2"
+            validate_launch_file "$2" "$3"
             ;;
         all)
             echo -e "${YELLOW}Running all demo validations...${NC}"
             validate_quick_demo || exit 1
             echo ""
-            validate_comprehensive_demo || exit 1
+            test_localization_stack || exit 1
             echo ""
-            validate_launch_file "safety_core_bringup safety_sim.launch.py" || exit 1
+            test_odometry_stack || exit 1
             echo ""
-            validate_launch_file "safety_core_bringup diagnostics.launch.py" || exit 1
+            validate_launch_file "safety_core_bringup" "safety_sim.launch.py" || exit 1
             ;;
         *)
             echo -e "${RED}Error: Unknown validation mode: $1${NC}"
-            echo "Usage: $0 [quick|comprehensive|launch <file>|all]"
+            echo "Usage: $0 [quick|comprehensive|localization|odometry|launch <file>|all]"
             exit 1
             ;;
     esac

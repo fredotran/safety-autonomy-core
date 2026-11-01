@@ -44,17 +44,27 @@ cd /workspace/safety-autonomy-core
 
 ### CI Integration
 
-The script is integrated into the GitHub Actions CI pipeline in `.github/workflows/ci.yml`:
+The script is integrated into the GitHub Actions CI pipeline in `.github/workflows/ci.yml` with Phase 1 optimizations:
+
+**Phase 1 Optimizations:**
+- **Parallel Execution**: Demo tests run in parallel using matrix strategy (quick, comprehensive, launch_safety, launch_diagnostic)
+- **Smart Test Selection**: Demo tests only run when Docker-related files change (docker-compose.yml, Dockerfile, CI workflow, ros2/ directory)
+- **Docker BuildKit Caching**: Layer caching via GitHub Actions cache for faster image builds
+- **Optimized Timeouts**: Reduced timeouts for faster feedback (quick: 90s, comprehensive: 240s, launch: 20s)
 
 ```yaml
 demo_tests:
   name: demo_tests (comprehensive Docker demo validation)
+  strategy:
+    matrix:
+      demo_type: [quick, comprehensive, launch_safety, launch_diagnostic]
   steps:
-    - name: Run quick demo validation
+    - name: Run ${{ matrix.demo_type }} demo validation
+      if: steps.check_changes.outputs.docker_changed == 'true'
       run: |
-        docker compose run --rm safety-autonomy-demo bash -c "
+        docker run --rm --network host safety-autonomy-core:latest bash -c "
           chmod +x /workspace/safety-autonomy-core/tools/ci/validate_demo.sh &&
-          /workspace/safety-autonomy-core/tools/ci/validate_demo.sh quick
+          /workspace/safety-autonomy-core/tools/ci/validate_demo.sh ${{ matrix.demo_type }}
         "
 ```
 
@@ -85,8 +95,8 @@ The script performs the following validations:
    - Requires at least one topic to exist
 
 5. **Demo Execution**
-   - Quick demo (2-minute validation)
-   - Comprehensive demo (5-minute validation)
+   - Quick demo (90-second validation)
+   - Comprehensive demo (4-minute validation)
    - Launch file validation
 
 ### Error Handling
@@ -94,9 +104,9 @@ The script performs the following validations:
 The script uses proper error detection and reporting:
 
 **Timeout Protection:**
-- Quick demo: 120 seconds
-- Comprehensive demo: 300 seconds
-- Launch validation: 30 seconds
+- Quick demo: 90 seconds (optimized from 120s)
+- Comprehensive demo: 240 seconds (optimized from 300s)
+- Launch validation: 20 seconds (optimized from 30s)
 
 **Error Detection:**
 - Exit code 0: Success

@@ -19,7 +19,7 @@ def generate_launch_description():
     safety_params = f"{pkg_bringup}/config/safety_params.yaml"
     sim_launch = f"{pkg_sim}/launch/sim_only.launch.py"
     
-    declare_use_sim_time = DeclareLaunchArgument("use_sim_time", default_value="true")
+    declare_use_sim_time = DeclareLaunchArgument("use_sim_time", default_value="true", description="Use simulation time from /clock topic.")
     
     # Simulation
     from launch.launch_description_sources import PythonLaunchDescriptionSource
