@@ -42,7 +42,10 @@ env:
   BUILD_DIR: build
   CMAKE_FLAGS: "-DCMAKE_BUILD_TYPE=RelWithDebInfo -DSAFETY_CORE_ENABLE_SANITIZERS=ON -G Ninja"
   COVERAGE_MIN_LINE: "80"
-  COVERAGE_MIN_BRANCH: "55"
+  # Ratcheted 2026-10-31 from 55 -> 70 after the coverage_gaps/state_machine
+  # test pass (measured 75.0% locally). Residual uncovered branches are CAS
+  # retry loops, defensive dead branches, and multi-TU inline artifacts.
+  COVERAGE_MIN_BRANCH: "70"
   CCACHE_DIR: /tmp/ccache
   APT_CACHE_DIR: /var/cache/apt
   # Improved cache keys for better hit rates
@@ -277,6 +280,8 @@ jobs:
             echo "Warning: verify_safety_case.sh not found, skipping safety case check"
             exit 0
           fi
+      - name: Verify hazard->test traceability
+        run: python3 tools/safety/verify_traceability.py
 
   # Stage 3: Build and test C++ library
   build_and_test:
@@ -425,6 +430,96 @@ jobs:
           path: |
             build-coverage/coverage.info
             build-coverage/coverage.xml
+
+  fuzz_smoke:
+    name: fuzz_smoke (libFuzzer short campaigns)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build clang
+      - name: Configure (fuzz)
+        env:
+          CC: clang
+          CXX: clang++
+        run: |
+          cmake -S . -B build-fuzz -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DSAFETY_CORE_ENABLE_SANITIZERS=OFF -DSAFETY_CORE_ENABLE_WERROR=OFF \
+            -DSAFETY_CORE_ENABLE_FUZZING=ON
+      - name: Build fuzzers
+        run: cmake --build build-fuzz --target fuzz_env_loader fuzz_filters
+      - name: Short fuzz campaign (env_loader)
+        run: ./build-fuzz/fuzz_env_loader -max_total_time=60 -timeout=10
+      - name: Short fuzz campaign (filters)
+        run: ./build-fuzz/fuzz_filters -max_total_time=60 -timeout=10
+
+  benchmarks:
+    name: benchmarks (timing evidence)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build
+      - name: Configure (release)
+        run: cmake -S . -B build-bench -DCMAKE_BUILD_TYPE=Release -DSAFETY_CORE_ENABLE_SANITIZERS=OFF
+      - name: Build benchmark
+        run: cmake --build build-bench --target safety_core_benchmarks
+      - name: Run benchmarks (budget gate)
+        run: ./build-bench/safety_core_benchmarks --iterations 50000
+      - name: Upload timing evidence
+        if: always()
+        run: ./build-bench/safety_core_benchmarks --iterations 50000 --json > benchmark_results.json
+      - name: Upload artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: benchmark_results.json
+
+  certifiable_build:
+    name: certifiable_build (no-exceptions / no-RTTI partition)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build
+      - name: Build certifiable partition
+        run: |
+          cmake -S . -B build-cert -GNinja
+          cmake --build build-cert --target safety_core_certifiable
+      - name: Verify no dynamic exception/RTTI symbols
+        run: |
+          # A certifiable TU must not reference exception-handling machinery.
+          ! nm -C build-cert/libsafety_core_certifiable.a 2>/dev/null \
+              | grep -E "__cxa_throw|__cxa_begin_catch|typeinfo for" | grep -v " U " | grep -q .
+          echo "partition clean: no exception/RTTI definitions"
+
+  sbom:
+    name: sbom (software bill of materials)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate SBOM / dependency manifest
+        run: ./tools/ci/generate_sbom.sh sbom
+      - name: Upload SBOM
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom/
 
   # Stage 4: Docker build and security scanning
   docker_build:
@@ -617,6 +712,28 @@ jobs:
           name: ros2-test-results
           path: ros2/test_results/
 
+
+  ros2_tests:
+    name: ros2_tests (colcon test in built image)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: docker_build
+    steps:
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+      - name: Load Docker image
+        run: docker load < docker-image.tar.gz
+      - name: Run ROS 2 package tests
+        run: |
+          docker run --rm --network host safety-autonomy-core:latest bash -c "
+            source /opt/ros/jazzy/setup.bash &&
+            cd /workspace/ros2_ws &&
+            colcon test --event-handlers console_direct+ &&
+            colcon test-result --verbose
+          "
+
   # Stage 6: Integration tests
   demo_tests:
     name: demo_tests (${{ matrix.test }})
@@ -668,7 +785,7 @@ jobs:
     name: CI Summary
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [detect_changes, format_check, clang_tidy, hook_smoke, policy_guard, safety_case_guard, build_and_test, coverage, docker_build, ros2_test]
+    needs: [detect_changes, format_check, clang_tidy, hook_smoke, policy_guard, safety_case_guard, build_and_test, coverage, docker_build, ros2_test, ros2_tests, fuzz_smoke, benchmarks, certifiable_build, sbom]
     if: always() && needs.detect_changes.result == 'success'
     steps:
       - name: Check job results
@@ -708,6 +825,11 @@ jobs:
           show_job_status "Coverage" "${{ needs.coverage.result }}"
           show_job_status "Docker Build" "${{ needs.docker_build.result }}"
           show_job_status "ROS2 Test" "${{ needs.ros2_test.result }}"
+          show_job_status "ROS2 Tests (colcon)" "${{ needs.ros2_tests.result }}"
+          show_job_status "Fuzz Smoke" "${{ needs.fuzz_smoke.result }}"
+          show_job_status "Benchmarks" "${{ needs.benchmarks.result }}"
+          show_job_status "Certifiable Build" "${{ needs.certifiable_build.result }}"
+          show_job_status "SBOM" "${{ needs.sbom.result }}"
 
       - name: Changes detected
         run: |
@@ -761,6 +883,21 @@ jobs:
 
           if [ "${{ needs.ros2_test.result }}" != "success" ] && [ "${{ needs.ros2_test.result }}" != "skipped" ]; then
             echo "❌ CI failed at ROS2 test" >> $GITHUB_STEP_SUMMARY
+            critical_failure=1
+          fi
+
+          if [ "${{ needs.ros2_tests.result }}" != "success" ] && [ "${{ needs.ros2_tests.result }}" != "skipped" ]; then
+            echo "❌ CI failed at ROS2 colcon tests" >> $GITHUB_STEP_SUMMARY
+            critical_failure=1
+          fi
+
+          if [ "${{ needs.fuzz_smoke.result }}" != "success" ] && [ "${{ needs.fuzz_smoke.result }}" != "skipped" ]; then
+            echo "❌ CI failed at fuzz smoke" >> $GITHUB_STEP_SUMMARY
+            critical_failure=1
+          fi
+
+          if [ "${{ needs.certifiable_build.result }}" != "success" ] && [ "${{ needs.certifiable_build.result }}" != "skipped" ]; then
+            echo "❌ CI failed at certifiable build" >> $GITHUB_STEP_SUMMARY
             critical_failure=1
           fi
 
