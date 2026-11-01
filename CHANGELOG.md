@@ -53,6 +53,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Safety Hardening & Evidence Infrastructure** (see `markdown/docs/IMPROVEMENT_PLAN.md`):
+  - Sensor staleness fail-safe chain: scan timestamp/stream watchdog (`scan_timeout_s`), envelope-status monitor (`envelope_timeout_s`, fault `0xE002`), odometry freshness (`odom_timeout_s`) with conservative max-speed fallback and boot-time missing-odom escalation to `LocalizationLost`
+  - NaN/Inf input guards on `safety_pid` and `alpha_beta_filter` (permanent state-poisoning fix)
+  - Atomic `ModeStateMachine::fault_code()` propagation to ROS `SafetyState` messages (codes `0xE001`/`0xE002`/`1001-1003`)
+  - libFuzzer harnesses, property tests, WCET benchmarks (critical→SafeStop p99 ~437 ns), branch-coverage gate raised to 70
+  - `safety_core_certifiable` target compiling the same sources under `-fno-exceptions -fno-rtti -Werror`; dead Eigen3 dependency removed
+  - Blocking static-analysis ratchet (36 tolerated findings), automated hazard→test traceability (`verify_traceability.py`), SBOM generation
+  - ROS 2 scenario regression suite (9 tests, obstacle→SafeStop ~50 ms) gated by new `ros2_tests` CI job running `colcon test`
+  - Safety-case docs: HIL strategy, MISRA status, timing evidence, certifiable partition, dependency locks, fault-code registry
 - **Advanced Localization Stack**: Comprehensive sensor fusion and fault detection system for robust AGV localization
   - **Visual Odometry Node**: ORB feature tracking using OpenCV for camera-based pose estimation with motion estimation and camera calibration support
   - **Adaptive EKF with Wheel Slip Detection**: Dynamic process noise adjustment based on motion state, compares wheel odometry with IMU/visual odometry to detect slip events
@@ -63,7 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Enhanced Localization Monitor**: Kidnapping detection via pose jump analysis, localization confidence scoring, TF tree consistency monitoring, and sensor timeout monitoring
   - **EKF YAML Parsing Fix**: Converted multi-line YAML arrays to single-line format to fix ROS2 container parsing errors
 - **Setup Demo Script**: `setup_demo.sh` convenience script at repository root for automated ROS 2 workspace build and launch with interactive menu.
-- **LICENSE File**: Added proprietary commercial license with per-robot/per-project licensing terms.
+- **LICENSE File**: MIT license (see [LICENSE](LICENSE)).
 - **CI Improvements**: Enhanced GitLab CI with:
   - Dependency caching (apt-cache, ccache) for faster builds
   - ROS 2 build, lint, and test jobs (Jazzy distro)

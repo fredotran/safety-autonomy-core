@@ -9,11 +9,14 @@ This matrix maps hazards to requirements, controls, executable evidence, and CI 
 | HZ-003 | SR-CONFIG-001 | Runtime instability from malformed startup config | Env parser full-token validation, schema migration, strict/warning validation policy | `tests/env_loader_tests.cpp`, `tests/context_factory_tests.cpp` | `build_and_test`, `coverage` |
 | HZ-004 | SR-DIAG-001 | Silent loss of observability due to clipped diagnostics | Fixed-capacity event buffers + truncation flags + cumulative truncation counters | `tests/diagnostic_truncation_tests.cpp` | `build_and_test` |
 | HZ-005 | SR-MEM-001 | Heap allocation in startup safety path causes jitter/failure | Non-allocating startup payload formatting, allocation policy tests, CI symbol audit for critical objects | `tests/no_allocation_policy_tests.cpp` | `build_and_test` (allocator symbol gate) |
-| HZ-006 | SR-PKG-001 | Integration regressions from packaging/config drift | CMake package config export + consumer smoke test | `package_install_smoke`, `package_config_smoke` | `build_and_test` |
+| HZ-006 | SR-PKG-001 | Integration regressions from packaging/config drift | CMake package config export + consumer smoke test | `CMakeLists.txt` (`package_install_smoke`, `package_config_smoke` ctest) | `build_and_test` |
 | HZ-007 | SR-FILTER-001 | State-estimation divergence from bounded disturbances | Bounded EKF + complementary filter clamps and finite guards | `tests/filter_invariants_tests.cpp`, `tests/fault_injection_tests.cpp` | `build_and_test`, `coverage` |
 | HZ-008 | SR-MOTION-001 | Unsafe trajectory command violates motion limits | Trajectory validator for speed/accel/jerk/time monotonicity | `tests/motion_trajectory_tests.cpp` | `build_and_test`, `coverage` |
 | HZ-009 | SR-DIAG-002 | Late detection of runtime degradation | Periodic health beacon topic with watchdog/truncation telemetry | `tests/health_beacon_tests.cpp`, `tests/system_context_tests.cpp` | `build_and_test` |
 | HZ-010 | SR-SUP-001 | Delayed or inconsistent fail-safe response under critical monitor events | SafetySupervisor warning/degraded/critical escalation with forced safe-stop path | `tests/safety_supervisor_tests.cpp` | `build_and_test` |
+| HZ-011 | SR-SENSE-001 | Stale, frozen, or absent LiDAR scan silently treated as fresh | `header.stamp` validation (`scan_timeout_s`), scan-stream watchdog publishing Emergency | `ros2/src/safety_core_ros/test/test_safety_scenario.cpp` | `ros2_tests`, `demo_tests` |
+| HZ-012 | SR-SENSE-002 | Envelope-status stream loss (envelope node death) goes undetected | Supervisor `envelope_timeout_s` monitor latches fault `0xE002` and forces SafeStop | `ros2/src/safety_core_ros/test/test_safety_scenario.cpp` | `ros2_tests`, `demo_tests` |
+| HZ-013 | SR-SENSE-003 | Frozen or missing odometry understates stopping distance / localization health | `odom_timeout_s` falls back to `max_speed_mps`; missing-odom escalates to LocalizationLost | `ros2/src/safety_core_ros/test/test_safety_scenario.cpp` | `ros2_tests`, `demo_tests` |
 
 ## Assumptions
 - Platform clock source is monotonic and stable.

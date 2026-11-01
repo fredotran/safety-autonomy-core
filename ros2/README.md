@@ -34,6 +34,10 @@ ROS 2 Jazzy + Gazebo Harmonic + Nav2 integration for the [`safety_autonomy_core`
         ▼
 ┌─────────────────── safety_envelope_node ───────────────────────────┐
 │  Reads /scan in robot footprint corridor                            │
+│  Stale scan stamps dropped; dead stream → EMERGENCY zone            │
+│  (scan_timeout_s watchdog)                                          │
+│  Stale or never-received /odom → evaluate at max speed              │
+│  (odom_timeout_s, conservative stopping distance)                   │
 │  Calls safety_core::safety::evaluate_stop_distance(footprint)       │
 │  Publishes:                                                         │
 │   - /safety/envelope_status (zone classification + recommended v)   │
@@ -47,9 +51,13 @@ ROS 2 Jazzy + Gazebo Harmonic + Nav2 integration for the [`safety_autonomy_core`
 │   Clear/Warning  → Moving                                           │
 │   Protective     → AvoidingObstacle                                 │
 │   Emergency      → SafeStop + latch_fault(0xE001)                   │
-│  Tracks localization staleness via /odom timestamps                 │
+│  Tracks localization staleness via /odom header stamps:             │
+│   stale or never-received → LocalizationLost, then                  │
+│   SafeStop + latch_fault(1002) at 2× localization_timeout_s         │
+│  Tracks envelope-status stream freshness:                           │
+│   stale > envelope_timeout_s → SafeStop + latch_fault(0xE002)       │
 │  Publishes:                                                         │
-│   - /safety/state       (mode, zone, fault flags)                   │
+│   - /safety/state       (mode, zone, fault flags + fault_code)      │
 │   - /safety/safe_stop   (boolean for downstream gating)             │
 │   - /safety/diagnostics (DiagnosticEvent stream from safety_core)   │
 └────────────────────────────────────────────────────────────────────┘
@@ -130,7 +138,7 @@ If Nav2 is installed, drop `--packages-skip safety_core_nav2` to also build the 
 
 > **Tip**: Use the `setup_demo.sh` script for a guided build and launch experience (see Build section above).
 
-### Full demo (Gazebo + safety_core + Nav2 + SLAM + RViz)
+### Full demo (Gazebo + safety_core + Nav2 + RViz)
 
 ```bash
 source install/setup.bash
@@ -141,24 +149,34 @@ In RViz, use the **Nav2 Goal** tool (toolbar) to send a navigation goal. The AGV
 
 Optional launch arguments:
 
-| Argument        | Default | Description                                  |
-|-----------------|---------|----------------------------------------------|
-| `use_sim_time`  | `true`  | Use Gazebo's `/clock`                        |
-| `rviz`          | `true`  | Launch RViz with the demo config             |
-| `slam`          | `false` | Launch SLAM Toolbox (online async mapping)   |
-| `nav2`          | `true`  | Launch Nav2 stack (only if installed)        |
-| `ekf`           | `false` | Enable EKF multi-sensor fusion localization  |
+| Argument          | Default                    | Description                                                              |
+|-------------------|----------------------------|--------------------------------------------------------------------------|
+| `use_sim_time`    | `true`                     | Use Gazebo's `/clock`                                                    |
+| `rviz`            | `true`                     | Launch RViz with the demo config                                         |
+| `ekf`             | `false`                    | Enable EKF multi-sensor fusion localization                              |
+| `gps`             | `true`                     | With `ekf:=true`, also run navsat_transform + map-frame EKF              |
+| `nav2_controller` | `dwb`                      | Nav2 controller plugin: `dwb` (simpler, diff-drive) or `mppi`            |
+| `teleop`          | `false`                    | Enable teleoperation node for manual control                             |
+| `environment`     | `outdoor`                  | Preset: `outdoor` (wheel-odometry Nav2; EKF+GPS opt-in), `indoor` (adds SLAM Toolbox), `warehouse` (AMCL map-based, no Nav2) |
+| `map_file`        | `maps/warehouse_map.yaml`  | Map file for AMCL (`environment:=warehouse`)                             |
 
-Example with no Nav2:
+Nav2 always runs in this launch (except `environment:=warehouse`). For a sim +
+safety stack without Nav2, use the dedicated lean launch:
 
 ```bash
-ros2 launch safety_core_bringup agv_warehouse.launch.py nav2:=false
+ros2 launch safety_core_bringup safety_sim.launch.py
 ```
 
 Example with EKF localization enabled:
 
 ```bash
 ros2 launch safety_core_bringup agv_warehouse.launch.py ekf:=true
+```
+
+Example with the indoor preset (EKF + SLAM Toolbox + Nav2):
+
+```bash
+ros2 launch safety_core_bringup agv_warehouse.launch.py environment:=indoor
 ```
 
 > **Note:** See [LOCALIZATION.md](LOCALIZATION.md) for detailed documentation on the multi-sensor fusion localization system.
@@ -211,17 +229,43 @@ ros2 launch safety_core_bringup safety_only.launch.py
 
 All wrapper-node parameters live in [`safety_core_bringup/config/safety_params.yaml`](src/safety_core_bringup/config/safety_params.yaml). The defaults match the AGV demo profile in `examples/agv_safety_demo.cpp`:
 
-| Parameter                              | Default | Description                                                |
-|----------------------------------------|---------|------------------------------------------------------------|
-| `envelope.max_speed_mps`               | 1.5     | Maximum forward speed                                      |
-| `envelope.max_comfort_decel_mps2`      | 1.0     | Comfort braking deceleration                               |
-| `envelope.safety_buffer_m`             | 0.30    | Minimum clearance to obstacle (defines Emergency boundary) |
-| `footprint.length_m` / `width_m`       | 0.80 / 0.60 | Robot bounding box                                     |
-| `footprint.front_overhang_m`           | 0.10    | Forward overhang beyond `base_link`                        |
-| `corridor_half_width_m`                | 0.40    | Lateral filter for forward-cone scan check                 |
-| `localization_timeout_s`               | 0.5     | Threshold for `LocalizationLost` mode                      |
-| `cmd_freshness_s`                      | 0.25    | Stale-Nav2-command watchdog                                |
-| `max_jerk_mps3`                        | 2.0     | Jerk limit for emergency stop profile                      |
+`safety_envelope_node`:
+
+| Parameter                              | Default     | Description                                                |
+|----------------------------------------|-------------|------------------------------------------------------------|
+| `envelope.max_speed_mps`               | 1.5         | Maximum forward speed                                      |
+| `envelope.max_accel_mps2`              | 0.75        | Maximum acceleration                                       |
+| `envelope.max_comfort_decel_mps2`      | 1.0         | Comfort braking deceleration                               |
+| `envelope.control_latency_s`           | 0.04        | Actuation latency budget in the stop-distance model        |
+| `envelope.safety_buffer_m`             | 1.0         | Minimum clearance to obstacle (defines Emergency boundary) |
+| `footprint.length_m` / `width_m`       | 0.80 / 0.60 | Robot bounding box                                         |
+| `footprint.front_overhang_m`           | 0.10        | Forward overhang beyond `base_link`                        |
+| `corridor_half_width_m`                | 0.40        | Lateral filter for forward-cone scan check                 |
+| `scan_min_valid_range_m`               | 0.05        | Minimum valid LiDAR return range                           |
+| `scan_ignore_min_range_m`              | 0.5         | Ignore obstacles closer than this (workers on the robot)   |
+| `startup_grace_period_s`               | 2.0         | Sensor stabilization grace period at startup               |
+| `scan_timeout_s`                       | 0.5         | Max scan age before the stream is treated as stale → EMERGENCY |
+| `odom_timeout_s`                       | 0.5         | Max odom stream age before speed falls back to `envelope.max_speed_mps` (conservative) |
+| `base_frame`                           | `base_link` | Robot base frame                                           |
+
+`safety_supervisor_node`:
+
+| Parameter                    | Default | Description                                              |
+|------------------------------|---------|----------------------------------------------------------|
+| `localization_timeout_s`     | 0.5     | Threshold for `LocalizationLost` mode                    |
+| `envelope_timeout_s`         | 1.0     | Max `envelope_status` age before fault `0xE002` → SafeStop |
+| `auto_recover_from_obstacle` | `true`  | Auto-resume `Moving` when the zone clears                |
+
+`safety_drive_bridge_node`:
+
+| Parameter            | Default | Description                                  |
+|----------------------|---------|----------------------------------------------|
+| `max_linear_mps`     | 1.5     | Output clamp on linear velocity              |
+| `max_angular_radps`  | 1.5     | Output clamp on angular velocity             |
+| `max_decel_mps2`     | 1.0     | Deceleration bound for the stop profile      |
+| `max_jerk_mps3`      | 2.0     | Jerk limit for emergency stop profile        |
+| `cmd_freshness_s`    | 0.25    | Stale-Nav2-command watchdog                  |
+| `control_period_s`   | 0.05    | Bridge control loop period                   |
 
 ## Verification (without Gazebo)
 
@@ -235,7 +279,23 @@ ros2 topic list | grep safety
 ros2 topic echo /safety/state --once
 ```
 
-Expected: topics include `/safety/{envelope_status,zone_markers,state,safe_stop,diagnostics}` and the state shows `mode: 1` (Idle), `zone.zone: 0` (Clear), `fault_latched: false`.
+Expected: topics include `/safety/{envelope_status,zone_markers,state,safe_stop,diagnostics}`.
+
+Because `safety_only.launch.py` has no sensor source, `/safety/state`
+deliberately escalates instead of staying Idle — sensor streams that never
+arrive are stale by definition (measured from node startup):
+
+- `mode: 1` (Idle) for the first `localization_timeout_s` (0.5 s)
+- `mode: 5` (LocalizationLost) once the timeout elapses
+- `mode: 7` (SafeStop) + `fault_latched: true` once the odometry age reaches
+  2 × `localization_timeout_s` (~1 s); `fault_code` reads `1002`
+  (localization stale) and switches to `0xE001` once the scan watchdog's
+  EMERGENCY zone latches (~`startup_grace_period_s`, 2 s)
+
+To watch the healthy path instead, provide stamped odometry and scans — e.g.
+launch `safety_sim.launch.py` (Gazebo publishes `/odom` at 50 Hz and `/scan`
+at 15 Hz). Note the supervisor reads `/odom`'s `header.stamp`, so a publisher
+that leaves the stamp at zero still reads as stale.
 
 ## Substituting the AWS RoboMaker warehouse
 
@@ -266,36 +326,68 @@ ros2 launch safety_core_bringup agv_warehouse.launch.py \
 
 The boundary contract: ROS callbacks copy data into safety_core types, run noexcept safety logic, copy results into ROS messages. Diagnostic events are emitted via the pluggable transport so the safety_core core stays decoupled from rclcpp.
 
+## Documentation
+
+- [LOCALIZATION.md](LOCALIZATION.md) — multi-sensor fusion localization stack (EKF, GPS, fault detection)
+- [WHEEL_ODOMETRY_NAVIGATION.md](WHEEL_ODOMETRY_NAVIGATION.md) — wheel-odometry-only navigation setup
+- [COMPREHENSIVE_DEMO.md](COMPREHENSIVE_DEMO.md) — comprehensive demo walkthrough
+- [PATH_FOLLOWING.md](PATH_FOLLOWING.md) — path-following demo notes
+- [RVIZ_FIX_GUIDE.md](RVIZ_FIX_GUIDE.md) — RViz display troubleshooting
+
+## Testing
+
+Each package ships tests that run under `colcon test`:
+
+- `safety_core_msgs` — message interface compile/runtime checks (`test/test_msg_interface.cpp`)
+- `safety_core_ros` — gtest suite for ROS bridges, param/QoS/time/math utilities, the envelope node, and a full safety scenario (`test/`)
+- `safety_core_nav2` — `IsSafe` BT condition tests (`test/test_is_safe_condition.cpp`)
+- `safety_core_sim` / `safety_core_bringup` — launch-file and sim-asset validation (`test/`)
+
+```bash
+colcon test --packages-select safety_core_msgs safety_core_ros safety_core_nav2 safety_core_sim safety_core_bringup
+colcon test-result --verbose
+```
+
 ## File map
 
 ```
 ros2/
 ├── README.md                           ← this file
+├── LOCALIZATION.md                     ← multi-sensor fusion localization guide
+├── WHEEL_ODOMETRY_NAVIGATION.md        ← wheel-odometry navigation guide
+├── COMPREHENSIVE_DEMO.md               ← comprehensive demo walkthrough
+├── PATH_FOLLOWING.md                   ← path-following demo notes
+├── RVIZ_FIX_GUIDE.md                   ← RViz display troubleshooting
 └── src/
     ├── safety_autonomy_core (symlink)
     ├── safety_core_msgs/
-    │   └── msg/{SafetyZone,SafetyState,EnvelopeStatus,DiagnosticEvent,MonitorEvent}.msg
+    │   ├── msg/{SafetyZone,SafetyState,EnvelopeStatus,DiagnosticEvent,MonitorEvent}.msg
+    │   └── test/test_msg_interface.cpp
     ├── safety_core_ros/
     │   ├── include/safety_core_ros/
-    │   │   ├── ros_clock.hpp
-    │   │   ├── ros_diagnostic_transport.hpp
-    │   │   ├── ros_health_monitor.hpp
-    │   │   ├── safety_envelope_node.hpp
-    │   │   ├── safety_supervisor_node.hpp
-    │   │   └── safety_drive_bridge_node.hpp
-    │   └── src/  (impls + main_*.cpp entry points)
+    │   │   ├── {ros_clock,ros_diagnostic_transport,ros_health_monitor}.hpp
+    │   │   ├── {param_loader,qos_config,time_utils,math_utils}.hpp
+    │   │   └── {safety_envelope,safety_supervisor,safety_drive_bridge}_node.hpp
+    │   ├── src/  (impls + main_*.cpp entry points + teleop_node.cpp)
+    │   └── test/ (bridges, param/qos/time/math utils, envelope node, scenario)
     ├── safety_core_nav2/
     │   ├── include/safety_core_nav2/is_safe_condition.hpp
     │   ├── src/is_safe_condition.cpp
-    │   └── safety_core_nav2_bt_plugins.xml
+    │   ├── safety_core_nav2_bt_plugins.xml
+    │   └── test/test_is_safe_condition.cpp
     ├── safety_core_sim/
     │   ├── description/agv.urdf.xacro
     │   ├── worlds/industrial_warehouse.sdf
     │   ├── config/ros_gz_bridge.yaml
-    │   └── launch/sim_only.launch.py
+    │   ├── launch/sim_only.launch.py
+    │   └── test/test_sim_files.py
     └── safety_core_bringup/
-        ├── launch/{agv_warehouse,safety_only,localization}.launch.py
-        ├── config/{safety_params,nav2_params,slam_toolbox,ekf_config}.yaml
-        ├── scripts/test_localization.py
+        ├── launch/{agv_warehouse,safety_only,safety_sim,localization,
+        │           diagnostics,comprehensive_demo}.launch.py
+        ├── config/  (safety_params, nav2_params*, slam_toolbox*, ekf_config*,
+        │           params_{outdoor,indoor,warehouse}, amcl_config)
+        ├── maps/    (warehouse_map.yaml drop-point for AMCL)
+        ├── scripts/ (demo + localization helper nodes)
+        ├── test/test_launch_files.py
         └── rviz/agv_warehouse.rviz
 ```

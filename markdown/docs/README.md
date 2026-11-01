@@ -14,7 +14,7 @@ Safety case artifacts and templates for ISO 26262/ISO 13849 compliance readiness
 
 - **outline.md** - Safety case outline for AGV/AMR indoor logistics operations
 - **functional_safety_plan.md** - Repository-level functional safety activities and roles
-- **safety_manual.md** - Integration constraints for safety-relevant mobile robot stacks
+- **safety_manual.md** - Integration constraints for safety-relevant mobile robot stacks; includes the latched fault-code registry (§5)
 - **traceability_matrix.md** - Hazard-to-control mapping and requirement traceability
 - **assumptions_register.md** - System assumptions and dependencies
 - **residual_risk_register.md** - Residual risk assessment and mitigation
@@ -26,6 +26,16 @@ Safety case artifacts and templates for ISO 26262/ISO 13849 compliance readiness
 - **release_safety_evidence_checklist.md** - Release evidence checklist
 - **vv_strategy.md** - Verification and validation strategy
 - **misra_compliance_tools.md** - MISRA compliance tools and certification path
+- **certifiable_partition.md** - Certifiable build partition (`safety_core_certifiable`, `-fno-exceptions -fno-rtti`)
+- **hil_strategy.md** - SIL-to-HIL strategy (deferred; tracked as accepted residual risk RR-005)
+- **misra_status.md** - Current MISRA/static-analysis coverage and baseline ratchet status
+- **timing_evidence.md** - Measured latency budgets for safety-critical operations
+
+### Project Guides (top level)
+
+- **DOCKER.md** - Docker deployment guide for the ROS 2 demo
+- **IMPROVEMENT_PLAN.md** - Improvement plan (all 12 items implemented) and rationale
+- **dependency_locks.md** - Dependency pinning and reproducibility policy
 
 ### Diagnostics Documentation (`diagnostics/`)
 
@@ -72,8 +82,6 @@ Commercial licensing and services may be offered in the future to support:
 - Enterprise support and SLAs
 - Advanced features and certified implementations
 - Professional services and training
-
-See [COMMERCIAL_LICENSE.md](../../COMMERCIAL_LICENSE.md) for details on potential future commercial offerings.
 
 ## Contributing to Documentation
 
@@ -125,5 +133,4 @@ For documentation questions:
 
 For detailed licensing information, see:
 - [LICENSE](../../LICENSE) - Full MIT License text
-- [COMMERCIAL_LICENSE.md](../../COMMERCIAL_LICENSE.md) - Future commercial licensing considerations
 - [README.md](../../README.md) - Main project README

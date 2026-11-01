@@ -88,10 +88,10 @@ If the robot stops unexpectedly:
 
 ## Integration with Nav2
 
-For autonomous navigation, enable Nav2 in the launch:
+For autonomous navigation, Nav2 runs by default in the full demo launch:
 
 ```bash
-ros2 launch safety_core_bringup agv_warehouse.launch.py nav2:=true
+ros2 launch safety_core_bringup agv_warehouse.launch.py
 ```
 
 Then use RViz to set navigation goals. The safety system will automatically gate Nav2 commands through the safety envelope.

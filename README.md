@@ -7,6 +7,15 @@ High-assurance C++20 library for safety-critical robotics and autonomous vehicle
 
 Designed for AGV/AMR platforms operating in dynamic warehouses (pedestrians, forklifts, pop-up obstacles, temporary localization loss).
 
+> **Positioning:** safety-autonomy-core is a *defense-in-depth* layer with
+> safety-grade engineering discipline — **not a certified safety channel**.
+> ISO 3691-4 / ISO 13849 deployments still require safety-rated hardware
+> (certified laser scanners, safety PLC, STO on the drives) as the authority.
+> This library sits between Nav2-style convenience monitoring and that
+> certified channel: deterministic, allocation-free, evidence-backed. See
+> [How this compares](#how-this-compares) and the
+> [safety case](markdown/docs/safety_case/) for certification-readiness status.
+
 ## Features
 
 | Module | Description |
@@ -20,12 +29,40 @@ Designed for AGV/AMR platforms operating in dynamic warehouses (pedestrians, for
 | **Diagnostics** | Fixed-capacity diagnostic events (no heap in transport path), health beacons, truncation observability, pluggable transports |
 | **Platform HAL** | Clock abstraction, 6-DOF IMU interface, odometry increments, drive actuator with command freshness watchdog |
 
+## How this compares
+
+Where safety-autonomy-core sits relative to other open projects in the ROS 2 /
+AGV-AMR safety space. Nothing below is a direct substitute — several entries are
+complementary building blocks, or the certified hardware channel this library is
+designed to sit alongside.
+
+| Project | What it provides | How it relates |
+|---------|------------------|----------------|
+| [`nav2_collision_monitor`](https://github.com/ros-navigation/navigation2) | Polygon-based stop/slowdown/limit/approach zones on `LaserScan`/`PointCloud`, inside Nav2 | Closest functional overlap with `safety_envelope_node`. Nav2's maintainers state it is not a certified safety system: no mode state machine, no fault latching, dynamic allocation throughout, no safety-case scaffolding. We add those; it offers richer zone geometry (arbitrary polygons, multiple action models) |
+| [`ros-safety/software_watchdogs`](https://github.com/ros-safety/software_watchdogs) | DDS-QoS/lifecycle watchdog + heartbeat nodes (ROS 2 Safety-Critical WG) | Complementary building blocks for liveliness monitoring. Our supervisor covers watchdog roles plus escalation, zone evaluation, and mode management in one deterministic pipeline |
+| [`ros-safety/contracts_lite`](https://github.com/ros-safety/contracts_lite) | C++ contract checks (pre/post-conditions, invariants) | Orthogonal tooling; can complement this library's `[[nodiscard]]`/`Result` discipline |
+| [Autoware MRM stack](https://github.com/autowarefoundation/autoware_universe) (`mrm_handler`, `system_error_monitor`, `emergency_handler`) | Hazard aggregation + minimum-risk-maneuver state machine for autonomous driving | Same supervisor→degraded→stop architecture at vehicle scale, but requires the Autoware ecosystem and targets road vehicles. Ours is minimal, ROS-agnostic at the core, and AGV-focused |
+| [`autoware_sentinel`](https://github.com/NEWSLabNTU/autoware_sentinel) | Rust `no_std` safety island on Zephyr MCU for Autoware | Complementary architecture — an independent compute island is what real certification paths look like. Our ROS-free core library could run on such a partition |
+| [`polymathrobotics/protective-stop`](https://github.com/polymathrobotics/protective-stop) | Open-hardware deadman / protective-stop remote (ESP32) with a public SIL 3 / PL e safety case | Complementary: an operator intent channel, not a motion safety layer. Member of the Open Source Safety Consortium — evidence of demand for open safety work |
+| [OpenAMR safety package](https://github.com/openAMRobot/openamr-platform-sw) | Open AMR platform with concept-phase safety case / FMEA / requirements docs | Platform-specific engineering record rather than a reusable library; comparable documentation rigor |
+| [`sick_safetyscanners2`](https://github.com/SICKAG/sick_safetyscanners2) · [`psen_scan_v2`](https://github.com/PilzDE/psen_scan_v2) | ROS 2 drivers for certified safety laser scanners (PL d / SIL 2, IEC 61496) | Complementary — the certified sensor channel. Our envelope can consume their scans while an independent safety PLC remains the authority |
+| [EasyNav](https://github.com/EasyNavigation/EasyNavigation) | Nav2-alternative stack with an explicit "we are not the safety channel" boundary | Philosophically adjacent: it delegates all safety functions to certified hardware and provides only reflex braking; we provide the disciplined defense-in-depth layer in between |
+| [`SOTERonROS`](https://github.com/Drona-Org/SOTERonROS) | Academic runtime-assurance (Simplex) framework | Research-grade, ROS 1, dormant |
+| eProsima [Safe DDS](https://www.eprosima.com/middleware/safe-dds) | ISO 26262 ASIL-D certified DDS middleware | Proprietary, not open source — relevant if a deployment needs certified comms; interoperates with ROS 2 |
+| Single-purpose e-stop/teleop nodes ([`twist_mux`](https://github.com/ros-teleop/twist_mux), ad-hoc estop multiplexers, teleop safety nodes) | Command arbitration, deadman timeouts, velocity clamps | Single-purpose; `safety_drive_bridge_node` covers their role plus command-freshness watchdog and jerk-limited stop profiles |
+
+**In short:** no open-source project today combines this scope in one package.
+The differentiation is engineering discipline — allocation-free `noexcept` core,
+enforced static-analysis ratchet, coverage/fuzz/timing gates — plus
+safety-case-as-code under `markdown/docs/safety_case/`, not novel algorithms.
+
 ## Requirements
 
 ### For Library Development
 - CMake 3.20+
 - C++20 compiler (GCC 12+ or Clang 15+)
-- Optional: ROS 2 Humble/Iron (for ament integration)
+- Ninja (only if using `cmake --preset ...`; the manual `cmake -S . -B build` flow uses Make)
+- Optional: ROS 2 Jazzy (for ament integration)
 
 ### For Docker Demo (Recommended)
 - Docker Engine 20.10+
@@ -159,10 +196,14 @@ safety-autonomy-core/
 │   └── system/                #   Context factory, system context
 ├── src/                       # Implementations
 ├── tests/                     # Unit and property tests
+├── benchmarks/                # Timing-evidence benchmarks (safety_core_benchmarks)
+├── fuzz/                      # libFuzzer harnesses (env loader, filters)
 ├── examples/                  # Demo applications
 │   └── agv_safety_demo.cpp    #   Full AGV safety pipeline demonstration
 ├── tools/                     # Developer tooling
-│   └── dev/run_quality_gate.sh
+│   ├── ci/                    #   CI gates (static analysis ratchet, SBOM, demo validation)
+│   ├── dev/run_quality_gate.sh
+│   └── safety/                #   Safety-case verification (policy, artifacts, traceability)
 ├── markdown/                  # Documentation and safety case artifacts
 │   └── docs/                  #   Documentation
 │       ├── DOCKER.md          #   Complete Docker deployment guide
@@ -177,9 +218,11 @@ safety-autonomy-core/
 ├── Makefile                   # Docker convenience commands
 ├── setup_demo.sh              # ROS 2 demo build + launch script (Docker-first)
 ├── README.md                  # Project documentation
+├── DEMO_GUIDE.md              # Demo modes and usage guide
+├── DEMO_TROUBLESHOOTING.md    # Demo troubleshooting guide
 ├── CHANGELOG.md               # Version history
 ├── CONTRIBUTING.md            # Contribution guidelines
-├── LICENSE                    # Commercial license terms
+├── LICENSE                    # MIT license terms
 ├── CMakeLists.txt             # Build system
 ├── CMakePresets.json          # Dev/safety/coverage presets
 ├── .clang-format              # Code style
@@ -195,7 +238,14 @@ safety-autonomy-core/
 | `SAFETY_CORE_ENABLE_SANITIZERS` | `ON` | Address/UB sanitizers for dev builds |
 | `SAFETY_CORE_ENABLE_WERROR` | `ON` | Treat warnings as errors |
 | `SAFETY_CORE_ENABLE_COVERAGE` | `OFF` | GCC coverage instrumentation |
+| `SAFETY_CORE_ENABLE_FUZZING` | `OFF` | libFuzzer harnesses (requires Clang) |
 | `SAFETY_CORE_ENABLE_AMENT` | `OFF` | ROS 2 ament_cmake integration |
+
+Additional build targets: `safety_core_certifiable` (same sources under
+`-fno-exceptions -fno-rtti`, see
+`markdown/docs/safety_case/certifiable_partition.md`) and
+`safety_core_benchmarks` (timing evidence, see
+`markdown/docs/safety_case/timing_evidence.md`).
 
 ## Build Presets
 
@@ -333,7 +383,7 @@ Deterministic escalation pipeline:
 Normal → Warning → Degraded → SafeStop (Critical)
 ```
 
-Monitors: localization age, diagnostic drop rate, obstacle proximity. Each monitor independently triggers escalation through the supervisor.
+Monitors: localization age, diagnostic drop rate, obstacle proximity. Each monitor independently triggers escalation through the supervisor. The ROS 2 layer adds stream-level watchdogs (scan/odom/envelope staleness) on top — see [`ros2/README.md`](ros2/README.md).
 
 ### Multi-Zone Safety Envelope
 
@@ -366,7 +416,7 @@ executor.set_catch_up_policy(exec::CatchUpPolicy::BoundedCatchUp, 2U);
 Fixed-capacity, zero-allocation event transport:
 
 ```
-pid.localization_stale    pid.output
+pid.localization_stale    pid.invalid_input    pid.output
 executor.task_added       executor.deadline_miss
 safety.monitor_warning    safety.safestop_forced
 health.beacon             config.migration
@@ -374,7 +424,7 @@ health.beacon             config.migration
 
 ## Testing
 
-19 test executables covering:
+**Library:** 19 test executables covering:
 
 - State machine transitions and fault latching
 - PID controller boundaries, anti-windup, feedforward
@@ -388,10 +438,30 @@ health.beacon             config.migration
 - Fault injection (backward clock, NaN bursts, transport drops)
 - No-allocation policy verification (symbol-level guards)
 - Diagnostic truncation observability
+- Deterministic property tests (fixed-seed PRNG; finite outputs, bounded commands, monotonic zone severity, crash-free parsing)
+- Coverage-gap regression tests (config error paths, filter dt branches, migration versions, zone classification)
+
+**ROS 2 layer** (`ros2/src/*/test`, run by the `ros2_tests` CI job via `colcon test`):
+
+- `test_safety_scenario.cpp` — 9 scenario tests covering the end-to-end fail-safe chain: clear drive, protective hold, pop-up obstacle → latched SafeStop, stale scan stamp → EMERGENCY, scan-stream loss → SafeStop, envelope-node loss → fault `0xE002`, stale/missing odometry chains
+- ROS bridges and param/QoS/time/math utilities, envelope-node suite, `IsSafe` BT condition, message interfaces, launch-file and sim-asset validation
 
 Run all tests:
 ```bash
 ctest --test-dir build --output-on-failure
+```
+
+Additional verification targets:
+
+```bash
+# libFuzzer harnesses (requires Clang)
+cmake -S . -B build-fuzz -DSAFETY_CORE_ENABLE_FUZZING=ON
+cmake --build build-fuzz --target fuzz_env_loader fuzz_filters
+./build-fuzz/fuzz_filters -max_total_time=60
+
+# Timing-evidence benchmarks (also registered as a ctest)
+cmake --build build --target safety_core_benchmarks
+./build/safety_core_benchmarks --iterations 50000 --json
 ```
 
 ## Quality Gate
@@ -426,13 +496,19 @@ GitHub Actions workflows live under [`.github/workflows/`](.github/workflows/):
 | Stage | Job | Description |
 |-------|-----|-------------|
 | Lint | `format_check` | clang-format guard |
-| Lint | `clang_tidy` | Static analysis (currently `continue-on-error` while pre-existing findings are cleaned up) |
+| Lint | `clang_tidy` | Static analysis ratchet — fails on new findings vs `tools/ci/baselines/static_analysis_baseline.txt` |
 | Lint | `hook_smoke` | Pre-commit hook validation |
 | Policy | `policy_guard` | Banned API checks (exceptions, dynamic alloc, abort) |
-| Policy | `safety_case_guard` | Safety artifact presence verification |
+| Policy | `safety_case_guard` | Safety artifact presence + hazard→test traceability (`tools/safety/verify_traceability.py`) |
 | Build | `build_and_test` | CMake build + ctest (sanitizers enabled) |
-| Coverage | `coverage` | gcovr gate (line: 80%, branch: 55%) |
+| Coverage | `coverage` | gcovr gate (line: 80%, branch: 70%) |
+| Fuzz | `fuzz_smoke` | libFuzzer short campaigns (`fuzz_env_loader`, `fuzz_filters`) |
+| Timing | `benchmarks` | `safety_core_benchmarks` budget gate + JSON timing evidence artifact |
+| Certifiable | `certifiable_build` | `safety_core_certifiable` build + no-exception/RTTI symbol check |
+| Supply chain | `sbom` | Software bill of materials via `tools/ci/generate_sbom.sh` |
 | ROS 2 | `docker_build` | Docker Compose build of ROS 2 packages (Jazzy + Gazebo + Nav2) |
+|| ROS 2 | `demo_tests` | Launch + demo validation in the built image (`tools/ci/validate_demo.sh`) |
+|| ROS 2 | `ros2_tests` | `colcon test` in the built image — incl. `test_safety_scenario` fail-safe suite |
 
 ## Release Process
 
@@ -462,9 +538,9 @@ MISRA/AUTOSAR-inspired rules for safety-critical code:
 The project implements MISRA-like coding standards for safety-critical robotics systems. Current status:
 
 **Static Analysis:**
-- **cppcheck**: MISRA-like rules with 161 active checkers (non-blocking baseline)
-- **clang-tidy**: Extended checks for bugprone, cppcoreguidelines, performance, and readability
-- **CI Job**: `clang_tidy` runs both tools for comprehensive analysis
+- **cppcheck**: MISRA-like rules via `--enable=all`, blocking through a checked-in baseline ratchet (`tools/ci/static_analysis_gate.sh` fails on *new* findings)
+- **clang-tidy**: Extended checks for bugprone, cppcoreguidelines, performance, and readability (same ratchet gate)
+- **CI Job**: `clang_tidy` runs the ratchet gate against `tools/ci/baselines/static_analysis_baseline.txt`; shrink the baseline locally with `--update`
 
 **Documentation:**
 - **Commercial Tools Guide**: Comprehensive documentation for Coverity, QAC, Helix QAC, and PCLint
@@ -514,6 +590,6 @@ MIT License - see [LICENSE](LICENSE) file for details.
 - ✅ No warranty or liability included
 - ✅ Community-driven development
 
-**Future Considerations:** Commercial licensing and services may be offered in the future to support enterprise deployments, certification support, and enhanced services. See [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md) for details on potential future commercial offerings.
+**Future Considerations:** Commercial licensing and services may be offered in the future to support enterprise deployments, certification support, and enhanced services.
 
 Copyright (c) 2026 RedEarth OS

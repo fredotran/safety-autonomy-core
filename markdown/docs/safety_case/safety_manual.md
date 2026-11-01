@@ -19,11 +19,23 @@ This document provides integration constraints for using `safety_autonomy_core` 
 - Clock sample progression (`observe_clock_sample`).
 - Localization freshness (`observe_localization_age`).
 - Diagnostic drop counts (`observe_transport_drop_count`).
+- Sensor stream staleness (ROS 2 layer): scan watchdog (`scan_timeout_s` → EMERGENCY zone), odometry freshness (`odom_timeout_s` → conservative max-speed fallback), envelope-status monitor (`envelope_timeout_s` → fault `0xE002`). Streams that never produce data count as stale from node startup (grace period applies where configured).
 
-## 5. Verification Expectations
+## 5. Safety Fault Codes
+Latched fault codes carried by `ModeStateMachine::fault_code()` and published on `safety/state`:
+
+| Code | Source | Meaning | Latched response |
+|---|---|---|---|
+| `0x03E9` (1001) | SafetySupervisor | Platform clock moved backwards | Critical monitor event → fault latch + SafeStop |
+| `0x03EA` (1002) | SafetySupervisor | Localization age exceeded `localization_timeout_s` (never-received odometry ages from node startup) | Critical monitor event → fault latch + SafeStop |
+| `0x03EB` (1003) | SafetySupervisor | Diagnostic transport drop count exceeded | Warning → Critical escalation → fault latch + SafeStop |
+| `0xE001` | SafetySupervisorNode | Safety envelope reported Emergency zone | Fault latch + SafeStop command publish |
+| `0xE002` | SafetySupervisorNode | `safety/envelope_status` stream stale or lost (`envelope_timeout_s`) | Fault latch + SafeStop command publish |
+
+## 6. Verification Expectations
 - Unit and integration tests must pass in CI.
 - Fault-injection tests must be included in release qualification.
 - Safety-case documents must be updated with requirement and risk deltas.
 
-## 6. Out-of-Scope
+## 7. Out-of-Scope
 This library does not by itself constitute ISO 3691 certification. Vehicle-level controls, sensing, braking performance validation, and operational procedures remain required at system level.
