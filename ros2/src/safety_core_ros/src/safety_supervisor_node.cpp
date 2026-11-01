@@ -489,7 +489,7 @@ namespace safety_core_ros
         msg.header.frame_id     = "base_link";
         msg.mode                = static_cast<std::uint8_t>(current_mode);
         msg.fault_latched       = machine_->fault_latched();
-        msg.fault_code          = 0U; // Library does not currently expose code
+        msg.fault_code          = machine_->fault_code();
         msg.zone.zone           = static_cast<std::uint8_t>(latest_zone_);
         msg.safe_stop_requested = safe_stop_requested_ || (current_mode == Mode::SafeStop);
         return msg;
