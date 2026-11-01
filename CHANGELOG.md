@@ -169,6 +169,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Enhanced SLAM Configurations**: Warehouse-optimized SLAM parameters with extended loop closure parameters
 - **Environment-Specific Parameter Presets**: Optimized configurations for outdoor, indoor, and warehouse scenarios
 - **Enhanced Localization Monitor**: Kidnapping detection, localization confidence scoring, TF tree consistency monitoring
+- **Safety Hardening & Evidence Infrastructure** (see `markdown/docs/IMPROVEMENT_PLAN.md`):
+  - Sensor staleness fail-safe chain: scan timestamp/stream watchdog (`scan_timeout_s`), envelope-status monitor (`envelope_timeout_s`, fault `0xE004`), odometry freshness (`odom_timeout_s`) with conservative max-speed fallback and boot-time missing-odom escalation to `LocalizationLost`
+  - NaN/Inf input guards on `safety_pid` and `alpha_beta_filter` (permanent state-poisoning fix)
+  - Atomic `ModeStateMachine::fault_code()` propagation to ROS `SafetyState` messages (codes `0xE001`/`0xE004`/`1001-1003`)
+  - libFuzzer harnesses, property tests, WCET benchmarks (critical→SafeStop p99 ~437 ns), branch-coverage gate raised to 70
+  - `safety_core_certifiable` target compiling the same sources under `-fno-exceptions -fno-rtti -Werror`; dead Eigen3 dependency removed
+  - ROS 2 scenario regression suite (9 tests, obstacle→SafeStop ~50 ms) gated by new `ros2_tests` CI job running `colcon test`
+  - Safety-case docs: HIL strategy, MISRA status, timing evidence, certifiable partition, dependency locks, fault-code registry
+- **Setup Demo Script**: `setup_demo.sh` convenience script at repository root for automated ROS 2 workspace build and launch with interactive menu.
+- **LICENSE File**: MIT license (see [LICENSE](LICENSE)).
+- **ROS 2 wrapper workspace** (`ros2/`): full ROS 2 Jazzy integration with five new packages.
+  - `safety_core_msgs`: ROS 2 message definitions (`SafetyState`, `SafetyZone`, `EnvelopeStatus`, `DiagnosticEvent`, `MonitorEvent`).
+  - `safety_core_ros`: wrapper nodes -- `safety_envelope_node` (lidar → zone classification), `safety_supervisor_node` (state machine + supervisor), `safety_drive_bridge_node` (Nav2 → /cmd_vel gating with jerk-limited stop and freshness watchdog).
+  - `safety_core_nav2`: Nav2 behavior-tree plugin (`IsSafe` condition node) for gating motion behind safety state.
+  - `safety_core_sim`: Gazebo Harmonic AGV (URDF xacro: diff drive + 360° lidar + IMU), self-contained industrial warehouse SDF (shelves, pallets, forklift, animated worker), `ros_gz_bridge` config, sim-only launch.
+  - `safety_core_bringup`: top-level launch (Gazebo + Nav2 + SLAM Toolbox + RViz), Nav2 params (MPPI controller, collision_monitor zones), SLAM Toolbox params, RViz config.
+- **rclcpp adapters** for safety_core abstractions: `RosClock`, `RosDiagnosticTransport`, `RosHealthMonitor`.
+- **PID Anti-Windup**: Integral clamping with configurable `max_integral` limit and back-calculation anti-windup when output saturates.
+- **PID Feedforward**: New `compute(setpoint, measurement, ff_velocity, ff_acceleration)` overload for trajectory tracking with velocity/acceleration feedforward terms.
+- **Drive Command Freshness Watchdog**: `is_command_fresh(now_ns, max_age_ns)` on `DriveActuator` interface for detecting stale commands; `command_count()` on `BufferedDriveActuator`.
+- **Thread-Safe State Machine**: `mode_` and `latched_fault_` converted to `std::atomic` with appropriate memory ordering (acquire/release) for lock-free concurrent reads.
+- **Timestamped Filter Updates**: All three filters (BoundedEKF, complementary, alpha-beta) accept explicit `timestamp_ns` parameters and compute actual dt from consecutive samples.
+- **Innovation Gating (Mahalanobis)**: BoundedEKF rejects measurements where `innovation^2 / S > gate_sigma^2` (default 3-sigma). Exposes `rejected_count()` for observability.
+- **6-DOF IMU Sample**: `ImuSample` expanded with 3-axis angular velocity and 3-axis linear acceleration fields.
+- **Multi-Zone Safety Envelope**: `SafetyZone` enum (Clear/Warning/Protective/Emergency) with `ZoneThresholds`, `RobotFootprint` geometry, and `evaluate_safety_zone()` function returning zone classification + effective clearance.
+- **Jerk-Limited Emergency Stop**: `generate_jerk_limited_stop_profile()` produces S-curve deceleration profiles (ramp-up/hold/ramp-down jerk phases) for smoother stops.
+- **Complementary Filter Cutoff Frequency**: Optional `cutoff_frequency_hz` parameter auto-derives alpha from `1 / (1 + 2*pi*fc*dt)`, replacing manual alpha tuning.
+- **AGV Safety Demo**: `examples/agv_safety_demo.cpp` demonstrating the full pipeline -- sensor fusion, PID control, multi-zone envelope, state transitions, and emergency stop.
+- **Production Improvements Tests**: 15 new test cases covering all above features.
+- **Safety-Critical Code Improvements**:
+  - Atomic mode transitions using compare-and-swap to prevent race conditions
+  - Enhanced integer overflow checks in time arithmetic with period validation
+  - Null pointer caching in safety supervisor to prevent TOCTOU vulnerabilities
+  - Floating-point parameter validation in bounded_ekf_filter
+  - Comprehensive configuration validation with safety limits
+  - Explicit bounds checking in task_executor array operations
+  - Magic number replacement with named constants
 
 ### Changed
 - **CI Pipeline**: Consolidated static analysis into single `clang_tidy` job with cppcheck integration, removed redundant `misra_like_analysis` job.

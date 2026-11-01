@@ -125,7 +125,7 @@ The setup script now provides 4 launch options:
    - RViz fixed frame is `base_link` (robot-centric view)
    - Nav2 provides path planning and control
    - No SLAM or AMCL (pure odometry)
-   - To enable SLAM: `ros2 launch safety_core_bringup agv_warehouse.launch.py slam:=true`
+   - To enable SLAM: `ros2 launch safety_core_bringup agv_warehouse.launch.py environment:=indoor`
 2. **Safety stack + Simulation** (Gazebo + Safety Nodes + RViz) - Recommended for testing
 3. **Safety stack only** (no simulation, for physical robot)
 4. **Simulation only** (Gazebo only)
@@ -481,9 +481,9 @@ The demo runs in real-time with the following characteristics:
 
 After completing the comprehensive demo:
 
-1. **Test with Nav2**: Enable autonomous navigation
+1. **Test with Nav2**: Autonomous navigation runs by default in the full demo
    ```bash
-   ros2 launch safety_core_bringup agv_warehouse.launch.py nav2:=true
+   ros2 launch safety_core_bringup agv_warehouse.launch.py
    ```
 
 2. **Custom Scenarios**: Modify the demo script for your use case
