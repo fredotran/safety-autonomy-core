@@ -5,6 +5,7 @@
 #include <iostream>
 #include <string>
 
+// @req SR-CONFIG-001
 namespace
 {
     using safety_core::test_support::check;

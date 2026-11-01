@@ -6,6 +6,7 @@
 #include <sstream>
 #include <string>
 
+// @req SR-DIAG-001
 namespace
 {
     using safety_core::test_support::check;

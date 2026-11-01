@@ -65,8 +65,10 @@ namespace safety_core::sm
 
     Result ModeStateMachine::latch_fault(std::uint16_t fault_code) noexcept
     {
+        // Publish the code BEFORE the flag: an observer that sees
+        // latched_fault_==true (acquire) must also see the matching code.
+        fault_code_.store(fault_code, std::memory_order_relaxed);
         latched_fault_.store(true, std::memory_order_release);
-        fault_code_ = fault_code;
         mode_.store(Mode::SafeStop, std::memory_order_release);
         notify_fault(fault_code);
         return Result::Fault("fault latched");
@@ -80,7 +82,7 @@ namespace safety_core::sm
         }
 
         latched_fault_.store(false, std::memory_order_release);
-        fault_code_ = 0U;
+        fault_code_.store(0U, std::memory_order_relaxed);
 
         // Atomic transition to Idle mode after clearing fault
         Mode prev = mode_.load(std::memory_order_acquire);

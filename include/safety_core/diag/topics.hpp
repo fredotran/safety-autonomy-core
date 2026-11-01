@@ -14,6 +14,7 @@ namespace safety_core::diag::topic
     constexpr std::string_view kFaultLatched   = "fault_latched";
 
     constexpr std::string_view kPidLocalizationStale = "pid.localization_stale";
+    constexpr std::string_view kPidInvalidInput      = "pid.invalid_input";
     constexpr std::string_view kPidOutput            = "pid.output";
 
     constexpr std::string_view kExecutorTaskAdded        = "executor.task_added";

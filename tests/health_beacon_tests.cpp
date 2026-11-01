@@ -7,6 +7,7 @@
 #include <iostream>
 #include <string_view>
 
+// @req SR-DIAG-002
 namespace
 {
     using safety_core::test_support::check;

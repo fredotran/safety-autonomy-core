@@ -52,6 +52,7 @@ namespace safety_core::filters
 
       private:
         [[nodiscard]] double dt_seconds() const noexcept;
+        void recover_if_diverged() noexcept;
 
         const config::SystemConfig* config_{nullptr};
         AlphaBetaParams params_{};

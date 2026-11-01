@@ -4,22 +4,32 @@
 #include "safety_core/filters/alpha_beta_filter.hpp"
 
 #include <chrono>
+#include <cmath>
 
 namespace safety_core::filters
 {
 
     double AlphaBetaFilter::update(double measurement) noexcept
     {
+        if (!std::isfinite(measurement))
+        {
+            return position_;
+        }
         const double dt         = dt_seconds();
         const double prediction = position_ + (velocity_ * dt);
         const double residual   = measurement - prediction;
         position_               = prediction + (params_.alpha * residual);
         velocity_               = velocity_ + ((params_.beta / dt) * residual);
+        recover_if_diverged();
         return position_;
     }
 
     double AlphaBetaFilter::update(double measurement, std::uint64_t timestamp_ns) noexcept
     {
+        if (!std::isfinite(measurement))
+        {
+            return position_;
+        }
         double dt = dt_seconds();
         if (last_timestamp_ns_ > 0U && timestamp_ns > last_timestamp_ns_)
         {
@@ -36,7 +46,20 @@ namespace safety_core::filters
         const double residual   = measurement - prediction;
         position_               = prediction + (params_.alpha * residual);
         velocity_               = velocity_ + ((params_.beta / dt) * residual);
+        recover_if_diverged();
         return position_;
+    }
+
+    void AlphaBetaFilter::recover_if_diverged() noexcept
+    {
+        // A single bad measurement (or an absurd dt) can push the state to
+        // NaN/Inf. Without recovery the state stays NaN forever — reset to a
+        // known-safe origin so the next valid sample restarts cleanly.
+        if (!std::isfinite(position_) || !std::isfinite(velocity_))
+        {
+            position_ = 0.0;
+            velocity_ = 0.0;
+        }
     }
 
     double AlphaBetaFilter::dt_seconds() const noexcept
