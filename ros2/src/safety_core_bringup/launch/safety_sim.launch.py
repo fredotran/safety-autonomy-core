@@ -5,8 +5,9 @@ Useful for:
     without paying the Nav2 / SLAM startup cost.
   * Visually validating the safety zones in RViz with /scan, /odom, and /tf only.
 
-Equivalent to ``agv_warehouse.launch.py nav2:=false slam:=false rviz:=true`` but
-with a leaner RViz config (``safety_simple.rviz``) and shorter startup.
+Equivalent to the sim + safety-stack subset of ``agv_warehouse.launch.py`` (no
+Nav2, no SLAM, no localization stack) but with a leaner RViz config
+(``safety_simple.rviz``) and shorter startup.
 """
 
 import os

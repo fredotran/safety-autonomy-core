@@ -19,8 +19,10 @@ namespace safety_core_ros
     {
         // Load parameters
         params_.localization_timeout_s     = ParamLoader::load_double(this, "localization_timeout_s", 0.5);
+        params_.envelope_timeout_s         = ParamLoader::load_double(this, "envelope_timeout_s", 1.0);
         params_.auto_recover_from_obstacle = ParamLoader::load_bool(this, "auto_recover_from_obstacle", true);
         localization_timeout_ns_           = TimeUtils::seconds_to_nanoseconds(params_.localization_timeout_s);
+        envelope_timeout_ns_               = TimeUtils::seconds_to_nanoseconds(params_.envelope_timeout_s);
 
         // Create ROS interfaces with standardized QoS
         diag_pub_ =
@@ -69,6 +71,10 @@ namespace safety_core_ros
         // Initialize in Idle state
         (void)machine_->transition_to(Mode::Idle);
 
+        // Baseline for "odometry never received" staleness — a dead-from-boot
+        // encoder/driver must escalate like a frozen one.
+        startup_time_ns_ = now_ns();
+
         RCLCPP_INFO(get_logger(), "safety_supervisor_node initialized | localization_timeout=%.3fs",
                     params_.localization_timeout_s);
     }
@@ -87,6 +93,12 @@ namespace safety_core_ros
 
     void SafetySupervisorNode::on_envelope(const safety_core_msgs::msg::EnvelopeStatus::ConstSharedPtr msg)
     {
+        // Track status-stream freshness from the carried stamp — the envelope
+        // node forwards the source scan's stamp, so this measures the actual
+        // data age, not just relay liveness.
+        last_envelope_time_ns_ = static_cast<std::uint64_t>(msg->header.stamp.sec) * 1'000'000'000ULL +
+                                 static_cast<std::uint64_t>(msg->header.stamp.nanosec);
+
         latest_zone_            = static_cast<SafetyZone>(msg->zone.zone);
         const Mode current_mode = machine_->mode();
 
@@ -138,37 +150,60 @@ namespace safety_core_ros
 
     void SafetySupervisorNode::timer_tick()
     {
-        // Cache current time and mode to avoid repeated calls
+        // Cache current time to avoid repeated calls
         const std::uint64_t current_time_ns = now_ns();
-        const Mode current_mode             = machine_->mode();
 
         // Check localization staleness
         check_localization_staleness();
 
+        // Check envelope status stream staleness (covers a dead envelope node)
+        check_envelope_staleness();
+
         // Observe clock sample
         (void)supervisor_->observe_clock_sample(current_time_ns);
 
-        // Publish current state
-        publish_state(current_mode);
+        // Publish current state — re-read the mode: staleness checks above may
+        // have transitioned/latched it this tick; publishing the cached value
+        // would emit an inconsistent SafetyState (fault latched + stale mode).
+        publish_state(machine_->mode());
     }
 
     void SafetySupervisorNode::check_localization_staleness()
     {
-        if (!last_odom_time_ns_.has_value())
-        {
-            return; // No odometry received yet
-        }
-
         const std::uint64_t current_time_ns = now_ns();
-        const std::uint64_t age_ns          = TimeUtils::calculate_age_ns(last_odom_time_ns_.value(), current_time_ns);
+
+        // Reference: last odom stamp, else node start — odometry that never
+        // arrived is stale-by-definition once the timeout elapses.
+        const std::uint64_t ref_ns = last_odom_time_ns_.value_or(startup_time_ns_);
+        const std::uint64_t age_ns = TimeUtils::calculate_age_ns(ref_ns, current_time_ns);
 
         (void)supervisor_->observe_localization_age(age_ns, localization_timeout_ns_);
 
         const Mode current_mode = machine_->mode();
-        if (TimeUtils::is_stale(last_odom_time_ns_.value(), current_time_ns, localization_timeout_ns_) &&
+        if (TimeUtils::is_stale(ref_ns, current_time_ns, localization_timeout_ns_) &&
             current_mode != Mode::LocalizationLost && current_mode != Mode::SafeStop)
         {
             (void)machine_->report_localization_lost();
+        }
+    }
+
+    void SafetySupervisorNode::check_envelope_staleness()
+    {
+        if (!last_envelope_time_ns_.has_value())
+        {
+            return; // No envelope status received yet
+        }
+
+        const std::uint64_t current_time_ns = now_ns();
+        const Mode current_mode             = machine_->mode();
+        if (TimeUtils::is_stale(last_envelope_time_ns_.value(), current_time_ns, envelope_timeout_ns_) &&
+            current_mode != Mode::SafeStop)
+        {
+            // Fault code 0xE002 == "envelope status stream stale" — the safety
+            // sensor pipeline is silent; stop and require operator clear.
+            (void)machine_->latch_fault(0xE002U);
+            (void)machine_->transition_to(Mode::SafeStop);
+            safe_stop_requested_ = true;
         }
     }
 
@@ -179,7 +214,7 @@ namespace safety_core_ros
         msg.header.frame_id     = "base_link";
         msg.mode                = static_cast<std::uint8_t>(current_mode);
         msg.fault_latched       = machine_->fault_latched();
-        msg.fault_code          = 0U; // Library does not currently expose code
+        msg.fault_code          = machine_->fault_code();
         msg.zone.zone           = static_cast<std::uint8_t>(latest_zone_);
         msg.safe_stop_requested = safe_stop_requested_ || (current_mode == Mode::SafeStop);
         return msg;

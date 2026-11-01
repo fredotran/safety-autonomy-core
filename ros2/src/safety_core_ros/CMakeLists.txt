@@ -15,8 +15,11 @@ endif()
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 
-  # Performance optimizations
-  add_compile_options(-O3 -march=native -ffast-math)
+  # Performance optimizations. NOTE: no -ffast-math — it implies
+  # -ffinite-math-only which turns std::isfinite()/isnan() into constant-folded
+  # stubs and silently disables the wrapper's NaN/Inf guards (e.g. a lost
+  # LiDAR would publish CLEAR instead of WARNING).
+  add_compile_options(-O3 -march=native)
 
   # Link-time optimization
   add_link_options(-flto)
@@ -130,6 +133,64 @@ add_executable(teleop_node
 target_include_directories(teleop_node PRIVATE include)
 ament_target_dependencies(teleop_node
   rclcpp geometry_msgs std_msgs)
+
+# ----------------------------------------------------------------------------
+# Tests
+# ----------------------------------------------------------------------------
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+
+  # Header-only utilities (no rclcpp context needed)
+  ament_add_gtest(test_math_utils test/test_math_utils.cpp)
+  target_include_directories(test_math_utils PRIVATE include)
+
+  ament_add_gtest(test_time_utils test/test_time_utils.cpp)
+  target_include_directories(test_time_utils PRIVATE include)
+  ament_target_dependencies(test_time_utils rclcpp)
+
+  ament_add_gtest(test_param_loader test/test_param_loader.cpp)
+  target_include_directories(test_param_loader PRIVATE include)
+  ament_target_dependencies(test_param_loader rclcpp)
+
+  ament_add_gtest(test_qos_config test/test_qos_config.cpp)
+  target_include_directories(test_qos_config PRIVATE include)
+  ament_target_dependencies(test_qos_config rclcpp)
+
+  # rclcpp <-> safety_core bridge adapters
+  ament_add_gtest(test_ros_bridges test/test_ros_bridges.cpp)
+  target_include_directories(test_ros_bridges PRIVATE include)
+  target_link_libraries(test_ros_bridges
+    safety_core_ros_bridges
+    ${SAFETY_CORE_TARGET})
+  ament_target_dependencies(test_ros_bridges
+    rclcpp safety_core_msgs)
+
+  # Full node integration: LaserScan/Odometry in -> EnvelopeStatus out
+  ament_add_gtest(test_safety_envelope_node
+    test/test_safety_envelope_node.cpp
+    src/safety_envelope_node.cpp)
+  target_include_directories(test_safety_envelope_node PRIVATE include)
+  target_link_libraries(test_safety_envelope_node
+    safety_core_ros_bridges
+    ${SAFETY_CORE_TARGET})
+  ament_target_dependencies(test_safety_envelope_node
+    rclcpp sensor_msgs nav_msgs geometry_msgs visualization_msgs
+    std_msgs tf2 tf2_ros safety_core_msgs)
+
+  # End-to-end scenario regression: envelope + supervisor nodes, synthetic
+  # sensor traffic, asserted SafeStop escalation deadlines.
+  ament_add_gtest(test_safety_scenario
+    test/test_safety_scenario.cpp
+    src/safety_envelope_node.cpp
+    src/safety_supervisor_node.cpp)
+  target_include_directories(test_safety_scenario PRIVATE include)
+  target_link_libraries(test_safety_scenario
+    safety_core_ros_bridges
+    ${SAFETY_CORE_TARGET})
+  ament_target_dependencies(test_safety_scenario
+    rclcpp sensor_msgs nav_msgs geometry_msgs visualization_msgs
+    std_msgs std_srvs tf2 tf2_ros safety_core_msgs)
+endif()
 
 # ----------------------------------------------------------------------------
 # Install

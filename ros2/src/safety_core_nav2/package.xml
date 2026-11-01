@@ -17,6 +17,8 @@
   <depend>nav2_behavior_tree</depend>
   <depend>safety_core_msgs</depend>
 
+  <test_depend>ament_cmake_gtest</test_depend>
+
   <export>
     <build_type>ament_cmake</build_type>
     <nav2_behavior_tree plugin="${prefix}/safety_core_nav2_bt_plugins.xml"/>

@@ -34,6 +34,14 @@ namespace safety_core_ros
 
         // Initialize startup time for grace period
         startup_time_ = get_clock()->now();
+        last_scan_time_ns_.store(startup_time_.nanoseconds(), std::memory_order_relaxed);
+
+        // Watchdog: detects a frozen or silent scan stream even when no
+        // callback fires. Period is bounded by the configured timeout.
+        const auto watchdog_period =
+            std::chrono::milliseconds(std::max(20, static_cast<int>(params_.scan_timeout_s * 1000.0 / 4.0)));
+        watchdog_timer_ =
+            create_wall_timer(watchdog_period, std::bind(&SafetyEnvelopeNode::check_scan_staleness, this));
 
         RCLCPP_INFO(get_logger(),
                     "safety_envelope_node up | footprint=%.2fx%.2fm overhang=%.2fm | "
@@ -68,6 +76,8 @@ namespace safety_core_ros
         params_.scan_min_valid_range_m  = ParamLoader::load_double(this, "scan_min_valid_range_m", 0.05);
         params_.scan_ignore_min_range_m = ParamLoader::load_double(this, "scan_ignore_min_range_m", 0.5);
         params_.startup_grace_period_s  = ParamLoader::load_double(this, "startup_grace_period_s", 2.0);
+        params_.scan_timeout_s          = ParamLoader::load_double(this, "scan_timeout_s", 0.5);
+        params_.odom_timeout_s          = ParamLoader::load_double(this, "odom_timeout_s", 0.5);
         params_.base_frame              = ParamLoader::load_string(this, "base_frame", "base_link");
     }
 
@@ -75,14 +85,92 @@ namespace safety_core_ros
     {
         // Store forward velocity (magnitude_safe = max(0, vx))
         latest_speed_mps_.store(msg->twist.twist.linear.x, std::memory_order_relaxed);
+        last_odom_time_ns_.store(get_clock()->now().nanoseconds(), std::memory_order_relaxed);
+        has_odom_.store(true, std::memory_order_relaxed);
+    }
+
+    double SafetyEnvelopeNode::effective_speed_mps(const rclcpp::Time& now) const noexcept
+    {
+        // Stream liveness is measured on receipt time — drivers that leave
+        // header.stamp at zero are handled by the supervisor's own
+        // localization staleness, not here.
+        // Never-seen odometry degrades only after startup + grace + timeout,
+        // mirroring the scan watchdog's bring-up semantics.
+        const std::int64_t ref_ns =
+            has_odom_.load(std::memory_order_relaxed)
+                ? last_odom_time_ns_.load(std::memory_order_relaxed)
+                : startup_time_.nanoseconds() + static_cast<std::int64_t>(params_.startup_grace_period_s * 1e9);
+        const double odom_age_s = static_cast<double>(now.nanoseconds() - ref_ns) / 1e9;
+        if (odom_age_s <= params_.odom_timeout_s)
+        {
+            return MathUtils::max(0.0, latest_speed_mps_.load(std::memory_order_relaxed));
+        }
+        // Stale or never-seen odometry: the true speed is unverifiable, so
+        // evaluate the envelope at worst-case speed (conservative — larger
+        // stopping distance, never an underestimate).
+        return config_.envelope.max_speed_mps;
     }
 
     void SafetyEnvelopeNode::on_scan(const sensor_msgs::msg::LaserScan::ConstSharedPtr msg)
     {
+        // Reject stale/frozen frames: a scan whose stamp is older than
+        // scan_timeout_s (or carries no stamp at all) must not be evaluated
+        // as current obstacle data — publish EMERGENCY instead.
+        const rclcpp::Time now   = get_clock()->now();
+        const rclcpp::Time stamp = msg->header.stamp;
+        if (stamp.nanoseconds() <= 0 || (now - stamp).seconds() > params_.scan_timeout_s)
+        {
+            publish_stale_status();
+            return;
+        }
+
+        last_scan_time_ns_.store(now.nanoseconds(), std::memory_order_relaxed);
+        has_scan_.store(true, std::memory_order_relaxed);
+
         // Find nearest obstacle and evaluate envelope
         const double distance_m = nearest_obstacle_in_footprint_corridor(*msg);
-        const double speed_mps  = MathUtils::max(0.0, latest_speed_mps_.load(std::memory_order_relaxed));
+        const double speed_mps  = effective_speed_mps(now);
         publish_envelope(distance_m, speed_mps, msg->header);
+    }
+
+    void SafetyEnvelopeNode::check_scan_staleness()
+    {
+        const rclcpp::Time now           = get_clock()->now();
+        const double elapsed_since_start = (now - startup_time_).seconds();
+        if (elapsed_since_start < params_.startup_grace_period_s)
+        {
+            return; // sensor is still allowed to come up
+        }
+
+        // Reference: last *fresh* scan receipt, else node start — so a
+        // never-seen sensor also degrades once the grace period elapses.
+        const std::int64_t ref_ns = has_scan_.load(std::memory_order_relaxed)
+                                        ? last_scan_time_ns_.load(std::memory_order_relaxed)
+                                        : startup_time_.nanoseconds();
+        if (static_cast<double>(now.nanoseconds() - ref_ns) / 1e9 > params_.scan_timeout_s)
+        {
+            publish_stale_status();
+        }
+    }
+
+    void SafetyEnvelopeNode::publish_stale_status()
+    {
+        safety_core_msgs::msg::EnvelopeStatus status;
+        status.header.stamp                = get_clock()->now();
+        status.header.frame_id             = params_.base_frame;
+        status.distance_to_obstacle_m      = -1.0; // Unknown — cannot verify environment
+        status.current_speed_mps           = latest_speed_mps_.load(std::memory_order_relaxed);
+        status.within_envelope             = false;
+        status.zone.zone                   = static_cast<std::uint8_t>(safety_core::safety::SafetyZone::Emergency);
+        status.stopping_distance_m         = config_.envelope.safety_buffer_m;
+        status.required_clearance_m        = config_.envelope.safety_buffer_m;
+        status.recommended_speed_limit_mps = 0.0;
+        status.footprint_length_m          = footprint_.length_m;
+        status.footprint_width_m           = footprint_.width_m;
+        status.footprint_front_overhang_m  = footprint_.front_overhang_m;
+        envelope_pub_->publish(std::move(status));
+        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000,
+                             "scan stream stale or absent — publishing EMERGENCY envelope status");
     }
 
     double

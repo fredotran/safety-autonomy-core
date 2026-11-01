@@ -50,12 +50,11 @@ def generate_launch_description():
 
     use_sim_time = LaunchConfiguration("use_sim_time")
     use_rviz = LaunchConfiguration("rviz")
-    use_slam = LaunchConfiguration("slam")
-    use_nav2 = LaunchConfiguration("nav2")
     use_ekf = LaunchConfiguration("ekf")
     use_gps = LaunchConfiguration("gps")
     nav2_controller = LaunchConfiguration("nav2_controller")
     use_teleop = LaunchConfiguration("teleop")
+    environment = LaunchConfiguration("environment")
 
     safety_params = os.path.join(pkg_bringup, "config", "safety_params.yaml")
     # Odometry-only Nav2 config (no AMCL / no map_server) for the default wheel-odometry mode.
@@ -74,10 +73,7 @@ def generate_launch_description():
 
     declare_use_sim_time = DeclareLaunchArgument("use_sim_time", default_value="true")
     declare_rviz = DeclareLaunchArgument("rviz", default_value="true")
-    # SLAM disabled by default — the demo runs in pure wheel-odometry mode.
-    declare_slam = DeclareLaunchArgument("slam", default_value="false")
-    declare_nav2 = DeclareLaunchArgument("nav2", default_value="true")
-    # EKF localization enabled by default for better odometry in outdoor/mixed environments.
+    # EKF fusion is opt-in: ekf:=true starts the robot_localization stack.
     declare_ekf = DeclareLaunchArgument("ekf", default_value="false")
     declare_gps = DeclareLaunchArgument(
         "gps",
@@ -97,20 +93,19 @@ def generate_launch_description():
     declare_environment = DeclareLaunchArgument(
         "environment",
         default_value="outdoor",
-        description="Environment type: 'outdoor' (EKF+GPS+Nav2), 'indoor' (EKF+SLAM+Nav2), 'warehouse' (EKF+Nav2, map-based)",
+        description=(
+            "Environment preset: 'outdoor' (wheel-odometry Nav2; EKF+GPS opt-in "
+            "via ekf:=true), 'indoor' (adds SLAM Toolbox), 'warehouse' "
+            "(AMCL + map_server localization, no Nav2 stack)"
+        ),
         choices=["outdoor", "indoor", "warehouse"],
     )
 
-    # Environment-specific configuration
-    # Outdoor: EKF + GPS + Nav2 (default)
-    # Indoor: EKF + SLAM + Nav2
-    # Warehouse: EKF + Nav2 with map-based navigation
-    use_ekf_env = PythonExpression([
-        ekf
-    ])
-    use_gps_env = PythonExpression([
-        "'true' if '", environment, "' == 'outdoor' else 'false'"
-    ])
+    # Environment presets drive the optional localization/navigation pieces:
+    #   outdoor   -- wheel-odometry Nav2; EKF + GPS enabled separately via ekf:=true
+    #   indoor    -- adds SLAM Toolbox (publishes map -> odom)
+    #   warehouse -- AMCL + map_server localization (Nav2 stack excluded)
+    use_ekf_env = PythonExpression(["'", use_ekf, "' == 'true'"])
     use_slam_env = PythonExpression([
         "'true' if '", environment, "' == 'indoor' else 'false'"
     ])
@@ -336,12 +331,12 @@ def generate_launch_description():
         [
             declare_use_sim_time,
             declare_rviz,
-            declare_slam,
-            declare_nav2,
             declare_ekf,
             declare_gps,
             declare_nav2_controller,
             declare_use_teleop,
+            declare_environment,
+            declare_map_file,
             sim,
             safety_stack,
             ekf_stack,
