@@ -24,7 +24,7 @@ if [[ "$COVERAGE" -eq 1 ]]; then
     cmake --build "$ROOT/build-coverage"
     ctest --test-dir "$ROOT/build-coverage" --output-on-failure
     gcovr --root "$ROOT" --filter "$ROOT/src" --filter "$ROOT/include" --exclude "$ROOT/build-coverage" \
-        --print-summary --fail-under-line 80 --fail-under-branch 55
+        --print-summary --fail-under-line 80 --fail-under-branch 70
 fi
 
 echo "[OK] quality gate passed"

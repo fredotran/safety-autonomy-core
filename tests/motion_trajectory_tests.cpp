@@ -4,6 +4,7 @@
 #include <iostream>
 #include <limits>
 
+// @req SR-MOTION-001
 namespace
 {
     using safety_core::test_support::check;

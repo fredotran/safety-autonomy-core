@@ -61,6 +61,10 @@ namespace safety_core::sm
         {
             return latched_fault_.load(std::memory_order_acquire);
         }
+        [[nodiscard]] std::uint16_t fault_code() const noexcept
+        {
+            return fault_code_.load(std::memory_order_relaxed);
+        }
 
         Result transition_to(Mode target) noexcept;
         Result latch_fault(std::uint16_t fault_code) noexcept;
@@ -80,7 +84,7 @@ namespace safety_core::sm
 
         std::atomic<Mode> mode_{Mode::Init};
         std::atomic<bool> latched_fault_{false};
-        std::uint16_t fault_code_{0U};
+        std::atomic<std::uint16_t> fault_code_{0U};
         diag::HealthMonitor* monitor_{nullptr};
         diag::DiagnosticTransport* diag_transport_{nullptr};
         platform::Clock* clock_{nullptr};

@@ -6,6 +6,7 @@ option(SAFETY_CORE_ENABLE_SANITIZERS "Enable runtime sanitizers for non-safety b
 option(SAFETY_CORE_ENABLE_WERROR "Treat compiler warnings as errors" ON)
 option(SAFETY_CORE_ENABLE_COVERAGE "Enable coverage instrumentation" OFF)
 option(SAFETY_CORE_ENABLE_SIZE_OPTIMIZATIONS "Enable size optimizations for low-resource systems (NOT for safety-critical use)" OFF)
+option(SAFETY_CORE_ENABLE_FUZZING "Build libFuzzer harnesses (requires Clang)" OFF)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -20,19 +21,12 @@ if(SAFETY_CORE_ENABLE_AMENT)
     find_package(ament_cmake REQUIRED)
 endif()
 
-# Find Eigen3
-find_package(Eigen3 QUIET)
+# NOTE: Eigen3 is intentionally NOT a dependency of safety_core. No source file
+# includes Eigen headers (verified — the previous hard requirement was dead).
+# Keeping the certifiable core free of third-party deps minimizes the
+# certification surface; see markdown/docs/safety_case/certifiable_partition.md.
 
-# Always set Eigen3 include directories (CMake package might not set them properly)
-set(EIGEN3_INCLUDE_DIR "/usr/include/eigen3" CACHE PATH "Eigen3 include directory")
-if(EXISTS ${EIGEN3_INCLUDE_DIR})
-    set(Eigen3_INCLUDE_DIRS ${EIGEN3_INCLUDE_DIR})
-    message(STATUS "Using Eigen3 include path: ${EIGEN3_INCLUDE_DIR}")
-else()
-    message(FATAL_ERROR "Eigen3 not found at ${EIGEN3_INCLUDE_DIR}. Please install Eigen3.")
-endif()
-
-add_library(safety_core STATIC
+set(SAFETY_CORE_SOURCES
     src/result.cpp
     src/common/time.cpp
     src/diagnostics/health_state.cpp
@@ -53,11 +47,12 @@ add_library(safety_core STATIC
     src/system/context_factory.cpp
 )
 
+add_library(safety_core STATIC ${SAFETY_CORE_SOURCES})
+
 target_include_directories(safety_core
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
-        ${Eigen3_INCLUDE_DIRS}
 )
 
 add_executable(safety_core_app
@@ -117,6 +112,33 @@ if(SAFETY_CORE_ENABLE_SIZE_OPTIMIZATIONS)
     endif()
 endif()
 
+# ---------------------------------------------------------------------------
+# Certifiable partition (improvement plan item 12)
+#
+# `safety_core_certifiable` compiles the exact same sources under the
+# constraints the safety case claims: no C++ exceptions, no RTTI. This turns
+# the "noexcept, deterministic" claims into compiler-enforced evidence — any
+# future source that introduces throw/catch/dynamic_cast fails THIS target.
+# It links identically to safety_core and is the boundary a future
+# certification scope would take (no ROS, no Eigen, no external deps).
+# ---------------------------------------------------------------------------
+add_library(safety_core_certifiable STATIC ${SAFETY_CORE_SOURCES})
+
+target_include_directories(safety_core_certifiable
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+)
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(safety_core_certifiable PRIVATE
+        -fno-exceptions
+        -fno-rtti
+        -Wall
+        -Wextra
+        -Wpedantic
+        -Werror
+    )
+endif()
 enable_testing()
 
 add_executable(safety_core_smoke
@@ -247,13 +269,56 @@ target_link_libraries(production_improvements_tests PRIVATE safety_core)
 
 add_test(NAME production_improvements_tests COMMAND production_improvements_tests)
 
+add_executable(coverage_gaps_tests
+    tests/coverage_gaps_tests.cpp
+)
+
+target_link_libraries(coverage_gaps_tests PRIVATE safety_core)
+
+add_test(NAME coverage_gaps_tests COMMAND coverage_gaps_tests)
+
+add_executable(property_tests
+    tests/property_tests.cpp
+)
+
+target_link_libraries(property_tests PRIVATE safety_core)
+
+add_test(NAME property_tests COMMAND property_tests)
+
+# libFuzzer harnesses (Clang only). CI runs them as short smoke campaigns;
+# longer campaigns belong in a dedicated fuzzing job.
+if(SAFETY_CORE_ENABLE_FUZZING)
+    if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        message(FATAL_ERROR "SAFETY_CORE_ENABLE_FUZZING requires Clang (-fsanitize=fuzzer)")
+    endif()
+
+    add_executable(fuzz_env_loader fuzz/fuzz_env_loader.cpp)
+    target_link_libraries(fuzz_env_loader PRIVATE safety_core)
+    target_compile_options(fuzz_env_loader PRIVATE -fsanitize=fuzzer,address,undefined -g -O1)
+    target_link_options(fuzz_env_loader PRIVATE -fsanitize=fuzzer,address,undefined)
+
+    add_executable(fuzz_filters fuzz/fuzz_filters.cpp)
+    target_link_libraries(fuzz_filters PRIVATE safety_core)
+    target_compile_options(fuzz_filters PRIVATE -fsanitize=fuzzer,address,undefined -g -O1)
+    target_link_options(fuzz_filters PRIVATE -fsanitize=fuzzer,address,undefined)
+endif()
+
 add_executable(agv_safety_demo
     examples/agv_safety_demo.cpp
 )
 
 target_link_libraries(agv_safety_demo PRIVATE safety_core)
 
+add_executable(safety_core_benchmarks
+    benchmarks/safety_core_benchmarks.cpp
+)
+
+target_link_libraries(safety_core_benchmarks PRIVATE safety_core)
+
+add_test(NAME safety_core_benchmarks COMMAND safety_core_benchmarks --iterations 5000)
+
 # Commentary: Package smoke test is defined inline to guarantee install/export + find_package validity.
+# @req SR-PKG-001 — packaging/config regressions caught by install+consumer smoke
 set(SAFETY_CORE_PACKAGE_SMOKE_ROOT "${CMAKE_BINARY_DIR}/package_smoke")
 set(SAFETY_CORE_PACKAGE_SMOKE_INSTALL_DIR "${SAFETY_CORE_PACKAGE_SMOKE_ROOT}/install")
 set(SAFETY_CORE_PACKAGE_SMOKE_CONSUMER_DIR "${SAFETY_CORE_PACKAGE_SMOKE_ROOT}/consumer")

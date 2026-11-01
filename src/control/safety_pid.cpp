@@ -81,6 +81,14 @@ namespace safety_core::control
             return 0.0;
         }
 
+        // Non-finite inputs (NaN/Inf from sensor faults) must not poison the
+        // integral/derivative state — skip this cycle and command a stop.
+        if (!std::isfinite(setpoint) || !std::isfinite(measurement))
+        {
+            publish_event(diag::topic::kPidInvalidInput.data(), "non-finite input rejected");
+            return 0.0;
+        }
+
         double dt = kDefaultDtSeconds;
         if (config_ != nullptr)
         {

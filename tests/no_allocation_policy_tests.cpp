@@ -9,6 +9,7 @@
 #include <iostream>
 #include <new>
 
+// @req SR-MEM-001
 namespace
 {
     std::atomic<std::size_t> g_allocation_count{0U};

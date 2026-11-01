@@ -7,6 +7,7 @@
 #include <cmath>
 #include <iostream>
 
+// @req SR-CTRL-001
 namespace
 {
     using safety_core::test_support::check;
