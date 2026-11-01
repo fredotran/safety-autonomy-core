@@ -17,20 +17,43 @@ if [ -z "$fmt_files" ]; then
     exit 0
 fi
 
+# Check if clang-format is available, try to use docker if not
 if ! command -v "$clang_format" >/dev/null 2>&1; then
-    echo "ERROR: clang-format not found (override with CLANG_FORMAT)" >&2
-    exit 1
+    # Check if docker-compose is available and there's a docker-compose.yml
+    if command -v docker-compose >/dev/null 2>&1 && [ -f "$ROOT/docker-compose.yml" ]; then
+        # Use docker to run clang-format
+        echo "clang-format not found on host, using docker..."
+        clang_format_cmd="docker exec safety-autonomy-demo clang-format"
+    else
+        echo "ERROR: clang-format not found (override with CLANG_FORMAT)" >&2
+        echo "Install with: sudo apt install clang-format" >&2
+        exit 1
+    fi
+else
+    clang_format_cmd="$clang_format"
 fi
 if [ "$auto_fix_format" = "1" ]; then
     echo "Running clang-format auto-fix on staged files..."
     while IFS= read -r file; do
         [ -n "$file" ] || continue
-        "$clang_format" -i "$file"
+        # Convert path for docker if needed
+        if [[ "$clang_format_cmd" == docker* ]]; then
+            docker_file="/workspace/safety-autonomy-core/$file"
+        else
+            docker_file="$file"
+        fi
+        $clang_format_cmd -i "$docker_file"
         git add "$file"
     done <<< "$fmt_files"
 else
     echo "Running clang-format check on staged files..."
-    echo "$fmt_files" | xargs -r "$clang_format" --dry-run --Werror
+    # Convert paths for docker if needed
+    if [[ "$clang_format_cmd" == docker* ]]; then
+        docker_files=$(echo "$fmt_files" | sed 's|^|/workspace/safety-autonomy-core/|')
+        echo "$docker_files" | xargs -r $clang_format_cmd --dry-run --Werror
+    else
+        echo "$fmt_files" | xargs -r $clang_format_cmd --dry-run --Werror
+    fi
 fi
 
 cpp_files=$(git diff --cached --name-only --diff-filter=ACM -- '*.cpp' '*.cc' '*.cxx')
